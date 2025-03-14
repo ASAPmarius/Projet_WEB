@@ -1,0 +1,135 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: flex-end; /* Align items to the right */
+    height: 100vh;
+    margin: 0;
+    background-color: #d3d3d3; /* Light grey background color */
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    max-width: 400px; /* Ajuste la largeur selon tes besoins */
+    height: 100vh;
+    padding: 20px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    font-size: 2em;
+    text-align: center;
+    color: #4CAF50;
+}
+
+.chatbox {
+    display: flex;
+    flex-direction: column;
+    height: 80vh; /* Ajuste la hauteur pour qu'elle occupe presque tout l'écran */
+    border: 2px solid black;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ---------------- MESSAGES ---------------- */
+.messages {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    height: 80vh; /* Ajuste la hauteur si nécessaire */
+}
+
+/* Style général des messages */
+.message-box {
+    display: flex;
+    align-items: center;
+    max-width: 70%;
+    padding: 10px;
+    margin: 5px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background-color: #f1f1f1;
+    word-break: break-word;
+}
+
+/* Messages envoyés par l'utilisateur (droite) */
+.my-message {
+    align-self: flex-end;
+    background-color: #d1f8d1;
+    flex-direction: row-reverse; /* Inverse l'ordre (image à droite) */
+    text-align: right;
+}
+
+/* Messages des autres utilisateurs (gauche) */
+.other-message {
+    align-self: flex-start;
+    background-color: #f1f1f1;
+}
+
+/* ---------------- IMAGES & TEXTES ---------------- */
+.user-picture {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.my-message .user-picture {
+    margin-left: 10px;
+    margin-right: 0;
+}
+
+.message-content {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Nom d'utilisateur */
+.user-name {
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+/* Texte du message */
+.message-text {
+    word-wrap: break-word;
+}
+
+/* ---------------- ZONE D'INPUT ---------------- */
+.input-area {
+    display: flex;
+    gap: 10px;
+}
+
+input[type="text"] {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1em;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+button:hover {
+    background-color: #45a049;
+}
