@@ -55,6 +55,22 @@ const authorizationMiddleware = async (ctx: Context, next: () => Promise<unknown
   }
 };
 
+// Middleware to check if the user is already connected
+const checkIfAlreadyConnected = async (ctx: Context, next: () => Promise<unknown>) => {
+  const body = await ctx.request.body.json();
+  const { username } = body;
+
+  const isConnected = connections.some(conn => conn.username === username);
+
+  if (isConnected) {
+    ctx.response.status = 403;
+    ctx.response.body = { error: "User is already connected" };
+    return;
+  }
+
+  await next();
+};
+
 async function get_hash(password: string): Promise<string> {
   const saltRounds = 10;
   const salt = await bcrypt.genSalt(saltRounds);  // Generate the salt manually
@@ -88,7 +104,7 @@ const users = [
   {"id" : '1', 'username': 'malou', 'password_hash': await get_hash("ponyo"), "pp_path": "profile_pictures/id1.jpg"}
 ]
 
-router.post("/login", async (ctx) => {
+router.post("/login", checkIfAlreadyConnected, async (ctx) => {
   const body = await ctx.request.body.json();
   const { username, password } = body;
   const user = users.find((u) => u.username === username);
@@ -158,9 +174,17 @@ router.get("/", authorizationMiddleware, (ctx) => {
   if (!ctx.isUpgradable) {
     ctx.throw(501);
   }
-  const ws = ctx.upgrade();
 
   const username = ctx.state.tokenData.userName;
+
+  // Check if the user is already connected
+  const isConnected = connections.some(conn => conn.username === username);
+  if (isConnected) {
+    ctx.throw(403, "User is already connected");
+    return;
+  }
+
+  const ws = ctx.upgrade();
   connections.push({ ws, username });
   console.log(`+ websocket connected (${connections.length})`);
 
@@ -196,6 +220,11 @@ router.get("/", authorizationMiddleware, (ctx) => {
       });
       console.log("connected users: " + connectedUsers);
       notifyAllUsers({ type: 'connected_users', users: connectedUsers });
+      return;
+    }
+
+    if (data.type === "card_change") {
+      notifyAllUsers({ type: "card_change", card: data.card });
       return;
     }
   };

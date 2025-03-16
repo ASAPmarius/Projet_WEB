@@ -15,7 +15,6 @@ function goToLogin() {
     location.href = "/login.html";
 }
 
-
 function requestUsersProfile() {
     const data = { auth_token: localStorage.auth_token, type: "connected_users" };
     ws.send(JSON.stringify(data));
@@ -100,6 +99,10 @@ ws.onmessage = function(event) {
             profileContainer.appendChild(profileBox);
         });
     }
+    if (data.type == "card_change") {
+        const cardElement = document.getElementById("card");
+        cardElement.textContent = data.card;
+    }
 };
 
 ws.onerror = function(error) {
@@ -111,3 +114,18 @@ ws.onclose = function(event) {
     console.log('WebSocket connection closed:', event);
     goToLogin();
 };
+
+// Card stack functionality
+const cards = ["Card 1", "Card 2", "Card 3", "Card 4"];
+let currentCardIndex = 0;
+
+const cardElement = document.getElementById("card");
+cardElement.addEventListener("click", () => {
+    currentCardIndex = (currentCardIndex + 1) % cards.length;
+    const newCard = cards[currentCardIndex];
+    cardElement.textContent = newCard;
+
+    // Send the card change to the server
+    const data = { auth_token: localStorage.auth_token, type: "card_change", card: newCard };
+    ws.send(JSON.stringify(data));
+});
