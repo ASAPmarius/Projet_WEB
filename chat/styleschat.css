@@ -138,7 +138,7 @@ button:hover {
 .card-stack {
     position: absolute;
     top: 50%;
-    left: calc((100% - 400px) / 2 - 150px); /* Center the card stack between the left edge and the chat box */
+    left: calc((100% - 700px) / 2 - 150px); /* Center the card stack between the left edge and the chat box */
     transform: translateY(-50%);
     width: 300px;
     height: 400px;
@@ -165,4 +165,40 @@ button:hover {
 /* Remove the hover effect */
 .card:hover {
     transform: none;
+}
+
+/* ---------------- PLAYER HAND ---------------- */
+.hand-container {
+    position: absolute; /* Position relative to the screen */
+    bottom: 10px; /* Distance from the bottom of the screen */
+    left: calc((100% - 400px) / 2 - 150px); /* Align with the card stack's center */
+    width: auto; /* Allow the width to adjust based on the number of cards */
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    white-space: nowrap; /* Prevent wrapping to the next line */
+    overflow: hidden; /* Prevent horizontal scrolling */
+    z-index: 10; /* Ensure it stays above other elements */
+}
+
+.hand-card {
+    width: 80px; /* Fixed width for all cards */
+    height: 120px; /* Fixed height for all cards */
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.9em; /* Adjust font size to fit the card */
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+/* Hover effect for cards */
+.hand-card:hover {
+    transform: translateY(-10px); /* Slightly lift the card */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* Add a stronger shadow */
+    background-color: #f9f9f9; /* Slightly change the background color */
 }

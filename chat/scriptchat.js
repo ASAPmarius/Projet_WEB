@@ -1,6 +1,4 @@
 const chat = document.getElementById('messageInput');
-const userList = document.getElementById('userList');
-
 const ws = new WebSocket(`ws://localhost:3000`);
 
 function sendJson() {
@@ -20,6 +18,22 @@ function requestUsersProfile() {
     ws.send(JSON.stringify(data));
 }
 
+function requestCard() {
+    const data = { auth_token: localStorage.auth_token, type: "card_request" };
+    ws.send(JSON.stringify(data));
+}
+
+function requestHand() {
+    const data = { auth_token: localStorage.auth_token, type: "hand_request" };
+    ws.send(JSON.stringify(data));
+}
+
+const cardElement = document.getElementById("card");
+cardElement.addEventListener("click", () => {
+    const data = { auth_token: localStorage.auth_token, type: "card_change"};
+    ws.send(JSON.stringify(data));
+});
+
 chat.addEventListener("keydown", function(event) {
     if (event.key === "Enter") {
         sendJson();
@@ -33,12 +47,16 @@ chat.addEventListener("keydown", function(event) {
 ws.onopen = function() {
     console.log('WebSocket connection established.');
     requestUsersProfile(); // Request to get user profile when the connection is established
+    console.log("Requested users profiles");
+    requestCard(); // Request to get card when the connection is established
+    console.log("Requested card");
+    requestHand()
+    console.log("Requested hand");
 };
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
     console.log('WebSocket message received:', data.type);
-    console.log(data);
     if (data.type == "message") {
         const message = JSON.parse(event.data);
         const messageBox = document.createElement("div");
@@ -66,7 +84,8 @@ ws.onmessage = function(event) {
         messageBox.appendChild(messageContent);
 
         // Vérifie si c'est un message de l'utilisateur actuel
-        const currentUser = localStorage.getItem("username"); // Assure-toi que l'username est stocké lors du login
+        const currentUser = data.username; // Assure-toi que l'username est stocké lors du login
+        console.log("Current user:", currentUser);
         if (message.owner === currentUser) {
             messageBox.classList.add("my-message");
         } else {
@@ -99,10 +118,26 @@ ws.onmessage = function(event) {
             profileContainer.appendChild(profileBox);
         });
     }
+    
     if (data.type == "card_change") {
         const cardElement = document.getElementById("card");
-        cardElement.textContent = data.card;
+        console.log("Received card data:", data);
+        cardElement.textContent = data.card.name;
     }
+
+    if (data.type === "player_hand") {
+        console.log("Received hand data:", data);
+        const handContainer = document.getElementById("handContainer");
+        handContainer.innerHTML = ""; // Clear the existing hand
+
+        data.hand.forEach(card => {
+            const cardElement = document.createElement("div");
+            cardElement.className = "hand-card";
+            cardElement.textContent = card;
+            handContainer.appendChild(cardElement);
+        });
+    }
+
 };
 
 ws.onerror = function(error) {
@@ -114,18 +149,3 @@ ws.onclose = function(event) {
     console.log('WebSocket connection closed:', event);
     goToLogin();
 };
-
-// Card stack functionality
-const cards = ["Card 1", "Card 2", "Card 3", "Card 4"];
-let currentCardIndex = 0;
-
-const cardElement = document.getElementById("card");
-cardElement.addEventListener("click", () => {
-    currentCardIndex = (currentCardIndex + 1) % cards.length;
-    const newCard = cards[currentCardIndex];
-    cardElement.textContent = newCard;
-
-    // Send the card change to the server
-    const data = { auth_token: localStorage.auth_token, type: "card_change", card: newCard };
-    ws.send(JSON.stringify(data));
-});

@@ -25,7 +25,6 @@ function login() {
         }
     })
     .then(data => {
-        localStorage.setItem("username", username);
         localStorage.setItem("auth_token", data.auth_token);
         globalThis.location.href = "index.html";
     })

@@ -79,7 +79,7 @@ async function get_hash(password: string): Promise<string> {
 
 // Connection related variables
 const tokens: { [key: string]: string } = {};
-const connections: { ws: WebSocket, username: string }[] = [];
+const connections: { ws: WebSocket, username: string , hand: string[] }[] = [];
 
 function removeTokenByUser(user: string) {
   for (const token in tokens) {
@@ -103,6 +103,86 @@ const users = [
   {"id" : '0', 'username': 'marius', 'password_hash': await get_hash("goat"), "pp_path": "profile_pictures/id0.jpg"},
   {"id" : '1', 'username': 'malou', 'password_hash': await get_hash("ponyo"), "pp_path": "profile_pictures/id1.jpg"}
 ]
+
+type CardKey =
+  | "Ace, clubs" | "2, clubs" | "3, clubs" | "4, clubs" | "5, clubs" | "6, clubs" | "7, clubs" | "8, clubs" | "9, clubs" | "10, clubs" | "Jack, clubs" | "Queen, clubs" | "King, clubs"
+  | "Ace, diamonds" | "2, diamonds" | "3, diamonds" | "4, diamonds" | "5, diamonds" | "6, diamonds" | "7, diamonds" | "8, diamonds" | "9, diamonds" | "10, diamonds" | "Jack, diamonds" | "Queen, diamonds" | "King, diamonds"
+  | "Ace, hearts" | "2, hearts" | "3, hearts" | "4, hearts" | "5, hearts" | "6, hearts" | "7, hearts" | "8, hearts" | "9, hearts" | "10, hearts" | "Jack, hearts" | "Queen, hearts" | "King, hearts"
+  | "Ace, spades" | "2, spades" | "3, spades" | "4, spades" | "5, spades" | "6, spades" | "7, spades" | "8, spades" | "9, spades" | "10, spades" | "Jack, spades" | "Queen, spades" | "King, spades";
+
+const cards: Record<CardKey, { name: string; state: string }> = {
+  "Ace, clubs": { name: "Ace, clubs", state: "pile" },
+  "2, clubs": { name: "2, clubs", state: "pile" },
+  "3, clubs": { name: "3, clubs", state: "pile" },
+  "4, clubs": { name: "4, clubs", state: "pile" },
+  "5, clubs": { name: "5, clubs", state: "pile" },
+  "6, clubs": { name: "6, clubs", state: "pile" },
+  "7, clubs": { name: "7, clubs", state: "pile" },
+  "8, clubs": { name: "8, clubs", state: "pile" },
+  "9, clubs": { name: "9, clubs", state: "pile" },
+  "10, clubs": { name: "10, clubs", state: "pile" },
+  "Jack, clubs": { name: "Jack, clubs", state: "pile" },
+  "Queen, clubs": { name: "Queen, clubs", state: "pile" },
+  "King, clubs": { name: "King, clubs", state: "pile" },
+  "Ace, diamonds": { name: "Ace, diamonds", state: "pile" },
+  "2, diamonds": { name: "2, diamonds", state: "pile" },
+  "3, diamonds": { name: "3, diamonds", state: "pile" },
+  "4, diamonds": { name: "4, diamonds", state: "pile" },
+  "5, diamonds": { name: "5, diamonds", state: "pile" },
+  "6, diamonds": { name: "6, diamonds", state: "pile" },
+  "7, diamonds": { name: "7, diamonds", state: "pile" },
+  "8, diamonds": { name: "8, diamonds", state: "pile" },
+  "9, diamonds": { name: "9, diamonds", state: "pile" },
+  "10, diamonds": { name: "10, diamonds", state: "pile" },
+  "Jack, diamonds": { name: "Jack, diamonds", state: "pile" },
+  "Queen, diamonds": { name: "Queen, diamonds", state: "pile" },
+  "King, diamonds": { name: "King, diamonds", state: "pile" },
+  "Ace, hearts": { name: "Ace, hearts", state: "pile" },
+  "2, hearts": { name: "2, hearts", state: "pile" },
+  "3, hearts": { name: "3, hearts", state: "pile" },
+  "4, hearts": { name: "4, hearts", state: "pile" },
+  "5, hearts": { name: "5, hearts", state: "pile" },
+  "6, hearts": { name: "6, hearts", state: "pile" },
+  "7, hearts": { name: "7, hearts", state: "pile" },
+  "8, hearts": { name: "8, hearts", state: "pile" },
+  "9, hearts": { name: "9, hearts", state: "pile" },
+  "10, hearts": { name: "10, hearts", state: "pile" },
+  "Jack, hearts": { name: "Jack, hearts", state: "pile" },
+  "Queen, hearts": { name: "Queen, hearts", state: "pile" },
+  "King, hearts": { name: "King, hearts", state: "pile" },
+  "Ace, spades": { name: "Ace, spades", state: "pile" },
+  "2, spades": { name: "2, spades", state: "pile" },
+  "3, spades": { name: "3, spades", state: "pile" },
+  "4, spades": { name: "4, spades", state: "pile" },
+  "5, spades": { name: "5, spades", state: "pile" },
+  "6, spades": { name: "6, spades", state: "pile" },
+  "7, spades": { name: "7, spades", state: "pile" },
+  "8, spades": { name: "8, spades", state: "pile" },
+  "9, spades": { name: "9, spades", state: "pile" },
+  "10, spades": { name: "10, spades", state: "pile" },
+  "Jack, spades": { name: "Jack, spades", state: "pile" },
+  "Queen, spades": { name: "Queen, spades", state: "pile" },
+  "King, spades": { name: "King, spades", state: "pile" }
+};
+
+let currentCardIndex = 0;
+let shuffledCardKeys: CardKey[] = [];
+
+function shuffleCards(): void {
+  const cardKeys = Object.keys(cards) as CardKey[]; // Get all keys from the cards object
+  for (let i = cardKeys.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1)); // Generate a random index
+    [cardKeys[i], cardKeys[j]] = [cardKeys[j], cardKeys[i]]; // Swap keys
+  }
+
+  // Update the state of all cards to "pile" to reset the game
+  cardKeys.forEach((key) => {
+    cards[key].state = "pile";
+  });
+
+  // Store the shuffled keys in a global variable for use in the game
+  shuffledCardKeys = cardKeys;
+}
 
 router.post("/login", checkIfAlreadyConnected, async (ctx) => {
   const body = await ctx.request.body.json();
@@ -185,7 +265,28 @@ router.get("/", authorizationMiddleware, (ctx) => {
   }
 
   const ws = ctx.upgrade();
-  connections.push({ ws, username });
+
+  // Shuffle the cards at the start of the game
+  shuffleCards();
+  console.log("Cards shuffled", cards);
+
+  const handSize = 5; // Number of cards in a hand
+  const hand: string[] = [];
+  let pileIndex = 0; // Start from the first card in the shuffled pile
+
+  while (hand.length < handSize && pileIndex < shuffledCardKeys.length) {
+    const cardKey = shuffledCardKeys[pileIndex];
+    const card = cards[cardKey];
+
+    if (card.state === "pile") {
+      card.state = "hand"; // Update the card's state to "hand"
+      hand.push(card.name); // Add the card to the player's hand
+    }
+
+    pileIndex++; // Move to the next card in the shuffled pile
+  }
+
+  connections.push({ ws, username ,hand });
   console.log(`+ websocket connected (${connections.length})`);
 
   ws.onerror = (_error) => {
@@ -209,7 +310,7 @@ router.get("/", authorizationMiddleware, (ctx) => {
       if (msg.length == 0) {
         return;
       }
-      notifyAllUsers({ type: "message", message: msg, owner: owner, user_pp_path: user_pp_path });
+      notifyAllUsers({ type: "message", message: msg, owner: owner, user_pp_path: user_pp_path, username: user?.username });
       return;
     }
 
@@ -218,13 +319,31 @@ router.get("/", authorizationMiddleware, (ctx) => {
         const user = users.find((u) => u.username === conn.username);
         return user ? { username: user.username, pp_path: user.pp_path } : { username: conn.username, pp_path: "" };
       });
-      console.log("connected users: " + connectedUsers);
       notifyAllUsers({ type: 'connected_users', users: connectedUsers });
       return;
     }
 
     if (data.type === "card_change") {
-      notifyAllUsers({ type: "card_change", card: data.card });
+      do {
+        currentCardIndex = (currentCardIndex + 1) % shuffledCardKeys.length;
+        const cardKey = shuffledCardKeys[currentCardIndex];
+        if (cards[cardKey].state === "pile") {
+          notifyAllUsers({ type: "card_change", card: cards[cardKey] });
+          break;
+        }
+      } while (true);
+      return;
+    }
+
+    if (data.type === "card_request") {
+      const cardKey = Object.keys(cards)[currentCardIndex] as CardKey;
+      ws.send(JSON.stringify({ type: "card_change", card: cards[cardKey] }));
+      return;
+    }
+
+    if (data.type === "hand_request") {
+      const hand = connections.find(conn => conn.ws === ws)?.hand;
+      ws.send(JSON.stringify({ type: "player_hand", hand }));
       return;
     }
   };
@@ -238,7 +357,6 @@ router.get("/", authorizationMiddleware, (ctx) => {
       const user = users.find((u) => u.username === conn.username);
       return user ? { username: user.username, pp_path: user.pp_path } : { username: conn.username, pp_path: "" };
     });
-    console.log("connected users: " + connectedUsers);
     notifyAllUsers({ type: 'connected_users', users: connectedUsers });
     console.log(`- websocket disconnected (${connections.length})`);
   };
