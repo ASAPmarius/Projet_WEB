@@ -305,12 +305,39 @@ router.get("/", authorizationMiddleware, (ctx) => {
     const user = users.find((u) => u.username === owner);
     const user_pp_path = user?.pp_path;
 
+    if (data.type === "add_card_to_hand") {
+
+      // Find the first card in the pile
+      const cardKey = shuffledCardKeys.find(key => cards[key].state === "pile");
+      if (cardKey) {
+        const card = cards[cardKey];
+        card.state = "hand"; // Update the card's state to "hand"
+        hand.push(card.name); // Add the card to the player's hand
+
+        // Send the updated hand back to the client
+        ws.send(JSON.stringify({ type: "player_hand", hand: hand }));
+      } else {
+        console.log("No cards left in the pile");
+      }
+      do {
+        currentCardIndex = (currentCardIndex + 1) % shuffledCardKeys.length;
+        const cardKey = shuffledCardKeys[currentCardIndex];
+        if (cards[cardKey].state === "pile") {
+          notifyAllUsers({ type: "card_change", card: cards[cardKey] });
+          break;
+        }
+      } while (true);
+      return;
+    }
+
     if ("message" in data) {
       const msg = data.message;
       if (msg.length == 0) {
         return;
       }
-      notifyAllUsers({ type: "message", message: msg, owner: owner, user_pp_path: user_pp_path, username: user?.username });
+      connections.forEach((client) => {
+        client.ws.send(JSON.stringify({ type: "message", message: msg, owner: owner, user_pp_path: user_pp_path, username: client.username }));
+      });
       return;
     }
 
@@ -320,18 +347,6 @@ router.get("/", authorizationMiddleware, (ctx) => {
         return user ? { username: user.username, pp_path: user.pp_path } : { username: conn.username, pp_path: "" };
       });
       notifyAllUsers({ type: 'connected_users', users: connectedUsers });
-      return;
-    }
-
-    if (data.type === "card_change") {
-      do {
-        currentCardIndex = (currentCardIndex + 1) % shuffledCardKeys.length;
-        const cardKey = shuffledCardKeys[currentCardIndex];
-        if (cards[cardKey].state === "pile") {
-          notifyAllUsers({ type: "card_change", card: cards[cardKey] });
-          break;
-        }
-      } while (true);
       return;
     }
 

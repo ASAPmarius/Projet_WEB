@@ -30,7 +30,7 @@ function requestHand() {
 
 const cardElement = document.getElementById("card");
 cardElement.addEventListener("click", () => {
-    const data = { auth_token: localStorage.auth_token, type: "card_change"};
+    const data = { auth_token: localStorage.auth_token, type: "add_card_to_hand" };
     ws.send(JSON.stringify(data));
 });
 
@@ -58,6 +58,7 @@ ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
     console.log('WebSocket message received:', data.type);
     if (data.type == "message") {
+        console.log("Received message:", data);
         const message = JSON.parse(event.data);
         const messageBox = document.createElement("div");
         messageBox.className = "message-box";
@@ -128,12 +129,36 @@ ws.onmessage = function(event) {
     if (data.type === "player_hand") {
         console.log("Received hand data:", data);
         const handContainer = document.getElementById("handContainer");
+
+        if (!handContainer) {
+            console.error("handContainer not found in the DOM.");
+            return;
+        }
+
         handContainer.innerHTML = ""; // Clear the existing hand
 
-        data.hand.forEach(card => {
+        const cardWidth = 80; // Width of each card
+        const containerWidth = handContainer.offsetWidth; // Get the available width
+        const totalCards = data.hand.length;
+
+        // Calculate the overlap dynamically based on the number of cards
+        let overlapOffset = Math.min(40, (containerWidth - cardWidth) / (totalCards - 1));
+        if (totalCards === 1) overlapOffset = 0; // No overlap if there's only one card
+
+        // Calculate the starting position for the first card
+        const totalWidth = cardWidth + (totalCards - 1) * overlapOffset;
+        const startPosition = (containerWidth - totalWidth) / 2;
+
+        data.hand.forEach((card, index) => {
             const cardElement = document.createElement("div");
             cardElement.className = "hand-card";
-            cardElement.textContent = card;
+            cardElement.textContent = card; // Display the card name
+
+            // Position the card dynamically
+            const position = startPosition + index * overlapOffset;
+            cardElement.style.left = `${position}px`;
+            cardElement.style.zIndex = index; // Ensure proper stacking order
+
             handContainer.appendChild(cardElement);
         });
     }
