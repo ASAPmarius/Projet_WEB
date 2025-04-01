@@ -174,5 +174,3 @@ ws.onclose = function(event) {
     console.log('WebSocket connection closed:', event);
     goToLogin();
 };
-
-//dazdad
