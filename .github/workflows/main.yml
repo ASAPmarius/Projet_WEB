@@ -16,7 +16,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v1
         with:
-          deno-version: "1.41.3" # Specify a recent version of Deno
+          deno-version: "2.1.10" # Specify a recent version of Deno
       
       - name: Cache Deno dependencies
         uses: actions/cache@v3
