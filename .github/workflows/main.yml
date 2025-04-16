@@ -1,0 +1,143 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      
+      - name: Debug - List Files
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Listing root directory:"
+          ls -la
+          echo "Listing backend directory:"
+          ls -la backend/
+      
+      - name: Cache Deno dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/deno
+          key: ${{ runner.os }}-deno-${{ hashFiles('**/deno.lock') }}
+          restore-keys: ${{ runner.os }}-deno-
+      
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          echo "Working directory: $(pwd)"
+          ls -la
+          # Try to use a simple import approach instead
+          deno task dev || echo "Task failed, continuing"
+      
+      - name: Lint backend
+        run: cd backend && deno lint
+      
+      - name: Format check backend
+        run: cd backend && deno fmt --check
+      
+      - name: Run backend tests
+        run: cd backend && deno test --allow-env --allow-read
+
+  frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install frontend linting tools
+        run: npm install -g eslint stylelint htmlhint stylelint-config-standard
+      
+      - name: Create frontend lint config files
+        run: |
+          echo '{
+            "env": {
+              "browser": true,
+              "es2021": true
+            },
+            "extends": "eslint:recommended",
+            "parserOptions": {
+              "ecmaVersion": 2021,
+              "sourceType": "module"
+            },
+            "rules": {
+              "indent": ["error", 2],
+              "quotes": ["error", "single"],
+              "semi": ["error", "always"]
+            }
+          }' > .eslintrc.json
+          
+          echo '{
+            "extends": "stylelint-config-standard",
+            "rules": {
+              "indentation": 2,
+              "color-hex-case": "lower",
+              "selector-class-pattern": null,
+              "selector-id-pattern": null
+            }
+          }' > .stylelintrc.json
+          
+          echo '{
+            "tagname-lowercase": true,
+            "attr-lowercase": true,
+            "attr-value-double-quotes": true,
+            "tag-pair": true,
+            "id-unique": true,
+            "src-not-empty": true,
+            "title-require": true,
+            "doctype-html5": true
+          }' > .htmlhintrc
+      
+      - name: Check HTML
+        run: htmlhint frontend/*.html
+      
+      - name: Check CSS
+        run: stylelint "frontend/styles/*.css" --config .stylelintrc.json
+      
+      - name: Check JavaScript
+        run: eslint "frontend/scripts/*.js"
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Build and push backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/project-backend:latest
+      
+      - name: Build and push frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/project-frontend:latest

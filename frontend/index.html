@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Page</title>
+    <link rel="stylesheet" href="styles/styleschat.css">
+    <script src="scripts/scriptchat.js" defer></script>
+</head>
+<body>
+    <div class="profile-container">
+        <h2>Player Profiles</h2>
+        <div class="profiles" id="profiles">
+        </div>
+    </div>
+    <div class="container">
+        <h1>Le miaou</h1>
+        <div class="chatbox">
+            <div class="messages" id="messages"></div>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="Type your message here...">
+                <button onclick="sendJson();">Send</button>
+            </div>
+        </div>
+    </div>
+    <div class="card-stack" id="cardStack">
+        <div class="card" id="card">Card 1</div>
+    </div>
+    <div class="hand-container" id="handContainer"></div>
+</body>
+</html>

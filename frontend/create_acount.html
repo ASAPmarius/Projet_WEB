@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account</title>
+    <link rel="stylesheet" href="styles/style_create_acount.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Create an Account</h1>
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <br>
+        <label for="confirm_password">Confirm Password:</label>
+        <input type="password" id="confirm_password" name="confirm_password" required>
+        <span id="error-message" style="color: red; display: none;"></span>
+        <br>
+        <label for="profile_picture">Choose a Profile Picture:</label>
+        <div class="profile-pictures">
+            <label>
+                <input type="radio" name="profile_picture" value="profile_pictures/id1.jpg" required>
+                <img src="profile_pictures/id1.jpg" alt="Profile 1" class="profile-picture">
+            </label>
+            <label>
+                <input type="radio" name="profile_picture" value="profile_pictures/id0.jpg" required>
+                <img src="profile_pictures/id0.jpg" alt="Profile 2" class="profile-picture">
+            </label>
+            <label>
+                <input type="radio" name="profile_picture" value="profile_pictures/id2.jpg" required>
+                <img src="profile_pictures/id2.jpg" alt="Profile 3" class="profile-picture">
+            </label>
+            <label>
+                <input type="radio" name="profile_picture" value="profile_pictures/id3.jpg" required>
+                <img src="profile_pictures/id3.jpg" alt="Profile 4" class="profile-picture">
+            </label>
+        </div>
+        <br>
+        <div class="button-container">
+            <button type="submit" onclick="createAccount()">Create Account</button>
+        </div>
+    </div>
+    <script src="scripts/script_create_acount.js"></script>
+</body>
+</html>

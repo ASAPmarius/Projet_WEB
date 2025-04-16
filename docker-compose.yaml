@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    networks:
+      - app-network
+    ports:
+      - "3000:3000"
+    command: ["3000", "localhost:8080"]
+
+  frontend:
+    build:
+      context: .
+    restart: unless-stopped
+    networks:
+      - app-network
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./frontend:/app/frontend
+
+  nginx:
+    image: nginx:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./proxy/conf.d:/etc/nginx/conf.d
+      - ./proxy/ngnix.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
