@@ -16,15 +16,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v1.x
-      
-      - name: Debug - List Files
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "Listing root directory:"
-          ls -la
-          echo "Listing backend directory:"
-          ls -la backend/
+          deno-version: "1.41.3" # Specify a recent version of Deno
       
       - name: Cache Deno dependencies
         uses: actions/cache@v3
@@ -38,17 +30,20 @@ jobs:
         run: |
           echo "Working directory: $(pwd)"
           ls -la
-          # Try to use a simple import approach instead
-          deno task dev || echo "Task failed, continuing"
+          # Use --reload flag to ignore the lockfile and fetch dependencies directly
+          deno cache --reload back_server.ts server_test.ts
       
       - name: Lint backend
-        run: cd backend && deno lint
+        working-directory: ./backend
+        run: deno lint --ignore=deno.lock
       
       - name: Format check backend
-        run: cd backend && deno fmt --check
+        working-directory: ./backend
+        run: deno fmt --check --ignore=deno.lock
       
       - name: Run backend tests
-        run: cd backend && deno test --allow-env --allow-read
+        working-directory: ./backend
+        run: deno test --allow-env --allow-read
 
   frontend:
     runs-on: ubuntu-latest
