@@ -20,7 +20,11 @@ function createAccount() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username: username, password: password, profilePicture: profilePicture })
+      body: JSON.stringify({
+        username: username,
+        password: password,
+        profilePicture: profilePicture
+      })
     })
       .then(response => {
         if (response.ok) {
@@ -38,3 +42,4 @@ function createAccount() {
         console.error(error);
       });
   }
+  

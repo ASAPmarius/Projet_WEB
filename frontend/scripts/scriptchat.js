@@ -1,5 +1,5 @@
 const chat = document.getElementById('messageInput');
-const ws = new WebSocket(`ws://localhost:3000`);
+const ws = new WebSocket('ws://localhost:3000');
 
 function sendJson() {
   event.preventDefault(); // Prevent default form submission
