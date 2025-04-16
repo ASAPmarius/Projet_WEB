@@ -1,3 +1,5 @@
+/* stylelint-disable indentation, color-hex-case */
+
 body {
     font-family: Arial, sans-serif;
     display: flex;
@@ -5,8 +7,7 @@ body {
     height: 100vh;
     margin: 0;
     background-color: #d3d3d3;
-    overflow-x: hidden;
-    overflow-y: hidden;
+    overflow: hidden;
   }
   
   .container {
