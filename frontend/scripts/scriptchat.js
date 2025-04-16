@@ -2,42 +2,42 @@ const chat = document.getElementById('messageInput');
 const ws = new WebSocket(`ws://localhost:3000`);
 
 function sendJson() {
-    event.preventDefault(); // Prevent default form submission
-    const message = chat.value;
-    const data = { auth_token: localStorage.auth_token, message: message };
-    ws.send(JSON.stringify(data));
-    chat.value = "";
+  event.preventDefault(); // Prevent default form submission
+  const message = chat.value;
+  const data = { auth_token: localStorage.auth_token, message: message };
+  ws.send(JSON.stringify(data));
+  chat.value = '';
 }
 
 function goToLogin() {
-    location.href = "../login.html";
+  location.href = '../login.html';
 }
 
 function requestUsersProfile() {
-    const data = { auth_token: localStorage.auth_token, type: "connected_users" };
-    ws.send(JSON.stringify(data));
+  const data = { auth_token: localStorage.auth_token, type: 'connected_users' };
+  ws.send(JSON.stringify(data));
 }
 
 function requestCard() {
-    const data = { auth_token: localStorage.auth_token, type: "card_request" };
-    ws.send(JSON.stringify(data));
+  const data = { auth_token: localStorage.auth_token, type: 'card_request' };
+  ws.send(JSON.stringify(data));
 }
 
 function requestHand() {
-    const data = { auth_token: localStorage.auth_token, type: "hand_request" };
-    ws.send(JSON.stringify(data));
+  const data = { auth_token: localStorage.auth_token, type: 'hand_request' };
+  ws.send(JSON.stringify(data));
 }
 
-const cardElement = document.getElementById("card");
-cardElement.addEventListener("click", () => {
-    const data = { auth_token: localStorage.auth_token, type: "add_card_to_hand" };
-    ws.send(JSON.stringify(data));
+const cardElement = document.getElementById('card');
+cardElement.addEventListener('click', () => {
+  const data = { auth_token: localStorage.auth_token, type: 'add_card_to_hand' };
+  ws.send(JSON.stringify(data));
 });
 
-chat.addEventListener("keydown", function(event) {
-    if (event.key === "Enter") {
-        sendJson();
-    }
+chat.addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    sendJson();
+  }
 });
 
 /****************************************************************/
@@ -45,132 +45,131 @@ chat.addEventListener("keydown", function(event) {
 /****************************************************************/
 
 ws.onopen = function() {
-    console.log('WebSocket connection established.');
-    requestUsersProfile(); // Request to get user profile when the connection is established
-    console.log("Requested users profiles");
-    requestCard(); // Request to get card when the connection is established
-    console.log("Requested card");
-    requestHand()
-    console.log("Requested hand");
+  console.log('WebSocket connection established.');
+  requestUsersProfile(); // Request to get user profile when the connection is established
+  console.log('Requested users profiles');
+  requestCard(); // Request to get card when the connection is established
+  console.log('Requested card');
+  requestHand();
+  console.log('Requested hand');
 };
 
 ws.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    console.log('WebSocket message received:', data.type);
-    if (data.type == "message") {
-        console.log("Received message:", data);
-        const message = JSON.parse(event.data);
-        const messageBox = document.createElement("div");
-        messageBox.className = "message-box";
+  const data = JSON.parse(event.data);
+  console.log('WebSocket message received:', data.type);
+  if (data.type == 'message') {
+    console.log('Received message:', data);
+    const message = JSON.parse(event.data);
+    const messageBox = document.createElement('div');
+    messageBox.className = 'message-box';
 
-        const userPicture = document.createElement("img");
-        userPicture.src = message.user_pp_path;
-        userPicture.alt = "User Picture";
-        userPicture.className = "user-picture";
+    const userPicture = document.createElement('img');
+    userPicture.src = message.user_pp_path;
+    userPicture.alt = 'User Picture';
+    userPicture.className = 'user-picture';
 
-        const messageContent = document.createElement("div");
-        messageContent.className = "message-content";
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
 
-        const userName = document.createElement("strong");
-        userName.className = "user-name";
-        userName.textContent = `${message.owner}:`;
+    const userName = document.createElement('strong');
+    userName.className = 'user-name';
+    userName.textContent = `${message.owner}:`;
 
-        const messageText = document.createElement("span");
-        messageText.className = "message-text";
-        messageText.textContent = message.message;
+    const messageText = document.createElement('span');
+    messageText.className = 'message-text';
+    messageText.textContent = message.message;
 
-        messageContent.appendChild(userName);
-        messageContent.appendChild(messageText);
-        messageBox.appendChild(userPicture);
-        messageBox.appendChild(messageContent);
+    messageContent.appendChild(userName);
+    messageContent.appendChild(messageText);
+    messageBox.appendChild(userPicture);
+    messageBox.appendChild(messageContent);
 
-        // Vérifie si c'est un message de l'utilisateur actuel
-        const currentUser = data.username; // Assure-toi que l'username est stocké lors du login
-        console.log("Current user:", currentUser);
-        if (message.owner === currentUser) {
-            messageBox.classList.add("my-message");
-        } else {
-            messageBox.classList.add("other-message");
-        }
-
-        document.getElementById('messages').appendChild(messageBox);
-    }
-    if (data.type == "connected_users") {
-        const users = data.users;
-        const profileContainer = document.getElementById('profiles');
-        profileContainer.innerHTML = ''; // Clear existing profiles
-
-        users.forEach(user => {
-            console.log(user)
-            const profileBox = document.createElement("div");
-            profileBox.className = "profile-box";
-
-            const profilePicture = document.createElement("img");
-            profilePicture.src = user.pp_path;
-            profilePicture.alt = "Profile Picture";
-            profilePicture.className = "profile-picture";
-
-            const profileName = document.createElement("div");
-            profileName.className = "profile-name";
-            profileName.textContent = user.username;
-
-            profileBox.appendChild(profilePicture);
-            profileBox.appendChild(profileName);
-            profileContainer.appendChild(profileBox);
-        });
-    }
-    
-    if (data.type == "card_change") {
-        const cardElement = document.getElementById("card");
-        console.log("Received card data:", data);
-        cardElement.textContent = data.card.name;
+    // Vérifie si c'est un message de l'utilisateur actuel
+    const currentUser = data.username; // Assure-toi que l'username est stocké lors du login
+    console.log('Current user:', currentUser);
+    if (message.owner === currentUser) {
+      messageBox.classList.add('my-message');
+    } else {
+      messageBox.classList.add('other-message');
     }
 
-    if (data.type === "player_hand") {
-        console.log("Received hand data:", data);
-        const handContainer = document.getElementById("handContainer");
+    document.getElementById('messages').appendChild(messageBox);
+  }
+  if (data.type == 'connected_users') {
+    const users = data.users;
+    const profileContainer = document.getElementById('profiles');
+    profileContainer.innerHTML = ''; // Clear existing profiles
 
-        if (!handContainer) {
-            console.error("handContainer not found in the DOM.");
-            return;
-        }
+    users.forEach(user => {
+      console.log(user);
+      const profileBox = document.createElement('div');
+      profileBox.className = 'profile-box';
 
-        handContainer.innerHTML = ""; // Clear the existing hand
+      const profilePicture = document.createElement('img');
+      profilePicture.src = user.pp_path;
+      profilePicture.alt = 'Profile Picture';
+      profilePicture.className = 'profile-picture';
 
-        const cardWidth = 80; // Width of each card
-        const containerWidth = handContainer.offsetWidth; // Get the available width
-        const totalCards = data.hand.length;
+      const profileName = document.createElement('div');
+      profileName.className = 'profile-name';
+      profileName.textContent = user.username;
 
-        // Calculate the overlap dynamically based on the number of cards
-        let overlapOffset = Math.min(40, (containerWidth - cardWidth) / (totalCards - 1));
-        if (totalCards === 1) overlapOffset = 0; // No overlap if there's only one card
+      profileBox.appendChild(profilePicture);
+      profileBox.appendChild(profileName);
+      profileContainer.appendChild(profileBox);
+    });
+  }
+  
+  if (data.type == 'card_change') {
+    const cardElement = document.getElementById('card');
+    console.log('Received card data:', data);
+    cardElement.textContent = data.card.name;
+  }
 
-        // Calculate the starting position for the first card
-        const totalWidth = cardWidth + (totalCards - 1) * overlapOffset;
-        const startPosition = (containerWidth - totalWidth) / 2;
+  if (data.type === 'player_hand') {
+    console.log('Received hand data:', data);
+    const handContainer = document.getElementById('handContainer');
 
-        data.hand.forEach((card, index) => {
-            const cardElement = document.createElement("div");
-            cardElement.className = "hand-card";
-            cardElement.textContent = card; // Display the card name
-
-            // Position the card dynamically
-            const position = startPosition + index * overlapOffset;
-            cardElement.style.left = `${position}px`;
-            cardElement.style.zIndex = index; // Ensure proper stacking order
-
-            handContainer.appendChild(cardElement);
-        });
+    if (!handContainer) {
+      console.error('handContainer not found in the DOM.');
+      return;
     }
 
+    handContainer.innerHTML = ''; // Clear the existing hand
+
+    const cardWidth = 80; // Width of each card
+    const containerWidth = handContainer.offsetWidth; // Get the available width
+    const totalCards = data.hand.length;
+
+    // Calculate the overlap dynamically based on the number of cards
+    let overlapOffset = Math.min(40, (containerWidth - cardWidth) / (totalCards - 1));
+    if (totalCards === 1) overlapOffset = 0; // No overlap if there's only one card
+
+    // Calculate the starting position for the first card
+    const totalWidth = cardWidth + (totalCards - 1) * overlapOffset;
+    const startPosition = (containerWidth - totalWidth) / 2;
+
+    data.hand.forEach((card, index) => {
+      const cardElement = document.createElement('div');
+      cardElement.className = 'hand-card';
+      cardElement.textContent = card; // Display the card name
+
+      // Position the card dynamically
+      const position = startPosition + index * overlapOffset;
+      cardElement.style.left = `${position}px`;
+      cardElement.style.zIndex = index; // Ensure proper stacking order
+
+      handContainer.appendChild(cardElement);
+    });
+  }
 };
 
 ws.onerror = function(error) {
-    console.error('WebSocket error:', error);
-    goToLogin();
+  console.error('WebSocket error:', error);
+  goToLogin();
 };
 
 ws.onclose = function(event) {
-    console.log('WebSocket connection closed:', event);
-    goToLogin();
+  console.log('WebSocket connection closed:', event);
+  goToLogin();
 };
