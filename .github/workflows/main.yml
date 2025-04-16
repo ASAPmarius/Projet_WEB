@@ -57,7 +57,7 @@ jobs:
           node-version: '18'
       
       - name: Install frontend linting tools
-        run: npm install -g eslint stylelint htmlhint stylelint-config-standard
+        run: npm install -g eslint@8.56.0 stylelint htmlhint stylelint-config-standard
       
       - name: Create frontend lint config files
         run: |
