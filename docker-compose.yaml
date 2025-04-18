@@ -37,23 +37,26 @@ services:
       - app-network
 
   db:
-    image: postgres
+    image: postgres:14
     container_name: DataBase
     restart: unless-stopped
     environment:
-      POSTGRES_USER: marius
-      POSTGRES_PASSWORD: caracaca123
-      POSTGRES_DB: CaraData
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - app-network
 
+# Make sure this networks section is properly defined
 networks:
   app-network:
     driver: bridge
 
+# Make sure this volumes section is properly defined
 volumes:
-  pgdata:
+  postgres_data:
