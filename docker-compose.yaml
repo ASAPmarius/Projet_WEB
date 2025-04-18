@@ -8,6 +8,8 @@ services:
     ports:
       - "3000:3000"
     command: ["3000", "localhost:8080"]
+    depends_on:
+      - db
 
   frontend:
     build:
@@ -34,7 +36,24 @@ services:
     networks:
       - app-network
 
+  db:
+    image: postgres
+    container_name: DataBase
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: marius
+      POSTGRES_PASSWORD: caracaca123
+      POSTGRES_DB: CaraData
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
 
+volumes:
+  pgdata:

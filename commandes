@@ -1,0 +1,4 @@
+deno run --allow-net --allow-read=./ server.ts 8080
+
+docker exec -it DataBase psql -U marius -d CaraData
+

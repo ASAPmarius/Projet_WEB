@@ -1,1 +1,0 @@
-deno run --allow-net --allow-read=./ server.ts 8080
