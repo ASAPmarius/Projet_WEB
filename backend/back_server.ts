@@ -22,7 +22,6 @@ try {
   console.error('Failed to connect to database:', error);
 }
 
-
 const router = new Router();
 const app = new Application();
 
