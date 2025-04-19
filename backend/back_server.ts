@@ -1,4 +1,4 @@
-import { loadSync } from "dotenv";
+import { loadSync } from 'dotenv';
 loadSync(); // This will load .env from the current directory
 
 import { Application, Context, Router } from 'oak';
@@ -8,26 +8,26 @@ import { create, verify } from 'djwt';
 import { Client } from 'postgres';
 
 const client = new Client({
-  user: Deno.env.get("DB_USER"),
-  password: Deno.env.get("DB_PASSWORD"),
-  database: Deno.env.get("DB_NAME"),
-  hostname: Deno.env.get("DB_HOST"),
-  port: Number(Deno.env.get("DB_PORT")),
+  user: Deno.env.get('DB_USER'),
+  password: Deno.env.get('DB_PASSWORD'),
+  database: Deno.env.get('DB_NAME'),
+  hostname: Deno.env.get('DB_HOST'),
+  port: Number(Deno.env.get('DB_PORT')),
 });
 
 try {
   await client.connect();
-  console.log("Connected to PostgreSQL database");
+  console.log('Connected to PostgreSQL database');
 } catch (error) {
-  console.error("Failed to connect to database:", error);
+  console.error('Failed to connect to database:', error);
 }
 
 
 const router = new Router();
 const app = new Application();
 
-addEventListener("unload", async () => {
-  console.log("🛑 Shutting down — disconnecting Postgres");
+addEventListener('unload', async () => {
+  console.log('🛑 Shutting down — disconnecting Postgres');
   await client.end();
 });
 
