@@ -3,7 +3,11 @@
     "oak": "jsr:@oak/oak",
     "cors": "jsr:@momiji/cors",
     "bcrypt": "jsr:@felix/bcrypt",
-    "djwt": "jsr:@zaubrik/djwt"
+    "djwt": "jsr:@zaubrik/djwt",
+    "postgres": "jsr:@dewars/postgres@0.20.0",
+    "dotenv/load": "jsr:@std/dotenv/load",
+    "dotenv": "jsr:@std/dotenv@0.225.3"
+
   },
   "compilerOptions": {
     "strict": true

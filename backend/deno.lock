@@ -2,6 +2,7 @@
   "version": "4",
   "specifiers": {
     "jsr:@denosaurs/plug@^1.0.6": "1.0.6",
+    "jsr:@dewars/postgres@0.20.0": "0.20.0",
     "jsr:@felix/bcrypt@*": "1.0.5",
     "jsr:@momiji/cors@*": "1.0.1",
     "jsr:@oak/commons@0.11": "0.11.0",
@@ -13,30 +14,37 @@
     "jsr:@std/assert@0.224": "0.224.0",
     "jsr:@std/assert@0.226": "0.226.0",
     "jsr:@std/assert@1": "1.0.12",
+    "jsr:@std/async@^1.0.3": "1.0.12",
     "jsr:@std/bytes@0.223": "0.223.0",
     "jsr:@std/bytes@0.224": "0.224.0",
     "jsr:@std/bytes@1": "1.0.5",
+    "jsr:@std/bytes@^1.0.2": "1.0.5",
     "jsr:@std/crypto@0.223": "0.223.0",
     "jsr:@std/crypto@0.224": "0.224.0",
     "jsr:@std/crypto@1": "1.0.4",
+    "jsr:@std/datetime@~0.224.4": "0.224.5",
     "jsr:@std/encoding@0.221": "0.221.0",
     "jsr:@std/encoding@0.223": "0.223.0",
     "jsr:@std/encoding@0.224.0": "0.224.0",
     "jsr:@std/encoding@1": "1.0.9",
     "jsr:@std/encoding@1.0.0-rc.2": "1.0.0-rc.2",
+    "jsr:@std/encoding@^1.0.1": "1.0.9",
     "jsr:@std/encoding@^1.0.9": "1.0.9",
     "jsr:@std/fmt@0.221": "0.221.0",
+    "jsr:@std/fmt@1": "1.0.6",
     "jsr:@std/fs@0.221": "0.221.0",
     "jsr:@std/http@0.223": "0.223.0",
     "jsr:@std/http@0.224": "0.224.5",
     "jsr:@std/http@1": "1.0.14",
     "jsr:@std/io@0.223": "0.223.0",
+    "jsr:@std/io@~0.224.4": "0.224.9",
     "jsr:@std/media-types@0.223": "0.223.0",
     "jsr:@std/media-types@0.224": "0.224.1",
     "jsr:@std/media-types@1": "1.1.0",
     "jsr:@std/path@0.221": "0.221.0",
     "jsr:@std/path@0.223": "0.223.0",
     "jsr:@std/path@1": "1.0.8",
+    "jsr:@std/path@^1.0.2": "1.0.8",
     "jsr:@zaubrik/djwt@*": "3.0.2",
     "npm:@types/node@*": "22.5.4",
     "npm:path-to-regexp@6.2.1": "6.2.1",
@@ -47,9 +55,21 @@
       "integrity": "6cf5b9daba7799837b9ffbe89f3450510f588fafef8115ddab1ff0be9cb7c1a7",
       "dependencies": [
         "jsr:@std/encoding@0.221",
-        "jsr:@std/fmt",
+        "jsr:@std/fmt@0.221",
         "jsr:@std/fs",
         "jsr:@std/path@0.221"
+      ]
+    },
+    "@dewars/postgres@0.20.0": {
+      "integrity": "a6a92875c35187871f8cf96b57dbae34e75298b492305e65c8c970eabfb41d5b",
+      "dependencies": [
+        "jsr:@std/async",
+        "jsr:@std/bytes@^1.0.2",
+        "jsr:@std/datetime",
+        "jsr:@std/encoding@^1.0.1",
+        "jsr:@std/fmt@1",
+        "jsr:@std/io@~0.224.4",
+        "jsr:@std/path@^1.0.2"
       ]
     },
     "@felix/bcrypt@1.0.5": {
@@ -93,7 +113,7 @@
         "jsr:@std/bytes@0.223",
         "jsr:@std/crypto@0.223",
         "jsr:@std/http@0.223",
-        "jsr:@std/io",
+        "jsr:@std/io@0.223",
         "jsr:@std/media-types@0.223",
         "jsr:@std/path@0.223",
         "npm:path-to-regexp@6.2.1"
@@ -126,6 +146,9 @@
     "@std/assert@1.0.12": {
       "integrity": "08009f0926dda9cbd8bef3a35d3b6a4b964b0ab5c3e140a4e0351fbf34af5b9a"
     },
+    "@std/async@1.0.12": {
+      "integrity": "d1bfcec459e8012846fe4e38dfc4241ab23240ecda3d8d6dfcf6d81a632e803d"
+    },
     "@std/bytes@0.223.0": {
       "integrity": "84b75052cd8680942c397c2631318772b295019098f40aac5c36cead4cba51a8"
     },
@@ -151,6 +174,9 @@
     "@std/crypto@1.0.4": {
       "integrity": "cee245c453bd5366207f4d8aa25ea3e9c86cecad2be3fefcaa6cb17203d79340"
     },
+    "@std/datetime@0.224.5": {
+      "integrity": "363fca6e2e46c1e85139c10ba77745d25c0936abd112b8bfdc9b8fc3615added"
+    },
     "@std/encoding@0.221.0": {
       "integrity": "d1dd76ef0dc5d14088411e6dc1dede53bf8308c95d1537df1214c97137208e45"
     },
@@ -168,6 +194,9 @@
     },
     "@std/fmt@0.221.0": {
       "integrity": "379fed69bdd9731110f26b9085aeb740606b20428ce6af31ef6bd45ef8efa62a"
+    },
+    "@std/fmt@1.0.6": {
+      "integrity": "a2c56a69a2369876ddb3ad6a500bb6501b5bad47bb3ea16bfb0c18974d2661fc"
     },
     "@std/fs@0.221.0": {
       "integrity": "028044450299de8ed5a716ade4e6d524399f035513b85913794f4e81f07da286",
@@ -199,6 +228,12 @@
       "integrity": "2d8c3c2ab3a515619b90da2c6ff5ea7b75a94383259ef4d02116b228393f84f1",
       "dependencies": [
         "jsr:@std/bytes@0.223"
+      ]
+    },
+    "@std/io@0.224.9": {
+      "integrity": "4414664b6926f665102e73c969cfda06d2c4c59bd5d0c603fd4f1b1c840d6ee3",
+      "dependencies": [
+        "jsr:@std/bytes@^1.0.2"
       ]
     },
     "@std/media-types@0.223.0": {
@@ -290,6 +325,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@dewars/postgres@0.20.0",
       "jsr:@felix/bcrypt@*",
       "jsr:@momiji/cors@*",
       "jsr:@oak/oak@*",

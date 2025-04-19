@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@dewars/postgres": "jsr:@dewars/postgres@0.20.0",
+    "@std/dotenv": "jsr:@std/dotenv@0.225.3"
+  }
+}

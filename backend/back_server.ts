@@ -1,15 +1,35 @@
-// import { Application, Context, Router } from "https://deno.land/x/oak@v17.1.4/mod.ts";
-// import { oakCors } from "https://deno.land/x/cors/mod.ts";
-// import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
-// import { create, verify } from "https://deno.land/x/djwt/mod.ts";
+import { loadSync } from "dotenv";
+loadSync(); // This will load .env from the current directory
+
 import { Application, Context, Router } from 'oak';
-// import { oakCors } from "cors";
 import { cors, type CorsOptions } from 'cors';
 import * as bcrypt from 'bcrypt';
 import { create, verify } from 'djwt';
+import { Client } from 'postgres';
+
+const client = new Client({
+  user: Deno.env.get("DB_USER"),
+  password: Deno.env.get("DB_PASSWORD"),
+  database: Deno.env.get("DB_NAME"),
+  hostname: Deno.env.get("DB_HOST"),
+  port: Number(Deno.env.get("DB_PORT")),
+});
+
+try {
+  await client.connect();
+  console.log("Connected to PostgreSQL database");
+} catch (error) {
+  console.error("Failed to connect to database:", error);
+}
+
 
 const router = new Router();
 const app = new Application();
+
+addEventListener("unload", async () => {
+  console.log("🛑 Shutting down — disconnecting Postgres");
+  await client.end();
+});
 
 // Update paths for profile pictures to match new structure
 const PROFILE_PICTURES_PATH = 'frontend/profile_pictures/';

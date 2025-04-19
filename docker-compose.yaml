@@ -7,6 +7,10 @@ services:
       - app-network
     ports:
       - "3000:3000"
+    env_file:
+      - ./.env
+    environment:
+      - DB_HOST=db  # Override DB_HOST to use the service name instead of localhost
     command: ["3000", "localhost:8080"]
     depends_on:
       - db
