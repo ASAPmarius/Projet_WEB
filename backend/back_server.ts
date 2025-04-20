@@ -20,11 +20,11 @@ function getEnv(key: string): string {
 }
 
 const client = new Client({
-  user:     getEnv('DB_USER'),
+  user: getEnv('DB_USER'),
   password: getEnv('DB_PASSWORD'),
   database: getEnv('DB_NAME'),
   hostname: getEnv('DB_HOST'),
-  port:     Number(getEnv('DB_PORT')),
+  port: Number(getEnv('DB_PORT')),
 });
 
 
