@@ -27,7 +27,6 @@ const client = new Client({
   port: Number(getEnv('DB_PORT')),
 });
 
-
 try {
   await client.connect();
   console.log('Connected to PostgreSQL database');
