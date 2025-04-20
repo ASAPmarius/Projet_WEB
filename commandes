@@ -1,4 +1,7 @@
-deno run --allow-ffi --allow-write --allow-read --allow-net --allow-env backend/back_server.ts 3000 8080
+deno run --allow-ffi --allow-write --allow-read --allow-net --allow-env backend/back_server.ts 3000 localhost:8080
+
+
+deno run --allow-net --allow-read=./ server.ts 8080
 
 docker exec -it DataBase psql -U marius -d CaraData
 

@@ -1,10 +1,10 @@
 import { loadSync } from 'dotenv';
 console.log('About to load .env file');
 const env = loadSync();
-console.log('Loaded .env file:', env);
+console.log('Loaded .env file:');
 
 for (const [key, value] of Object.entries(env)) {
-  Deno.env.set(key, value); // 👈 this line is crucial
+  Deno.env.set(key, value); //this line is crucial
 }
 
 import { Application, Context, Router } from 'oak';
