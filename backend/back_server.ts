@@ -1,7 +1,7 @@
 import { loadSync } from 'dotenv';
-console.log("About to load .env file");
+console.log('About to load .env file');
 const env = loadSync();
-console.log("Loaded .env file:", env);
+console.log('Loaded .env file:', env);
 
 for (const [key, value] of Object.entries(env)) {
   Deno.env.set(key, value); // 👈 this line is crucial
@@ -20,11 +20,11 @@ function getEnv(key: string): string {
 }
 
 const client = new Client({
-  user:     getEnv("DB_USER"),
-  password: getEnv("DB_PASSWORD"),
-  database: getEnv("DB_NAME"),
-  hostname: getEnv("DB_HOST"),
-  port:     Number(getEnv("DB_PORT")),
+  user:     getEnv('DB_USER'),
+  password: getEnv('DB_PASSWORD'),
+  database: getEnv('DB_NAME'),
+  hostname: getEnv('DB_HOST'),
+  port:     Number(getEnv('DB_PORT')),
 });
 
 
