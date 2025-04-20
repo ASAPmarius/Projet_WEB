@@ -1,5 +1,11 @@
 import { loadSync } from 'dotenv';
-loadSync(); // This will load .env from the current directory
+console.log("About to load .env file");
+const env = loadSync();
+console.log("Loaded .env file:", env);
+
+for (const [key, value] of Object.entries(env)) {
+  Deno.env.set(key, value); // 👈 this line is crucial
+}
 
 import { Application, Context, Router } from 'oak';
 import { cors, type CorsOptions } from 'cors';
@@ -7,13 +13,20 @@ import * as bcrypt from 'bcrypt';
 import { create, verify } from 'djwt';
 import { Client } from 'postgres';
 
+function getEnv(key: string): string {
+  const val = Deno.env.get(key);
+  if (!val) throw new Error(`Missing env var: ${key}`);
+  return val;
+}
+
 const client = new Client({
-  user: Deno.env.get('DB_USER'),
-  password: Deno.env.get('DB_PASSWORD'),
-  database: Deno.env.get('DB_NAME'),
-  hostname: Deno.env.get('DB_HOST'),
-  port: Number(Deno.env.get('DB_PORT')),
+  user:     getEnv("DB_USER"),
+  password: getEnv("DB_PASSWORD"),
+  database: getEnv("DB_NAME"),
+  hostname: getEnv("DB_HOST"),
+  port:     Number(getEnv("DB_PORT")),
 });
+
 
 try {
   await client.connect();
@@ -487,7 +500,7 @@ router.get('/test_cookie', authorizationMiddleware, (ctx) => {
 // Vérification des arguments (port)
 if (Deno.args.length < 2) {
   console.log(
-    `Usage: $ deno run --allow-net backend/back_server.ts PORT ALLOW_ORIGIN [CERT_PATH KEY_PATH]`,
+    `Usage: $ deno run --allow-net --allow-env backend/back_server.ts PORT ALLOW_ORIGIN [CERT_PATH KEY_PATH]`,
   );
   Deno.exit();
 }

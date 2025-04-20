@@ -634,6 +634,17 @@
       ]
     }
   },
+  "remote": {
+    "https://deno.land/std@0.170.0/_util/asserts.ts": "d0844e9b62510f89ce1f9878b046f6a57bf88f208a10304aab50efcb48365272",
+    "https://deno.land/std@0.170.0/bytes/copy.ts": "d14a58f188a997ee0d2ba696d0c82a42f4fb4b6705e90a4238b77d7644dae24c",
+    "https://deno.land/std@0.170.0/io/buf_reader.ts": "6c0eb067040a9931be2d24de50f56e67b10e3ff69d5344575df06caddf551417",
+    "https://deno.land/std@0.170.0/io/copy_n.ts": "1792d3ee1ff25243bd072259ba707afbfbff4a5475b733a93ac91c0d62bff669",
+    "https://deno.land/std@0.170.0/io/read_int.ts": "450166b029ffd72e976c7c44cd54959709f25ac54e965b0d65b2c1cbbdaf788b",
+    "https://deno.land/std@0.170.0/io/read_long.ts": "df004f58988b0ed502d895aabc34a78a5d95f45ff1561e6442b42a807918d3ca",
+    "https://deno.land/std@0.170.0/io/read_short.ts": "3e95f068465db1a90dcb2878a7ada31158970685dce70e5e5cc78642054435b9",
+    "https://deno.land/std@0.170.0/io/slice_long_to_bytes.ts": "9b8408430b2b9bb79e70c6eb3e4e8248a13b5562af4a95ae4f8f96dffa64c37e",
+    "https://deno.land/std@0.170.0/io/util.ts": "45ab8e2aac2777bf64165b303f6ba7ba67754427fcddf9eebc79aaf1d39a7e99"
+  },
   "workspace": {
     "dependencies": [
       "jsr:@dewars/postgres@0.20.0",
