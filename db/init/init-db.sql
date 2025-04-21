@@ -19,12 +19,22 @@ CREATE TABLE IF NOT EXISTS "Game_Users" (
     PRIMARY KEY ("idUsers", "idGame")
 );
 
+-- New Cards table for card types
 CREATE TABLE IF NOT EXISTS "Cards" (
+    "idCardType" SERIAL PRIMARY KEY,
+    "Picture" BYTEA NOT NULL
+);
+
+-- Renamed from Cards to ActiveCards with additional fields
+CREATE TABLE IF NOT EXISTS "ActiveCards" (
     "idCard" SERIAL PRIMARY KEY,
     "idGame" INT REFERENCES "Game"("idGame"),
     "idUserHoldingIt" INT REFERENCES "User"("idUser"),
     "Picture" VARCHAR(255) NOT NULL,
-    "CardState" VARCHAR(50) NOT NULL
+    "CardState" VARCHAR(50) NOT NULL,
+    "cardType" INT REFERENCES "Cards"("idCardType"),
+    CONSTRAINT check_card_state 
+        CHECK ("CardState" IN ('in_deck', 'in_hand', 'played', 'discarded'))
 );
 
 CREATE TABLE IF NOT EXISTS "ChatMessages" (
@@ -43,8 +53,5 @@ CREATE TABLE IF NOT EXISTS "GamesResults" (
 );
 
 -- Add constraints
-ALTER TABLE "Cards" ADD CONSTRAINT check_card_state 
-    CHECK ("CardState" IN ('in_deck', 'in_hand', 'played', 'discarded'));
-
 ALTER TABLE "Game" ADD CONSTRAINT check_game_type
     CHECK ("GameType" IN ('classic', 'timed', 'tournament'));

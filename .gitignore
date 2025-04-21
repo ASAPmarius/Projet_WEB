@@ -1,3 +1,5 @@
 node_modules/
 .env
 /pgdata
+backend/cards_images
+backend/insert_cards.ts
