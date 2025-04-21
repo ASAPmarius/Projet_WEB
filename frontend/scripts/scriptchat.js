@@ -123,7 +123,21 @@ ws.onmessage = function(event) {
   if (data.type == 'card_change') {
     const cardElement = document.getElementById('card');
     console.log('Received card data:', data);
-    cardElement.textContent = data.card.name;
+    
+    // Use the card's picture from the database (base64 encoded)
+    if (cardElement) {
+      // Clear existing content
+      cardElement.innerHTML = '';
+      
+      // Create an image element to display the card
+      const cardImage = document.createElement('img');
+      cardImage.src = data.card.picture; // This already contains the data:image/png;base64 prefix
+      cardImage.alt = `Card ${data.card.idCard}`;
+      cardImage.className = 'card-image';
+      
+      // Append the image to the card element
+      cardElement.appendChild(cardImage);
+    }
   }
 
   if (data.type === 'player_hand') {
@@ -132,6 +146,12 @@ ws.onmessage = function(event) {
 
     if (!handContainer) {
       console.error('handContainer not found in the DOM.');
+      return;
+    }
+
+    // Validate hand data
+    if (!data.hand || !Array.isArray(data.hand)) {
+      console.error('Invalid hand data received:', data);
       return;
     }
 
@@ -150,9 +170,23 @@ ws.onmessage = function(event) {
     const startPosition = (containerWidth - totalWidth) / 2;
 
     data.hand.forEach((card, index) => {
+      // Skip invalid cards
+      if (!card || !card.picture) {
+        console.warn('Skipping invalid card in hand:', card);
+        return;
+      }
+      
       const cardElement = document.createElement('div');
       cardElement.className = 'hand-card';
-      cardElement.textContent = card; // Display the card name
+      
+      // Create an image element to display the card
+      const cardImage = document.createElement('img');
+      cardImage.src = card.picture; // Base64 encoded image data
+      cardImage.alt = `Card ${card.idCard || 'Unknown'}`;
+      cardImage.className = 'card-image';
+      
+      // Add the image to the card element
+      cardElement.appendChild(cardImage);
 
       // Position the card dynamically
       const position = startPosition + index * overlapOffset;

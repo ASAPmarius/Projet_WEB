@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS "ActiveCards" (
     "idCard" SERIAL PRIMARY KEY,
     "idGame" INT REFERENCES "Game"("idGame"),
     "idUserHoldingIt" INT REFERENCES "User"("idUser"),
-    "Picture" VARCHAR(255) NOT NULL,
     "CardState" VARCHAR(50) NOT NULL,
     "cardType" INT REFERENCES "Cards"("idCardType"),
     CONSTRAINT check_card_state 

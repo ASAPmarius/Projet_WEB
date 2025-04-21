@@ -11,9 +11,30 @@ services:
       - ./.env
     environment:
       - DB_HOST=db  # Override DB_HOST to use the service name instead of localhost
-    command: ["3000", "localhost:8080"]
+      - ALLOW_ORIGIN=localhost:8080  # Make sure this is explicitly set
+    command: ["run", "--allow-net","--allow-ffi", "--allow-write", "--allow-env", "--allow-read", "--unstable-ffi", "--no-lock", "back_server.ts", "3000", "localhost:8080"]
     depends_on:
       - db
+      - db-init  # Add dependency on db-init service
+    volumes:
+      - ./backend/cards_images:/app/cards_images  # Mount card images only, not the source code
+
+  # New service for database initialization
+  db-init:
+    build:
+      context: ./backend
+    restart: "no"
+    networks:
+      - app-network
+    env_file:
+      - ./.env
+    environment:
+      - DB_HOST=db
+    volumes:
+      - ./backend/cards_images:/app/cards_images
+    depends_on:
+      - db
+    command: ["run", "--allow-net", "--allow-read", "--allow-env", "--unstable-ffi", "--no-lock", "insert_cards.ts"]
 
   frontend:
     build:
@@ -40,6 +61,7 @@ services:
     networks:
       - app-network
 
+  # Add the missing db service
   db:
     image: postgres:14
     container_name: DataBase
