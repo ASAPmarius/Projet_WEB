@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS "User" (
     "idUser" SERIAL PRIMARY KEY,
     "Username" VARCHAR(50) NOT NULL UNIQUE,
     "Password" VARCHAR(255) NOT NULL,
-    "Profile_picture" VARCHAR(255),
+    "Profile_picture" BYTEA,
     "isAdmin" BOOLEAN DEFAULT FALSE
 );
 
