@@ -15,6 +15,7 @@ function goToLogin() {
 
 function requestUsersProfile() {
   const data = { auth_token: localStorage.auth_token, type: 'connected_users' };
+  console.log('Requesting connected users with:', data);
   ws.send(JSON.stringify(data));
 }
 
@@ -46,6 +47,15 @@ chat.addEventListener('keydown', function(event) {
 
 ws.onopen = function() {
   console.log('WebSocket connection established.');
+  
+  // Check if profiles container exists
+  const profileContainer = document.getElementById('profiles');
+  if (!profileContainer) {
+    console.error('Profiles container not found in the DOM!');
+  } else {
+    console.log('Profiles container found:', profileContainer);
+  }
+  
   requestUsersProfile(); // Request to get user profile when the connection is established
   console.log('Requested users profiles');
   requestCard(); // Request to get card when the connection is established
@@ -56,7 +66,8 @@ ws.onopen = function() {
 
 ws.onmessage = function(event) {
   const data = JSON.parse(event.data);
-  console.log('WebSocket message received:', data.type);
+  console.log('WebSocket message received:', data.type, data);
+  
   if (data.type == 'message') {
     console.log('Received message:', data);
     const message = JSON.parse(event.data);
@@ -64,7 +75,18 @@ ws.onmessage = function(event) {
     messageBox.className = 'message-box';
 
     const userPicture = document.createElement('img');
-    userPicture.src = message.user_pp_path;
+    
+    // Check if user_pp_path is base64 or a regular path
+    if (message.user_pp_path && message.user_pp_path.startsWith('data:image')) {
+      userPicture.src = message.user_pp_path;
+    } else if (message.user_pp_path) {
+      // For backward compatibility with path-based images
+      userPicture.src = message.user_pp_path;
+    } else {
+      // Fallback to a default image or placeholder
+      userPicture.src = 'profile_pictures/default.jpg';
+    }
+    
     userPicture.alt = 'User Picture';
     userPicture.className = 'user-picture';
 
@@ -95,18 +117,42 @@ ws.onmessage = function(event) {
 
     document.getElementById('messages').appendChild(messageBox);
   }
+  
   if (data.type == 'connected_users') {
+    console.log('Received connected users:', data.users);
     const users = data.users;
     const profileContainer = document.getElementById('profiles');
+    
+    if (!profileContainer) {
+      console.error('Profiles container not found in the DOM!');
+      return;
+    }
+    
+    console.log('Clearing existing profiles');
     profileContainer.innerHTML = ''; // Clear existing profiles
 
-    users.forEach(user => {
-      console.log(user);
+    console.log('Adding', users.length, 'user profiles');
+    users.forEach((user, index) => {
+      console.log('Processing user', index, ':', user);
       const profileBox = document.createElement('div');
       profileBox.className = 'profile-box';
 
       const profilePicture = document.createElement('img');
-      profilePicture.src = user.pp_path;
+      
+      // Check if pp_path is base64 or a regular path
+      if (user.pp_path && user.pp_path.startsWith('data:image')) {
+        profilePicture.src = user.pp_path;
+        console.log('Using base64 image for user:', user.username);
+      } else if (user.pp_path) {
+        // For backward compatibility with path-based images
+        profilePicture.src = user.pp_path;
+        console.log('Using path image for user:', user.username);
+      } else {
+        // Fallback to a default image or placeholder
+        profilePicture.src = 'profile_pictures/default.jpg';
+        console.log('Using default image for user:', user.username);
+      }
+      
       profilePicture.alt = 'Profile Picture';
       profilePicture.className = 'profile-picture';
 
@@ -117,7 +163,10 @@ ws.onmessage = function(event) {
       profileBox.appendChild(profilePicture);
       profileBox.appendChild(profileName);
       profileContainer.appendChild(profileBox);
+      console.log('Added profile box for:', user.username);
     });
+    
+    console.log('Finished updating profile container');
   }
   
   if (data.type == 'card_change') {

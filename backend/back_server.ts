@@ -304,8 +304,51 @@ async function checkCardTypes(): Promise<void> {
   console.log(`Found ${existingCards.rows[0].count} card types in database`);
 }
 
+// Cleanup function for finished games - Only delete ActiveCards
+async function cleanupFinishedGame(gameId: number): Promise<void> {
+  try {
+    // Delete all active cards associated with this game
+    await client.queryObject(
+      'DELETE FROM "ActiveCards" WHERE "idGame" = $1',
+      [gameId]
+    );
+    
+    console.log(`Cleaned up ActiveCards for game ${gameId}`);
+  } catch (error) {
+    console.error(`Error cleaning up ActiveCards for game ${gameId}:`, error);
+  }
+}
+
+// Check if a game is finished (all players disconnected)
+async function checkAndCleanupFinishedGames(): Promise<void> {
+  // Get all active games
+  const activeGames = await client.queryObject<{ idGame: number }>(
+    'SELECT "idGame" FROM "Game"'
+  );
+  
+  for (const game of activeGames.rows) {
+    // Check if there are any active players for this game
+    const activeUsers = await client.queryObject<{ count: number }>(
+      'SELECT COUNT(*) as count FROM "Game_Users" gu ' +
+      'INNER JOIN "User" u ON gu."idUsers" = u."idUser" ' +
+      'WHERE gu."idGame" = $1 AND u."Username" IN (' +
+      '  SELECT ws.username FROM unnest($2::text[]) as ws(username)' +
+      ')',
+      [game.idGame, connections.map(conn => conn.username)]
+    );
+    
+    // If no active users, clean up the game's ActiveCards
+    if (activeUsers.rows[0].count === 0 && game.idGame !== currentGameId) {
+      await cleanupFinishedGame(game.idGame);
+    }
+  }
+}
+
 // Call this during server startup
 await checkCardTypes();
+
+// Cleanup any lingering ActiveCards from previous server sessions
+await checkAndCleanupFinishedGames();
 
 // Current game tracking
 let currentGameId: number | null = null;
@@ -315,14 +358,14 @@ async function getOrCreateGame(): Promise<number> {
   if (currentGameId === null) {
     currentGameId = await createGame('classic');
     
-    // Get all card types (excluding the last one which is the card back)
+    // Get all card types (excluding the card back which is id 54)
     const result = await client.queryObject<{ idCardType: number }>(
       'SELECT "idCardType" FROM "Cards" WHERE "idCardType" < 53 ORDER BY "idCardType"'
     );
     
     const cardTypeIds = result.rows.map(row => row.idCardType);
     
-    // Shuffle the card types
+    // Shuffle the card types using Fisher-Yates algorithm
     for (let i = cardTypeIds.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [cardTypeIds[i], cardTypeIds[j]] = [cardTypeIds[j], cardTypeIds[i]];
@@ -335,6 +378,14 @@ async function getOrCreateGame(): Promise<number> {
   }
   
   return currentGameId;
+}
+
+// Function to get card back image (id 54)
+async function getCardBackImage(): Promise<Uint8Array | null> {
+  const result = await client.queryObject<{ Picture: Uint8Array }>(
+    'SELECT "Picture" FROM "Cards" WHERE "idCardType" = 54'
+  );
+  return result.rows.length > 0 ? result.rows[0].Picture : null;
 }
 
 // Add an OPTIONS handler for the login route
@@ -496,6 +547,46 @@ router.get('/', authorizationMiddleware, async (ctx) => {
   connections.push({ ws, username, hand });
   console.log(`+ websocket connected (${connections.length})`);
 
+  // Send initial card back when user connects
+  const cardsInDeck = await getActiveCardsInDeck(gameId);
+  if (cardsInDeck.length > 0) {
+    const cardBackImage = await getCardBackImage();
+    try {
+      const base64String = safelyConvertToBase64(cardBackImage);
+      ws.send(JSON.stringify({ 
+        type: 'card_change', 
+        card: {
+          idCard: cardsInDeck[0].idCard,
+          picture: base64String ? `data:image/png;base64,${base64String}` : '',
+          cardType: 54
+        }
+      }));
+    } catch (error) {
+      console.error('Error sending initial card back:', error);
+    }
+  }
+
+  // Send connected users list to the new connection
+  const usersInGame = await getUsersInGame(gameId);
+  const connectedUsers = usersInGame.map(user => {
+    let ppPath = '';
+    if (user.Profile_picture) {
+      const base64String = safelyConvertToBase64(user.Profile_picture);
+      ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
+    }
+    
+    return {
+      username: user.Username,
+      pp_path: ppPath
+    };
+  });
+  
+  // Send to the new user
+  ws.send(JSON.stringify({ type: 'connected_users', users: connectedUsers }));
+  
+  // Notify all other users about the new connection
+  notifyAllUsers({ type: 'connected_users', users: connectedUsers });
+
   ws.onerror = (_error) => {
     const index = connections.findIndex((conn) => conn.ws === ws);
     if (index !== -1) {
@@ -568,26 +659,37 @@ router.get('/', authorizationMiddleware, async (ctx) => {
           console.error('Error converting hand images to base64:', error);
         }
         
-        // Notify all users about the card change
+        // Notify all users about the card change (show card back)
         const remainingCardsInDeck = await getActiveCardsInDeck(gameId);
         if (remainingCardsInDeck.length > 0) {
-          // Convert binary data to base64 strings for JSON safely
+          // Get the card back image instead of the actual card
+          const cardBackImage = await getCardBackImage();
+          
           try {
-            const picture_data = remainingCardsInDeck[0].picture_data;
-            // Convert Uint8Array to base64 using a safer approach
-            const base64String = safelyConvertToBase64(picture_data);
+            // Convert card back image to base64
+            const base64String = safelyConvertToBase64(cardBackImage);
             
             notifyAllUsers({ 
               type: 'card_change', 
               card: {
                 idCard: remainingCardsInDeck[0].idCard,
                 picture: base64String ? `data:image/png;base64,${base64String}` : '',
-                cardType: remainingCardsInDeck[0].cardType
+                cardType: 54 // Indicate it's a card back
               }
             });
           } catch (error) {
-            console.error('Error converting card image to base64:', error);
+            console.error('Error converting card back image to base64:', error);
           }
+        } else {
+          // Notify that the deck is empty
+          notifyAllUsers({ 
+            type: 'card_change', 
+            card: {
+              idCard: null,
+              picture: '',
+              cardType: null
+            }
+          });
         }
       } else {
         console.log('No cards left in the pile');
@@ -645,34 +747,46 @@ router.get('/', authorizationMiddleware, async (ctx) => {
         };
       });
       
+      console.log('Sending connected users:', connectedUsers); // Debug log
       notifyAllUsers({ type: 'connected_users', users: connectedUsers });
       return;
     }
 
     if (data.type === 'card_request') {
-      // Get a card from the deck
+      // Get the card back image instead of the actual card
       const gameId = await getOrCreateGame();
       const cardsInDeck = await getActiveCardsInDeck(gameId);
       
       if (cardsInDeck.length > 0) {
         const card = cardsInDeck[0];
-        // Convert binary data to base64 strings for JSON safely
+        // Get the card back image (id 54)
+        const cardBackImage = await getCardBackImage();
+        
         try {
-          const picture_data = card.picture_data;
-          // Convert Uint8Array to base64 using a safer approach
-          const base64String = safelyConvertToBase64(picture_data);
+          // Convert card back image to base64
+          const base64String = safelyConvertToBase64(cardBackImage);
           
           ws.send(JSON.stringify({ 
             type: 'card_change', 
             card: {
               idCard: card.idCard,
               picture: base64String ? `data:image/png;base64,${base64String}` : '',
-              cardType: card.cardType
+              cardType: 54 // Indicate it's a card back
             }
           }));
         } catch (error) {
-          console.error('Error converting card image to base64:', error);
+          console.error('Error converting card back image to base64:', error);
         }
+      } else {
+        // If no cards left, show empty pile or some indication
+        ws.send(JSON.stringify({ 
+          type: 'card_change', 
+          card: {
+            idCard: null,
+            picture: '',
+            cardType: null
+          }
+        }));
       }
       return;
     }
@@ -736,6 +850,16 @@ router.get('/', authorizationMiddleware, async (ctx) => {
     
     notifyAllUsers({ type: 'connected_users', users: connectedUsers });
     console.log(`- websocket disconnected (${connections.length})`);
+    
+    // Check if the game is finished (no more players)
+    if (connections.length === 0 && currentGameId !== null) {
+      // Clean up the finished game's ActiveCards
+      await cleanupFinishedGame(currentGameId);
+      currentGameId = null; // Reset for a new game
+    } else {
+      // Check for other finished games that might need cleanup
+      await checkAndCleanupFinishedGames();
+    }
   };
 });
 

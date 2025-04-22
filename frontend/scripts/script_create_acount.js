@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-unused-vars
 // Handle file upload and preview
 document.addEventListener('DOMContentLoaded', () => {
   const fileInput = document.getElementById('profile_picture_upload');

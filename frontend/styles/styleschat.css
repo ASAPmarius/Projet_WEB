@@ -149,22 +149,21 @@ button:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 2em;
   cursor: pointer;
   transition: transform 0.5s;
-  overflow: hidden; /* Ensure images don't overflow */
+  overflow: hidden;
 }
 
 /* Updated card image styling */
 .card-image {
   width: 100%;
   height: 100%;
-  object-fit: contain; /* Ensures image maintains aspect ratio */
-  border-radius: 8px; /* Slightly rounded corners for the image */
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .card:hover {
-  transform: scale(1.05); /* Slightly enlarge card on hover */
+  transform: scale(1.05);
 }
 
 .hand-container {
@@ -189,12 +188,10 @@ button:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 0.9em;
-  text-align: center;
   position: absolute;
   transition: transform 0.3s, box-shadow 0.3s;
   cursor: pointer;
-  overflow: hidden; /* Ensure images don't overflow */
+  overflow: hidden;
 }
 
 /* Hand card image styling */
@@ -208,14 +205,27 @@ button:hover {
 .hand-card:hover {
   transform: translateY(-60px);
   box-shadow: 0 8px 16px rgb(0 0 0 / 20%);
-  z-index: 20; /* Ensure hovered card appears above others */
+  z-index: 20;
 }
 
 /* Add styles for the profiles section */
-.profiles-container {
+.profile-container {
   position: absolute;
   top: 20px;
   left: 20px;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-container h2 {
+  margin: 0 0 10px 0;
+  font-size: 1.2em;
+  color: #4CAF50;
+}
+
+.profiles {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
