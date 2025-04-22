@@ -18,6 +18,7 @@ services:
       - db-init  # Add dependency on db-init service
     volumes:
       - ./backend/cards_images:/app/cards_images  # Mount card images only, not the source code
+      - ./backend/convertIMG.ts:/app/convertIMG.ts  # Mount the convertIMG.ts file
 
   # New service for database initialization
   db-init:
@@ -61,7 +62,7 @@ services:
     networks:
       - app-network
 
-  # Add the missing db service
+  # Database service
   db:
     image: postgres:14
     container_name: DataBase
@@ -78,11 +79,11 @@ services:
     networks:
       - app-network
 
-# Make sure this networks section is properly defined
+# Networks section
 networks:
   app-network:
     driver: bridge
 
-# Make sure this volumes section is properly defined
+# Volumes section
 volumes:
   postgres_data:

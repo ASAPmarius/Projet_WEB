@@ -12,6 +12,7 @@ import { cors, type CorsOptions } from 'cors';
 import * as bcrypt from 'bcrypt';
 import { create, verify } from 'djwt';
 import { Client } from 'postgres';
+import { base64ToBytes, bytesToDataURL } from './convertIMG.ts';
 
 // Global error handler
 addEventListener("error", (event) => {
@@ -32,9 +33,6 @@ function getEnv(key: string): string {
 // Initialize router and application
 const router = new Router();
 const app = new Application();
-
-// Update paths for profile pictures to match new structure
-const PROFILE_PICTURES_PATH = 'frontend/profile_pictures/';
 
 const client = new Client({
   user: getEnv('DB_USER'),
@@ -216,7 +214,7 @@ async function getUserByUsername(username: string): Promise<User | null> {
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
-async function createUser(username: string, password: string, profilePicture: string): Promise<User> {
+async function createUser(username: string, password: string, profilePicture: Uint8Array | null): Promise<User> {
   const hashedPassword = await get_hash(password);
   const result = await client.queryObject<User>(
     'INSERT INTO "User" ("Username", "Password", "Profile_picture", "isAdmin") VALUES ($1, $2, $3, $4) RETURNING *',
@@ -418,10 +416,32 @@ router.post('/create_account', async (ctx) => {
     return;
   }
 
-  const newUser = await createUser(username, password, profilePicture);
+  let profilePictureBytes: Uint8Array | null = null;
+
+  // Convert base64 to bytes for uploaded image
+  if (profilePicture) {
+    try {
+      profilePictureBytes = base64ToBytes(profilePicture);
+    } catch (error) {
+      console.error('Error converting profile picture:', error);
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Invalid profile picture format' };
+      return;
+    }
+  } else {
+    ctx.response.status = 400;
+    ctx.response.body = { error: 'Profile picture is required' };
+    return;
+  }
+
+  const newUser = await createUser(username, password, profilePictureBytes);
 
   ctx.response.status = 201;
-  ctx.response.body = { status: 'success', user: newUser };
+  ctx.response.body = { status: 'success', user: { 
+    idUser: newUser.idUser,
+    Username: newUser.Username,
+    isAdmin: newUser.isAdmin
+  }};
 });
 
 router.get('/get_cookie', async (ctx) => {
@@ -500,7 +520,6 @@ router.get('/', authorizationMiddleware, async (ctx) => {
       return;
     }
     
-    const userPpPath = user.Profile_picture;
     const userId = user.idUser;
 
     if (data.type === 'add_card_to_hand' && userId) {
@@ -586,6 +605,13 @@ router.get('/', authorizationMiddleware, async (ctx) => {
       const gameId = await getOrCreateGame();
       await recordChatMessage(gameId, msg);
       
+      // Handle profile picture - either from DB or path
+      let userProfilePicture = '';
+      if (user.Profile_picture) {
+        const base64String = safelyConvertToBase64(user.Profile_picture);
+        userProfilePicture = base64String ? `data:image/png;base64,${base64String}` : '';
+      }
+      
       // Send the message to all connected users
       connections.forEach((client) => {
         client.ws.send(
@@ -593,7 +619,7 @@ router.get('/', authorizationMiddleware, async (ctx) => {
             type: 'message',
             message: msg,
             owner: owner,
-            user_pp_path: userPpPath ? safelyConvertToBase64(userPpPath) : '',
+            user_pp_path: userProfilePicture,
             username: client.username,
           }),
         );
@@ -606,10 +632,18 @@ router.get('/', authorizationMiddleware, async (ctx) => {
       const gameId = await getOrCreateGame();
       const usersInGame = await getUsersInGame(gameId);
       
-      const connectedUsers = usersInGame.map(user => ({
-        username: user.Username,
-        pp_path: user.Profile_picture ? safelyConvertToBase64(user.Profile_picture) : ''
-      }));
+      const connectedUsers = usersInGame.map(user => {
+        let ppPath = '';
+        if (user.Profile_picture) {
+          const base64String = safelyConvertToBase64(user.Profile_picture);
+          ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
+        }
+        
+        return {
+          username: user.Username,
+          pp_path: ppPath
+        };
+      });
       
       notifyAllUsers({ type: 'connected_users', users: connectedUsers });
       return;
@@ -687,10 +721,18 @@ router.get('/', authorizationMiddleware, async (ctx) => {
     
     const connectedUsers = usersInGame
       .filter(user => connections.some(conn => conn.username === user.Username))
-      .map(user => ({
-        username: user.Username,
-        pp_path: user.Profile_picture ? safelyConvertToBase64(user.Profile_picture) : ''
-      }));
+      .map(user => {
+        let ppPath = '';
+        if (user.Profile_picture) {
+          const base64String = safelyConvertToBase64(user.Profile_picture);
+          ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
+        }
+        
+        return {
+          username: user.Username,
+          pp_path: ppPath
+        };
+      });
     
     notifyAllUsers({ type: 'connected_users', users: connectedUsers });
     console.log(`- websocket disconnected (${connections.length})`);

@@ -11,6 +11,7 @@ RUN rm -f deno.lock
 # Cache the dependencies without lockfile
 RUN deno cache --reload back_server.ts
 RUN deno cache --reload insert_cards.ts
+RUN deno cache --reload convertIMG.ts
 
 # Create directory for card images (if it doesn't exist)
 RUN mkdir -p /app/cards_images

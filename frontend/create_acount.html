@@ -19,24 +19,12 @@
         <input type="password" id="confirm_password" name="confirm_password" required>
         <span id="error-message" style="color: red; display: none;"></span>
         <br>
-        <label for="profile_picture">Choose a Profile Picture:</label>
-        <div class="profile-pictures">
-            <label>
-                <input type="radio" name="profile_picture" value="profile_pictures/id1.jpg" required>
-                <img src="profile_pictures/id1.jpg" alt="Profile 1" class="profile-picture">
-            </label>
-            <label>
-                <input type="radio" name="profile_picture" value="profile_pictures/id0.jpg" required>
-                <img src="profile_pictures/id0.jpg" alt="Profile 2" class="profile-picture">
-            </label>
-            <label>
-                <input type="radio" name="profile_picture" value="profile_pictures/id2.jpg" required>
-                <img src="profile_pictures/id2.jpg" alt="Profile 3" class="profile-picture">
-            </label>
-            <label>
-                <input type="radio" name="profile_picture" value="profile_pictures/id3.jpg" required>
-                <img src="profile_pictures/id3.jpg" alt="Profile 4" class="profile-picture">
-            </label>
+        <label for="profile_picture">Profile Picture:</label>
+        <div class="profile-upload">
+            <input type="file" id="profile_picture_upload" accept="image/*" required>
+            <div id="image-preview" style="display: none;">
+                <img id="preview" src="#" alt="Preview" class="profile-picture">
+            </div>
         </div>
         <br>
         <div class="button-container">
