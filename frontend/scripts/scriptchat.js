@@ -1,6 +1,11 @@
 const chat = document.getElementById('messageInput');
 const ws = new WebSocket('ws://localhost:3000');
 
+// Store current username when logging in
+function storeCurrentUsername(username) {
+  localStorage.setItem('currentUsername', username);
+}
+
 function sendJson() {
   event.preventDefault(); // Prevent default form submission
   const message = chat.value;
@@ -30,16 +35,20 @@ function requestHand() {
 }
 
 const cardElement = document.getElementById('card');
-cardElement.addEventListener('click', () => {
-  const data = { auth_token: localStorage.auth_token, type: 'add_card_to_hand' };
-  ws.send(JSON.stringify(data));
-});
+if (cardElement) {
+  cardElement.addEventListener('click', () => {
+    const data = { auth_token: localStorage.auth_token, type: 'add_card_to_hand' };
+    ws.send(JSON.stringify(data));
+  });
+}
 
-chat.addEventListener('keydown', function(event) {
-  if (event.key === 'Enter') {
-    sendJson();
-  }
-});
+if (chat) {
+  chat.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      sendJson();
+    }
+  });
+}
 
 /****************************************************************/
 /************************* WEBSOCKET ****************************/
@@ -48,12 +57,9 @@ chat.addEventListener('keydown', function(event) {
 ws.onopen = function() {
   console.log('WebSocket connection established.');
   
-  // Check if profiles container exists
-  const profileContainer = document.getElementById('profiles');
-  if (!profileContainer) {
-    console.error('Profiles container not found in the DOM!');
-  } else {
-    console.log('Profiles container found:', profileContainer);
+  // Initialize the poker table if available
+  if (typeof globalThis.initPokerTable === 'function') {
+    globalThis.initPokerTable();
   }
   
   requestUsersProfile(); // Request to get user profile when the connection is established
@@ -106,8 +112,8 @@ ws.onmessage = function(event) {
     messageBox.appendChild(userPicture);
     messageBox.appendChild(messageContent);
 
-    // Vérifie si c'est un message de l'utilisateur actuel
-    const currentUser = data.username; // Assure-toi que l'username est stocké lors du login
+    // Check if it's a message from the current user
+    const currentUser = data.username; // Username stored when user logs in
     console.log('Current user:', currentUser);
     if (message.owner === currentUser) {
       messageBox.classList.add('my-message');
@@ -115,65 +121,73 @@ ws.onmessage = function(event) {
       messageBox.classList.add('other-message');
     }
 
-    document.getElementById('messages').appendChild(messageBox);
+    const messagesContainer = document.getElementById('messages');
+    if (messagesContainer) {
+      messagesContainer.appendChild(messageBox);
+    }
   }
   
-  if (data.type == 'connected_users') {
+  if (data.type === 'connected_users') {
     console.log('Received connected users:', data.users);
     const users = data.users;
-    const profileContainer = document.getElementById('profiles');
     
-    if (!profileContainer) {
-      console.error('Profiles container not found in the DOM!');
-      return;
+    // Update the user profiles sidebar
+    const profileContainer = document.getElementById('profiles');
+    if (profileContainer) {
+      console.log('Updating profiles sidebar');
+      profileContainer.innerHTML = ''; // Clear existing profiles
+
+      users.forEach((user, index) => {
+        const profileBox = document.createElement('div');
+        profileBox.className = 'profile-box';
+
+        const profilePicture = document.createElement('img');
+        
+        // Check if pp_path is base64 or a regular path
+        if (user.pp_path && user.pp_path.startsWith('data:image')) {
+          profilePicture.src = user.pp_path;
+        } else if (user.pp_path) {
+          // For backward compatibility with path-based images
+          profilePicture.src = user.pp_path;
+        } else {
+          // Fallback to a default image or placeholder
+          profilePicture.src = 'profile_pictures/default.jpg';
+        }
+        
+        profilePicture.alt = 'Profile Picture';
+        profilePicture.className = 'profile-picture';
+
+        const profileName = document.createElement('div');
+        profileName.className = 'profile-name';
+        profileName.textContent = user.username;
+
+        profileBox.appendChild(profilePicture);
+        profileBox.appendChild(profileName);
+        profileContainer.appendChild(profileBox);
+      });
     }
     
-    console.log('Clearing existing profiles');
-    profileContainer.innerHTML = ''; // Clear existing profiles
-
-    console.log('Adding', users.length, 'user profiles');
-    users.forEach((user, index) => {
-      console.log('Processing user', index, ':', user);
-      const profileBox = document.createElement('div');
-      profileBox.className = 'profile-box';
-
-      const profilePicture = document.createElement('img');
-      
-      // Check if pp_path is base64 or a regular path
-      if (user.pp_path && user.pp_path.startsWith('data:image')) {
-        profilePicture.src = user.pp_path;
-        console.log('Using base64 image for user:', user.username);
-      } else if (user.pp_path) {
-        // For backward compatibility with path-based images
-        profilePicture.src = user.pp_path;
-        console.log('Using path image for user:', user.username);
-      } else {
-        // Fallback to a default image or placeholder
-        profilePicture.src = 'profile_pictures/default.jpg';
-        console.log('Using default image for user:', user.username);
-      }
-      
-      profilePicture.alt = 'Profile Picture';
-      profilePicture.className = 'profile-picture';
-
-      const profileName = document.createElement('div');
-      profileName.className = 'profile-name';
-      profileName.textContent = user.username;
-
-      profileBox.appendChild(profilePicture);
-      profileBox.appendChild(profileName);
-      profileContainer.appendChild(profileBox);
-      console.log('Added profile box for:', user.username);
-    });
+    // Get current username
+    let currentUsername = data.username;
+    if (!currentUsername) {
+      currentUsername = localStorage.getItem('currentUsername');
+    }
+    if (!currentUsername && data.owner) {
+      currentUsername = data.owner;
+      storeCurrentUsername(currentUsername);
+    }
     
-    console.log('Finished updating profile container');
+    // Update the poker table if available
+    if (typeof globalThis.updateTablePlayers === 'function') {
+      globalThis.updateTablePlayers(data.users, currentUsername);
+    }
   }
   
   if (data.type == 'card_change') {
-    const cardElement = document.getElementById('card');
     console.log('Received card data:', data);
     
     // Use the card's picture from the database (base64 encoded)
+    const cardElement = document.getElementById('card');
     if (cardElement) {
       // Clear existing content
       cardElement.innerHTML = '';
@@ -186,6 +200,16 @@ ws.onmessage = function(event) {
       
       // Append the image to the card element
       cardElement.appendChild(cardImage);
+    }
+    
+    // Update the draw pile image if available
+    if (typeof globalThis.updateDrawPileCard === 'function') {
+      globalThis.updateDrawPileCard(data.card.picture);
+    }
+    
+    // Update pile count if available
+    if (data.pileCount !== undefined && typeof globalThis.updatePileCount === 'function') {
+      globalThis.updatePileCount(data.pileCount);
     }
   }
 
@@ -244,6 +268,28 @@ ws.onmessage = function(event) {
 
       handContainer.appendChild(cardElement);
     });
+    
+    // Update player's card count in the table view
+    const currentUsername = localStorage.getItem('currentUsername');
+    if (currentUsername) {
+      const cardCount = data.hand.length;
+      
+      // Send update to server to broadcast this player's card count
+      ws.send(JSON.stringify({
+        auth_token: localStorage.auth_token,
+        type: 'player_hand_update',
+        username: currentUsername,
+        cardCount: cardCount
+      }));
+      
+      // Request updated users list to refresh the table
+      requestUsersProfile();
+    }
+  }
+  
+  if (data.type === 'player_hand_update') {
+    // Request an updated user list to refresh all players on the table
+    requestUsersProfile();
   }
 };
 

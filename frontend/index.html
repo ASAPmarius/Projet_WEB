@@ -3,16 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Page</title>
+    <title>Card Game</title>
     <link rel="stylesheet" href="styles/styleschat.css">
+    <link rel="stylesheet" href="styles/table-view.css">
+    <link rel="stylesheet" href="styles/chat-toggle.css">
+    <script src="scripts/table-view.js" defer></script>
+    <script src="scripts/chat-toggle.js" defer></script>
     <script src="scripts/scriptchat.js" defer></script>
 </head>
 <body>
     <div class="profile-container">
         <h2>Player Profiles</h2>
         <div class="profiles" id="profiles">
+            <!-- Player profiles will be populated dynamically -->
         </div>
     </div>
+    
+    <!-- Poker table will be inserted here dynamically via JavaScript -->
+    
     <div class="container">
         <h1>Le miaou</h1>
         <div class="chatbox">
@@ -23,9 +31,15 @@
             </div>
         </div>
     </div>
+    
     <div class="card-stack" id="cardStack">
-        <div class="card" id="card">Card 1</div>
+        <div class="card" id="card">
+            <!-- Card will be populated dynamically -->
+        </div>
     </div>
-    <div class="hand-container" id="handContainer"></div>
+    
+    <div class="hand-container" id="handContainer">
+        <!-- Player's hand will be populated dynamically -->
+    </div>
 </body>
 </html>

@@ -213,7 +213,12 @@ async function get_hash(password: string): Promise<string> {
 
 // Connection related variables
 const tokens: { [key: string]: string } = {};
-const connections: { ws: WebSocket; username: string; hand: number[] }[] = [];
+const connections: { 
+  ws: WebSocket; 
+  username: string; 
+  hand: number[]; 
+  handCards?: { idCard: number; picture: string; cardType: number }[] 
+}[] = [];
 
 function removeTokenByUser(user: string) {
   for (const token in tokens) {
@@ -646,7 +651,8 @@ router.get('/', authorizationMiddleware, async (ctx) => {
   ws.onmessage = async (event) => {
     const message = event.data;
     const data = JSON.parse(message);
-
+  
+    // Get user information
     const owner = tokens[data.auth_token];
     if (!owner) {
       console.log('Invalid auth token');
@@ -660,7 +666,19 @@ router.get('/', authorizationMiddleware, async (ctx) => {
     }
     
     const userId = user.idUser;
-
+    
+    // Handle player_hand_update
+    if (data.type === 'player_hand_update' && owner === data.username) {
+      // Broadcast the card count update to all connected users
+      notifyAllUsers({
+        type: 'player_hand_update',
+        username: data.username,
+        cardCount: data.cardCount
+      });
+      return;
+    }
+  
+    // Handle add_card_to_hand - add counting deck cards
     if (data.type === 'add_card_to_hand' && userId) {
       // Get the current game ID
       const gameId = await getOrCreateGame();
@@ -685,24 +703,38 @@ router.get('/', authorizationMiddleware, async (ctx) => {
         
         // Convert binary data to base64 strings for JSON safely
         try {
+          const handCards = updatedCards.map(card => {
+            // Safely convert binary data to base64
+            const picture_data = card.picture_data;
+            let base64String = '';
+            
+            if (picture_data) {
+              base64String = safelyConvertToBase64(picture_data);
+            }
+            
+            return {
+              idCard: card.idCard,
+              picture: base64String ? `data:image/png;base64,${base64String}` : '',
+              cardType: card.cardType
+            };
+          });
+          
+          // Update the connection's handCards
+          if (connectionIndex !== -1) {
+            connections[connectionIndex].handCards = handCards;
+          }
+          
           ws.send(JSON.stringify({ 
             type: 'player_hand', 
-            hand: updatedCards.map(card => {
-              // Safely convert binary data to base64
-              const picture_data = card.picture_data;
-              let base64String = '';
-              
-              if (picture_data) {
-                base64String = safelyConvertToBase64(picture_data);
-              }
-              
-              return {
-                idCard: card.idCard,
-                picture: base64String ? `data:image/png;base64,${base64String}` : '',
-                cardType: card.cardType
-              };
-            })
+            hand: handCards
           }));
+          
+          // Broadcast the card count update to all connected users
+          notifyAllUsers({
+            type: 'player_hand_update',
+            username: owner,
+            cardCount: updatedCards.length
+          });
         } catch (error) {
           console.error('Error converting hand images to base64:', error);
         }
@@ -723,7 +755,8 @@ router.get('/', authorizationMiddleware, async (ctx) => {
                 idCard: remainingCardsInDeck[0].idCard,
                 picture: base64String ? `data:image/png;base64,${base64String}` : '',
                 cardType: 54 // Indicate it's a card back
-              }
+              },
+              pileCount: remainingCardsInDeck.length // Add the deck count
             });
           } catch (error) {
             console.error('Error converting card back image to base64:', error);
@@ -736,7 +769,8 @@ router.get('/', authorizationMiddleware, async (ctx) => {
               idCard: null,
               picture: '',
               cardType: null
-            }
+            },
+            pileCount: 0
           });
         }
       } else {
@@ -744,6 +778,52 @@ router.get('/', authorizationMiddleware, async (ctx) => {
       }
       return;
     }
+    
+      // Update the connected_users handler to include card counts
+      if (data.type === 'connected_users') {
+        // Get all users in the current game
+        const gameId = await getOrCreateGame();
+        const usersInGame = await getUsersInGame(gameId);
+        
+        const connectedUsers = await Promise.all(usersInGame.map(async (user) => {
+          // Get profile picture
+          let ppPath = '';
+          if (user.Profile_picture) {
+            const base64String = safelyConvertToBase64(user.Profile_picture);
+            ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
+          }
+          
+          // Get card count for this user from active connection or database
+          const connection = connections.find(conn => conn.username === user.Username);
+          let cardCount = 0;
+          
+          if (connection) {
+            // If user is connected, use hand length from connection
+            cardCount = connection.hand.length;
+          } else {
+            // Otherwise, query database for cards in hand
+            const userCards = await getActiveCardsInHand(gameId, user.idUser);
+            cardCount = userCards.length;
+          }
+          
+          return {
+            username: user.Username,
+            pp_path: ppPath,
+            cardCount: cardCount
+          };
+        }));
+        
+        // Add current user information to the response
+        const response = { 
+          type: 'connected_users', 
+          users: connectedUsers,
+          username: owner // Add current username for client identification
+        };
+        
+        console.log('Sending connected users with card counts:', response);
+        notifyAllUsers(response);
+        return;
+      }
 
     if ('message' in data) {
       const msg = data.message;
