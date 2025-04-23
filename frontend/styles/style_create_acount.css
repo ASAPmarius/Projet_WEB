@@ -128,3 +128,14 @@ body {
 	object-fit: cover;
 	border: 2px solid #4CAF50;
   }
+  .profile-upload {
+	width: 100%;
+	text-align: center;
+  }
+  
+  .helper-text {
+	margin-top: 5px;
+	font-size: 0.8em;
+	color: #666;
+	font-style: italic;
+  }

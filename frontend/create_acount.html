@@ -19,12 +19,13 @@
         <input type="password" id="confirm_password" name="confirm_password" required>
         <span id="error-message" style="color: red; display: none;"></span>
         <br>
-        <label for="profile_picture">Profile Picture:</label>
+        <label for="profile_picture">Profile Picture (optional):</label>
         <div class="profile-upload">
-            <input type="file" id="profile_picture_upload" accept="image/*" required>
+            <input type="file" id="profile_picture_upload" accept="image/*">
             <div id="image-preview" style="display: none;">
                 <img id="preview" src="#" alt="Preview" class="profile-picture">
             </div>
+            <p class="helper-text">If no image is selected, a default profile picture will be used.</p>
         </div>
         <br>
         <div class="button-container">

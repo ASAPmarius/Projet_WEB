@@ -15,6 +15,9 @@ document.addEventListener('DOMContentLoaded', () => {
         imagePreview.style.display = 'block';
       };
       reader.readAsDataURL(file);
+    } else {
+      // If file selection is cleared, hide the preview
+      imagePreview.style.display = 'none';
     }
   });
 });
@@ -26,6 +29,16 @@ async function createAccount() {
   const errorMessage = document.getElementById('error-message');
   const fileInput = document.getElementById('profile_picture_upload');
   
+  // Clear previous error message
+  errorMessage.style.display = 'none';
+  
+  // Validate username and password
+  if (!username || !password) {
+    errorMessage.textContent = 'Username and password are required!';
+    errorMessage.style.display = 'block';
+    return;
+  }
+  
   // Validate passwords match
   if (password !== confirmPassword) {
     errorMessage.textContent = 'Passwords do not match!';
@@ -33,21 +46,33 @@ async function createAccount() {
     return;
   }
 
-  // Check if file is selected
+  // Create request data object
+  const requestData = {
+    username: username,
+    password: password
+  };
+
+  // Check if there's a profile picture and add it if present
   const file = fileInput.files[0];
-  if (!file) {
-    errorMessage.textContent = 'Please select a profile picture!';
-    errorMessage.style.display = 'block';
-    return;
+  if (file) {
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      const profilePictureData = await new Promise((resolve, reject) => {
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+      });
+      
+      // Add to request data
+      requestData.profilePicture = profilePictureData;
+    } catch (error) {
+      console.error("Error processing profile picture:", error);
+      // Continue without the profile picture - will use default
+    }
   }
-  
-  // Convert file to base64
-  const reader = new FileReader();
-  const profilePictureData = await new Promise((resolve, reject) => {
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(e);
-    reader.readAsDataURL(file);
-  });
+  // If no file is selected, we don't add profilePicture to the request
+  // and the server will use the default
 
   // Proceed with account creation
   fetch('http://localhost:3000/create_account', {
@@ -57,12 +82,7 @@ async function createAccount() {
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      username: username,
-      password: password,
-      profilePicture: profilePictureData,
-      pictureType: 'custom'  // Always custom for upload
-    })
+    body: JSON.stringify(requestData)
   })
     .then(response => {
       if (response.ok) {
@@ -75,7 +95,7 @@ async function createAccount() {
     })
     .then(data => {
       alert('Account created successfully!');
-      globalThis.location.href = '../index.html';
+      window.location.href = '../login.html';
     })
     .catch(error => {
       errorMessage.textContent = error.message;

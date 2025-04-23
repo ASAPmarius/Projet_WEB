@@ -12,7 +12,7 @@ import { cors, type CorsOptions } from 'cors';
 import * as bcrypt from 'bcrypt';
 import { create, verify } from 'djwt';
 import { Client } from 'postgres';
-import { base64ToBytes, bytesToDataURL } from './convertIMG.ts';
+import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
 
 // Global error handler
 addEventListener("error", (event) => {
@@ -48,6 +48,38 @@ try {
 } catch (error) {
   console.error('Failed to connect to database:', error);
 }
+
+let defaultProfilePictureCache: Uint8Array | null = null;
+
+async function initDefaultProfilePicture(): Promise<void> {
+  try {
+    console.log('Loading default profile picture...');
+    defaultProfilePictureCache = await convertImageToBytes('./defaultPP.jpg');
+    console.log('Default profile picture loaded successfully!');
+  } catch (error) {
+    console.error('Failed to load default profile picture:', error);
+    defaultProfilePictureCache = null;
+  }
+}
+
+async function getDefaultProfilePicture(): Promise<Uint8Array> {
+  // If we already have the default picture in cache, return it
+  if (defaultProfilePictureCache) {
+    return defaultProfilePictureCache;
+  }
+  
+  // Otherwise, try to load it from the file
+  try {
+    defaultProfilePictureCache = await convertImageToBytes('./defaultPP.jpg');
+    return defaultProfilePictureCache;
+  } catch (error) {
+    console.error('Error loading default profile picture:', error);
+    // Return an empty Uint8Array as fallback
+    return new Uint8Array();
+  }
+}
+
+await initDefaultProfilePicture();
 
 addEventListener('unload', async () => {
   console.log('🛑 Shutting down — disconnecting Postgres');
@@ -114,6 +146,8 @@ function safelyConvertToBase64(binaryData: Uint8Array | null | undefined): strin
     return "";
   }
 }
+
+await initDefaultProfilePicture();
 
 // Function to check the tokens received by websocket messages
 const is_authorized = async (auth_token: string) => {
@@ -216,6 +250,9 @@ async function getUserByUsername(username: string): Promise<User | null> {
 
 async function createUser(username: string, password: string, profilePicture: Uint8Array | null): Promise<User> {
   const hashedPassword = await get_hash(password);
+   if (!profilePicture) {
+    profilePicture = await getDefaultProfilePicture();
+  }
   const result = await client.queryObject<User>(
     'INSERT INTO "User" ("Username", "Password", "Profile_picture", "isAdmin") VALUES ($1, $2, $3, $4) RETURNING *',
     [username, hashedPassword, profilePicture, false]
@@ -460,8 +497,12 @@ router.post('/create_account', async (ctx) => {
   const body = await ctx.request.body.json();
   const { username, password, profilePicture } = body;
 
+  console.log("Creating account for user:", username);
+  console.log("Profile picture provided:", profilePicture ? "Yes" : "No");
+
   const existingUser = await getUserByUsername(username);
   if (existingUser) {
+    console.log("Username already exists:", username);
     ctx.response.status = 400;
     ctx.response.body = { error: 'Username already exists' };
     return;
@@ -469,30 +510,37 @@ router.post('/create_account', async (ctx) => {
 
   let profilePictureBytes: Uint8Array | null = null;
 
-  // Convert base64 to bytes for uploaded image
+  // Convert base64 to bytes if profile picture was provided
   if (profilePicture) {
     try {
+      console.log("Converting provided profile picture to binary");
       profilePictureBytes = base64ToBytes(profilePicture);
     } catch (error) {
       console.error('Error converting profile picture:', error);
-      ctx.response.status = 400;
-      ctx.response.body = { error: 'Invalid profile picture format' };
-      return;
+      // If there's an error, we'll use null which will trigger default pic
+      profilePictureBytes = null;
     }
   } else {
-    ctx.response.status = 400;
-    ctx.response.body = { error: 'Profile picture is required' };
-    return;
+    console.log("Using default profile picture");
+    // profilePictureBytes remains null - default will be used
   }
 
-  const newUser = await createUser(username, password, profilePictureBytes);
+  try {
+    // The createUser function should handle null by using default picture
+    const newUser = await createUser(username, password, profilePictureBytes);
+    console.log("User created successfully:", newUser.idUser);
 
-  ctx.response.status = 201;
-  ctx.response.body = { status: 'success', user: { 
-    idUser: newUser.idUser,
-    Username: newUser.Username,
-    isAdmin: newUser.isAdmin
-  }};
+    ctx.response.status = 201;
+    ctx.response.body = { status: 'success', user: { 
+      idUser: newUser.idUser,
+      Username: newUser.Username,
+      isAdmin: newUser.isAdmin
+    }};
+  } catch (error) {
+    console.error("Error creating user:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Failed to create account' };
+  }
 });
 
 router.get('/get_cookie', async (ctx) => {
