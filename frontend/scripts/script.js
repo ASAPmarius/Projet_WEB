@@ -48,7 +48,7 @@ function login() {
     .then(data => {
       console.log('Login successful, redirecting...');
       localStorage.setItem('auth_token', data.auth_token);
-      window.location.href = '../index.html';
+      globalThis.location.href = '../index.html';
     })
     .catch(error => {
       console.error('Login error:', error);
@@ -69,5 +69,5 @@ if (password) {
 
 // eslint-disable-next-line no-unused-vars
 function create_account_page() {
-  window.location.href = '../create_acount.html';
+  globalThis.location.href = '../create_acount.html';
 }
