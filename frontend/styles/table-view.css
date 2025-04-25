@@ -1,212 +1,235 @@
-/* Poker table layout styles */
+/* Poker table layout styles - with card badge fix */
 .poker-table-container {
-    position: fixed;
-    top: 50%;
-    left: 45%; /* Moved slightly to the left to account for chat */
-    transform: translate(-50%, -50%);
-    width: calc(90vw - 200px);  /* Adjusted width to account for chat */
-    height: 75vh; /* Reduced height to make room for players */
-    max-width: 1200px;
-    max-height: 700px;
-    border-radius: 45% / 30%;  /* Elliptical shape */
-    background-color: #2a7d2e;  /* Poker table green */
-    box-shadow: 0 0 0 20px #763c28;  /* Brown table edge */
-    z-index: 5;
-    transition: width 0.3s ease, left 0.3s ease;
-  }
-  
-  .table-center {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 140px;
-    height: 140px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 6;
-  }
-  
-  .draw-pile {
-    position: relative;
-    width: 120px;
-    height: 180px;
-    background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    overflow: hidden;
-    transition: transform 0.2s ease;
-  }
-  
-  .draw-pile:hover {
-    transform: scale(1.05);
-  }
-  
-  .pile-count {
-    position: absolute;
-    top: -15px;
-    right: -15px;
-    background-color: #ff5722;
-    color: white;
-    font-size: 16px;
-    font-weight: bold;
-    padding: 8px 12px;
-    border-radius: 50%;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-    z-index: 7;
+  position: fixed;
+  top: 50%;
+  left: 45%; /* Moved slightly to the left to account for chat */
+  transform: translate(-50%, -50%);
+  width: calc(90vw - 200px);  /* Adjusted width to account for chat */
+  height: 75vh; /* Reduced height to make room for players */
+  max-width: 1200px;
+  max-height: 700px;
+  border-radius: 45% / 30%;  /* Elliptical shape */
+  background-color: #2a7d2e;  /* Poker table green */
+  box-shadow: 0 0 0 20px #763c28;  /* Brown table edge */
+  z-index: 5;
+  transition: width 0.3s ease, left 0.3s ease;
+}
+
+.table-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140px;
+  height: 140px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 6;
+}
+
+.draw-pile {
+  position: relative;
+  width: 120px;
+  height: 180px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  overflow: visible !important; /* Changed from hidden to visible */
+  transition: transform 0.2s ease;
+}
+
+.draw-pile:hover {
+  transform: scale(1.05);
+}
+
+/* FIXED CARD NOTIFICATION BADGE */
+.pile-count {
+  position: absolute !important;
+  top: -15px !important;
+  right: -15px !important;
+  width: 32px !important;
+  height: 32px !important;
+  background-color: #ff5722 !important;
+  color: white !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  border-radius: 50% !important;
+  z-index: 100 !important;
+  padding: 0 !important;
+  border: 2px solid white !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5) !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  pointer-events: none !important;
+}
+
+/* Card stack needs overflow visible */
+.card-stack {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* Card needs overflow visible */
+.card {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* Rest of the table-view.css remains unchanged */
+.player-seat {
+  position: absolute;
+  width: 180px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 12px;
+  border: 3px solid #333;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 20;
+  transition: transform 0.2s ease;
+  transform-origin: center bottom;
+}
+
+.player-seat.current-player {
+  border: 3px solid #ffcc00;
+  background-color: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
+}
+
+.player-info {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.player-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #666;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.player-details {
+  margin-left: 12px;
+  flex-grow: 1;
+}
+
+.player-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+.player-cards {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.card-mini {
+  display: inline-block;
+  width: 30px;
+  height: 42px;
+  background-color: white;
+  border-radius: 5px;
+  margin-right: -15px;
+  border: 1px solid #ccc;
+  box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.cards-count {
+  margin-left: 20px;
+  font-weight: bold;
+  font-size: 16px;
+  color: #ffcc00;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Position seats around but outside the elliptical table */
+.player-seat:nth-child(1) {
+  top: -100px; /* Move up, outside the table */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.player-seat:nth-child(2) {
+  top: 20%;
+  right: -120px; /* Move right, outside the table */
+}
+
+.player-seat:nth-child(3) {
+  bottom: 20%;
+  right: -120px; /* Move right, outside the table */
+}
+
+.player-seat:nth-child(4) {
+  bottom: -100px; /* Move down, outside the table */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.player-seat:nth-child(5) {
+  bottom: 20%;
+  left: -120px; /* Move left, outside the table */
+}
+
+.player-seat:nth-child(6) {
+  top: 20%;
+  left: -120px; /* Move left, outside the table */
+}
+
+/* Make sure hand container stays visible */
+.hand-container {
+  position: fixed;
+  bottom: 30px;
+  left: 0;
+  right: 0;
+  height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: visible;
+  z-index: 100;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .poker-table-container {
+    width: 85vw;
+    height: 65vh;
   }
   
   .player-seat {
-    position: absolute;
-    width: 180px;
-    padding: 12px;
-    background-color: rgba(0, 0, 0, 0.7);
-    border-radius: 12px;
-    border: 3px solid #333;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    z-index: 20; /* Increased z-index to ensure they stay above the table */
-    transition: transform 0.2s ease;
-    transform-origin: center bottom;
-  }
-  
-  .player-seat.current-player {
-    border: 3px solid #ffcc00;
-    background-color: rgba(0, 0, 0, 0.85);
-    box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
-  }
-  
-  .player-info {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    margin-bottom: 8px;
+    width: 150px;
+    padding: 8px;
   }
   
   .player-avatar {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid #666;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    width: 50px;
+    height: 50px;
   }
   
-  .player-details {
-    margin-left: 12px;
-    flex-grow: 1;
-  }
-  
-  .player-name {
-    font-size: 18px;
-    font-weight: bold;
-    color: white;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100px;
-  }
-  
-  .player-cards {
-    font-size: 12px;
-    color: #ccc;
-  }
-  
-  .card-mini {
-    display: inline-block;
-    width: 30px;
-    height: 42px;
-    background-color: white;
-    border-radius: 5px;
-    margin-right: -15px;
-    border: 1px solid #ccc;
-    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
-  }
-  
-  .cards-count {
-    margin-left: 20px;
-    font-weight: bold;
-    font-size: 18px;
-    color: #ffcc00;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  }
-  
-  /* Position seats around but outside the elliptical table */
-  .player-seat:nth-child(1) {
-    top: -100px; /* Move up, outside the table */
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .player-seat:nth-child(2) {
-    top: 20%;
-    right: -120px; /* Move right, outside the table */
-  }
-  
-  .player-seat:nth-child(3) {
-    bottom: 20%;
-    right: -120px; /* Move right, outside the table */
-  }
-  
-  .player-seat:nth-child(4) {
-    bottom: -100px; /* Move down, outside the table */
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .player-seat:nth-child(5) {
-    bottom: 20%;
-    left: -120px; /* Move left, outside the table */
-  }
-  
-  .player-seat:nth-child(6) {
-    top: 20%;
-    left: -120px; /* Move left, outside the table */
-  }
-  
-  /* Make sure hand container stays visible */
-  .hand-container {
-    position: fixed;
-    bottom: 30px;
-    left: 0;
-    right: 0;
-    height: 120px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: visible;
-    z-index: 100;
-  }
-  
-  /* Responsive adjustments */
-  @media (max-width: 1200px) {
-    .poker-table-container {
-      width: 85vw;
-      height: 65vh;
-    }
-    
-    .player-seat {
-      width: 150px;
-      padding: 8px;
-    }
-    
-    .player-avatar {
-      width: 50px;
-      height: 50px;
-    }
-    
-    /* Adjust player positions for smaller screens */
-    .player-seat:nth-child(1) { top: -80px; }
-    .player-seat:nth-child(2) { right: -100px; }
-    .player-seat:nth-child(3) { right: -100px; }
-    .player-seat:nth-child(4) { bottom: -80px; }
-    .player-seat:nth-child(5) { left: -100px; }
-    .player-seat:nth-child(6) { left: -100px; }
-  }
+  /* Adjust player positions for smaller screens */
+  .player-seat:nth-child(1) { top: -80px; }
+  .player-seat:nth-child(2) { right: -100px; }
+  .player-seat:nth-child(3) { right: -100px; }
+  .player-seat:nth-child(4) { bottom: -80px; }
+  .player-seat:nth-child(5) { left: -100px; }
+  .player-seat:nth-child(6) { left: -100px; }
+}

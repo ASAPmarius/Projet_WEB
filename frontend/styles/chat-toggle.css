@@ -1,137 +1,105 @@
-/* Chat toggle button styles */
+/* Chat toggle button styles - with transparency fix */
 .chat-toggle {
-    position: fixed;
-    top: 50%;
-    right: 400px; /* Position it at the edge of the chat container when visible */
-    transform: translateY(-50%);
-    width: 30px;
-    height: 60px;
-    background-color: #4CAF50;
-    border-radius: 8px 0 0 8px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    z-index: 1000;
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
-    transition: right 0.3s ease;
-  }
-  
-  .chat-toggle.chat-hidden {
-    right: 0; /* Move to edge of screen when chat is hidden */
-  }
-  
-  .chat-toggle::before {
-    content: "◀";
-    color: white;
-    font-size: 20px;
-  }
-  
-  .chat-toggle.chat-hidden::before {
-    content: "▶";
-  }
-  
-  /* Chat container adjustment */
-  .container {
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: 400px;
-    background-color: white;
-    transition: transform 0.3s ease;
-    z-index: 999;
-    border-left: 1px solid #ccc;
-    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
-  }
-  
-  .container.chat-hidden {
-    transform: translateX(100%); /* Move off screen */
-  }
-  
-  /* Update poker table for better fit with toggle chat */
-  .poker-table-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: calc(90vw - 200px); /* Adjust width to accommodate chat */
-    max-width: 1200px;
-    height: 75vh;
-    max-height: 800px;
-    transition: width 0.3s ease, left 0.3s ease;
-  }
-  
-  .poker-table-container.chat-hidden {
-    width: 90vw; /* Full width when chat is hidden */
-    left: 45%; /* Center better when chat is hidden */
-  }
-  
-  /* Position players outside the table */
-  .player-seat {
-    position: absolute;
-    width: 180px;
-    padding: 12px;
-    background-color: rgba(0, 0, 0, 0.7);
-    border-radius: 12px;
-    border: 3px solid #333;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    z-index: 10;
-    transition: transform 0.2s ease;
-  }
-  
-  /* Reposition players completely outside the table */
-  .player-seat:nth-child(1) {
-    top: -100px; /* Move up, outside the table */
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .player-seat:nth-child(2) {
-    top: 20%;
-    right: -120px; /* Move right, outside the table */
-  }
-  
-  .player-seat:nth-child(3) {
-    bottom: 20%;
-    right: -120px; /* Move right, outside the table */
-  }
-  
-  .player-seat:nth-child(4) {
-    bottom: -100px; /* Move down, outside the table */
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .player-seat:nth-child(5) {
-    bottom: 20%;
-    left: -120px; /* Move left, outside the table */
-  }
-  
-  .player-seat:nth-child(6) {
-    top: 20%;
-    left: -120px; /* Move left, outside the table */
-  }
-  
-  /* Adjust the profile container to be above the table */
-  .profile-container {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    z-index: 1000;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* Adjust the hand container to be at the bottom of the screen */
-  .hand-container {
-    bottom: 20px;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-  }
+  position: fixed;
+  top: 50%;
+  right: 400px; /* Position it at the edge of the chat container when visible */
+  transform: translateY(-50%);
+  width: 30px;
+  height: 60px;
+  background-color: #4CAF50;
+  border-radius: 8px 0 0 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
+  transition: right 0.3s ease;
+}
+
+.chat-toggle.chat-hidden {
+  right: 0; /* Move to edge of screen when chat is hidden */
+}
+
+.chat-toggle::before {
+  content: "◀";
+  color: white;
+  font-size: 20px;
+}
+
+.chat-toggle.chat-hidden::before {
+  content: "▶";
+}
+
+/* Chat container with transparency fix */
+.container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 400px;
+  background-color: rgba(255, 255, 255, 0.1); /* Transparent container */
+  transition: transform 0.3s ease;
+  z-index: 999;
+  border-left: 1px solid rgba(204, 204, 204, 0.3);
+  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(3px);
+  pointer-events: auto !important;
+}
+
+.container.chat-hidden {
+  transform: translateX(100%); /* Move off screen */
+}
+
+/* Transparent chatbox */
+.chatbox {
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  pointer-events: auto !important;
+}
+
+/* Keep messages area opaque for readability */
+.messages {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 1000;
+}
+
+/* Semi-transparent header */
+h1 {
+  color: #4CAF50;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8); /* Text glow for better visibility */
+}
+
+/* Make input area visible but semi-transparent */
+.input-area {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  padding: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1050;
+  pointer-events: auto !important;
+}
+
+/* Keep input and button opaque */
+#messageInput, 
+.input-area button {
+  background-color: white !important;
+  z-index: 1051;
+  position: relative;
+  pointer-events: auto !important;
+}
+
+/* Keep message boxes fully opaque */
+.message-box {
+  background-color: #f1f1f1 !important;
+  pointer-events: auto !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.my-message {
+  background-color: #d1f8d1 !important;
+}

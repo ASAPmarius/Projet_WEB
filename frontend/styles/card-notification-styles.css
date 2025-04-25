@@ -1,0 +1,58 @@
+/* Specific styles to ensure card notification is properly displayed */
+
+/* Make the card have overflow visible */
+.card {
+    overflow: visible !important;
+    position: relative !important;
+  }
+  
+  /* Make the card stack have overflow visible */
+  .card-stack {
+    overflow: visible !important;
+    position: relative !important;
+  }
+  
+  /* Card notification badge */
+  .pile-count {
+    position: absolute !important;
+    top: -10px !important;
+    right: -10px !important;
+    width: 32px !important;
+    height: 32px !important;
+    background-color: #ff5722 !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    border-radius: 50% !important;
+    z-index: 9999 !important;
+    border: 2px solid white !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5) !important;
+    pointer-events: none !important; /* Don't capture clicks */
+  }
+  
+  /* Card image should not overflow its container */
+  .card-image {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+  }
+  
+  /* Card should not hide or crop its children */
+  .card * {
+    position: relative;
+  }
+  
+  /* Remove any max-width or max-height restrictions that might cause cropping */
+  img.card-image {
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+  
+  /* For double-digit numbers, slightly reduce font size */
+  .pile-count.double-digit {
+    font-size: 14px !important;
+  }
