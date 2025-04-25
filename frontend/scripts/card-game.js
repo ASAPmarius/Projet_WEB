@@ -14,25 +14,41 @@
   // Initialize application when DOM is loaded
   document.addEventListener('DOMContentLoaded', init);
   
-  // Main initialization function
+  // Main initialization function with improved error handling
   function init() {
-    // Store references to DOM elements
-    cardElement = document.getElementById('card');
-    originalCardStack = document.getElementById('cardStack');
-    chatContainer = document.querySelector('.container');
-    messageInput = document.getElementById('messageInput');
-    
-    // Initialize all components with a slight delay to ensure DOM is ready
-    setTimeout(() => {
-      initChatToggle();
-      initChatInput();
-      initPokerTable();
-      addCardNotification();
-      setupEventListeners();
-    }, 500);
-    
-    // Initialize WebSocket connection
-    connectWebSocket();
+    try {
+      // Store references to DOM elements
+      cardElement = document.getElementById('card');
+      originalCardStack = document.getElementById('cardStack');
+      chatContainer = document.querySelector('.container');
+      messageInput = document.getElementById('messageInput');
+      
+      console.log('DOM elements initialization:');
+      console.log('- Card element:', cardElement ? 'found' : 'not found');
+      console.log('- Original card stack:', originalCardStack ? 'found' : 'not found');
+      console.log('- Chat container:', chatContainer ? 'found' : 'not found');
+      console.log('- Message input:', messageInput ? 'found' : 'not found');
+      
+      // Initialize all components with a slight delay to ensure DOM is ready
+      setTimeout(() => {
+        try {
+          console.log('Starting components initialization');
+          initChatToggle();
+          initChatInput();
+          initPokerTable();
+          addCardNotification();
+          setupEventListeners();
+          console.log('Components initialization completed');
+        } catch (error) {
+          console.error('Error during component initialization:', error);
+        }
+      }, 1000); // Increased from 500ms to 1000ms
+      
+      // Initialize WebSocket connection
+      connectWebSocket();
+    } catch (error) {
+      console.error('Error during main initialization:', error);
+    }
   }
   
   // ====================== WEBSOCKET FUNCTIONALITY ======================
@@ -104,6 +120,11 @@
     const message = data;
     const messageBox = document.createElement('div');
     messageBox.className = 'message-box';
+
+    // Store the userId as a data attribute if available
+    if (message.userId) {
+      messageBox.setAttribute('data-user-id', message.userId);
+    }
 
     const userPicture = document.createElement('img');
     
@@ -400,24 +421,36 @@
   }
   
   // ====================== POKER TABLE FUNCTIONALITY ======================
-  // Initialize the poker table
+  // Initialize the poker table with retry logic
   function initPokerTable() {
     console.log('Initializing poker table');
     
     if (!originalCardStack || !cardElement) {
-      console.warn('Original card stack or card element not found');
+      console.warn('Original card stack or card element not found, will retry');
+      // Retry with a short delay
+      setTimeout(initPokerTable, 100);
       return;
     }
     
     // Create the poker table if it doesn't exist
     if (!document.getElementById('pokerTableContainer')) {
-      createPokerTable();
+      try {
+        createPokerTable();
+        console.log('Poker table created successfully');
+        
+        // Hide the original card stack
+        hideOriginalCardStack();
+      } catch (error) {
+        console.error('Error creating poker table:', error);
+        // Retry with a short delay
+        setTimeout(initPokerTable, 100);
+      }
+    } else {
+      console.log('Poker table already exists');
+      // Make sure the reference is set
+      pokerTable = document.getElementById('pokerTableContainer');
     }
-    
-    // Hide the original card stack
-    hideOriginalCardStack();
   }
-  
   // Create the poker table
   function createPokerTable() {
     // Create the table container

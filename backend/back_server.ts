@@ -99,6 +99,8 @@ interface User {
   Password: string;
   Profile_picture: Uint8Array | null;
   isAdmin: boolean;
+  Bio?: string;         // New optional field
+  Favorite_song?: string; // New optional field
 }
 
 interface Card {
@@ -117,6 +119,7 @@ interface ActiveCard {
 interface ChatMessage {
   idMessages: number;
   idGame: number;
+  idUser: number;       // New field matching the updated database
   TextContent: string;
   Timestamp: Date;
 }
@@ -253,15 +256,24 @@ async function getUserByUsername(username: string): Promise<User | null> {
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
-async function createUser(username: string, password: string, profilePicture: Uint8Array | null): Promise<User> {
+async function createUser(
+  username: string, 
+  password: string, 
+  profilePicture: Uint8Array | null,
+  bio: string | null = null,
+  favoriteSong: string | null = null
+): Promise<User> {
   const hashedPassword = await get_hash(password);
-   if (!profilePicture) {
+  if (!profilePicture) {
     profilePicture = await getDefaultProfilePicture();
   }
+  
   const result = await client.queryObject<User>(
-    'INSERT INTO "User" ("Username", "Password", "Profile_picture", "isAdmin") VALUES ($1, $2, $3, $4) RETURNING *',
-    [username, hashedPassword, profilePicture, false]
+    'INSERT INTO "User" ("Username", "Password", "Profile_picture", "isAdmin", "Bio", "Favorite_song") ' +
+    'VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+    [username, hashedPassword, profilePicture, false, bio, favoriteSong]
   );
+  
   return result.rows[0];
 }
 
@@ -323,10 +335,10 @@ async function getActiveCardsInHand(gameId: number, userId: number): Promise<(Ac
   return result.rows;
 }
 
-async function recordChatMessage(gameId: number, textContent: string): Promise<ChatMessage> {
+async function recordChatMessage(gameId: number, userId: number, textContent: string): Promise<ChatMessage> {
   const result = await client.queryObject<ChatMessage>(
-    'INSERT INTO "ChatMessages" ("idGame", "TextContent") VALUES ($1, $2) RETURNING *',
-    [gameId, textContent]
+    'INSERT INTO "ChatMessages" ("idGame", "idUser", "TextContent") VALUES ($1, $2, $3) RETURNING *',
+    [gameId, userId, textContent]
   );
   return result.rows[0];
 }
@@ -500,10 +512,12 @@ router.post('/create_account', async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
   const body = await ctx.request.body.json();
-  const { username, password, profilePicture } = body;
+  const { username, password, profilePicture, bio, favoriteSong } = body;
 
   console.log("Creating account for user:", username);
   console.log("Profile picture provided:", profilePicture ? "Yes" : "No");
+  console.log("Bio provided:", bio ? "Yes" : "No");
+  console.log("Favorite song provided:", favoriteSong ? "Yes" : "No");
 
   const existingUser = await getUserByUsername(username);
   if (existingUser) {
@@ -531,15 +545,24 @@ router.post('/create_account', async (ctx) => {
   }
 
   try {
-    // The createUser function should handle null by using default picture
-    const newUser = await createUser(username, password, profilePictureBytes);
+    // Use the updated createUser function with bio and favorite song
+    const newUser = await createUser(
+      username, 
+      password, 
+      profilePictureBytes,
+      bio || null,
+      favoriteSong || null
+    );
+    
     console.log("User created successfully:", newUser.idUser);
 
     ctx.response.status = 201;
     ctx.response.body = { status: 'success', user: { 
       idUser: newUser.idUser,
       Username: newUser.Username,
-      isAdmin: newUser.isAdmin
+      isAdmin: newUser.isAdmin,
+      Bio: newUser.Bio,
+      Favorite_song: newUser.Favorite_song
     }};
   } catch (error) {
     console.error("Error creating user:", error);
@@ -825,37 +848,53 @@ router.get('/', authorizationMiddleware, async (ctx) => {
         return;
       }
 
-    if ('message' in data) {
-      const msg = data.message;
-      if (msg.length == 0) {
+      // Updated chat message handling in ws.onmessage
+      if ('message' in data) {
+        const msg = data.message;
+        if (msg.length == 0) {
+          return;
+        }
+        
+        // Check that we have a valid userId
+        if (!userId) {
+          console.error('Cannot send message: Missing userId for user', owner);
+          return;
+        }
+        
+        // Store the message in the database with the user ID
+        const gameId = await getOrCreateGame();
+        
+        try {
+          // Explicitly pass the userId as a number to ensure it's not null
+          const chatMessage = await recordChatMessage(gameId, userId, msg);
+          console.log(`Chat message recorded with ID: ${chatMessage.idMessages}, userId: ${chatMessage.idUser}`);
+          
+          // Handle profile picture - either from DB or path
+          let userProfilePicture = '';
+          if (user.Profile_picture) {
+            const base64String = safelyConvertToBase64(user.Profile_picture);
+            userProfilePicture = base64String ? `data:image/png;base64,${base64String}` : '';
+          }
+          
+          // Send the message to all connected users
+          connections.forEach((client) => {
+            client.ws.send(
+              JSON.stringify({
+                type: 'message',
+                message: msg,
+                owner: owner,
+                user_pp_path: userProfilePicture,
+                username: client.username,
+                userId: userId  // Add userId to the message object
+              }),
+            );
+          });
+        } catch (error) {
+          console.error('Error recording chat message:', error);
+        }
+        
         return;
       }
-      
-      // Store the message in the database
-      const gameId = await getOrCreateGame();
-      await recordChatMessage(gameId, msg);
-      
-      // Handle profile picture - either from DB or path
-      let userProfilePicture = '';
-      if (user.Profile_picture) {
-        const base64String = safelyConvertToBase64(user.Profile_picture);
-        userProfilePicture = base64String ? `data:image/png;base64,${base64String}` : '';
-      }
-      
-      // Send the message to all connected users
-      connections.forEach((client) => {
-        client.ws.send(
-          JSON.stringify({
-            type: 'message',
-            message: msg,
-            owner: owner,
-            user_pp_path: userProfilePicture,
-            username: client.username,
-          }),
-        );
-      });
-      return;
-    }
 
     if (data.type === 'connected_users') {
       // Get all users in the current game

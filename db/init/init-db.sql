@@ -4,7 +4,9 @@ CREATE TABLE IF NOT EXISTS "User" (
     "Username" VARCHAR(50) NOT NULL UNIQUE,
     "Password" VARCHAR(255) NOT NULL,
     "Profile_picture" BYTEA,
-    "isAdmin" BOOLEAN DEFAULT FALSE
+    "isAdmin" BOOLEAN DEFAULT FALSE,
+    "Bio" TEXT,
+    "Favorite_song" VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS "Game" (
@@ -39,6 +41,7 @@ CREATE TABLE IF NOT EXISTS "ActiveCards" (
 CREATE TABLE IF NOT EXISTS "ChatMessages" (
     "idMessages" SERIAL PRIMARY KEY,
     "idGame" INT REFERENCES "Game"("idGame"),
+    "idUser" INT REFERENCES "User"("idUser"),
     "TextContent" TEXT NOT NULL,
     "Timestamp" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
