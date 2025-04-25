@@ -4,12 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Card Game</title>
+    <!-- Load base styles first -->
     <link rel="stylesheet" href="styles/styleschat.css">
     <link rel="stylesheet" href="styles/table-view.css">
+    <!-- Load the updated styles second to override any conflicts -->
     <link rel="stylesheet" href="styles/chat-toggle.css">
+    <link rel="stylesheet" href="styles/chat-input-fix.css">
+    <!-- Add the dedicated fix for card notification -->
+    <link rel="stylesheet" href="styles/card-notification-styles.css">
+    <!-- Load scripts -->
+    <script src="scripts/fixed-card-display.js" defer></script>
     <script src="scripts/table-view.js" defer></script>
     <script src="scripts/chat-toggle.js" defer></script>
     <script src="scripts/scriptchat.js" defer></script>
+    <script src="scripts/chat-input-fix.js" defer></script>
 </head>
 <body>
     <div class="profile-container">
@@ -26,8 +34,8 @@
         <div class="chatbox">
             <div class="messages" id="messages"></div>
             <div class="input-area">
-                <input type="text" id="messageInput" placeholder="Type your message here...">
-                <button onclick="sendJson();">Send</button>
+                <input type="text" id="messageInput" placeholder="Type your message here..." tabindex="1">
+                <button onclick="sendJson();" type="button">Send</button>
             </div>
         </div>
     </div>
@@ -35,6 +43,7 @@
     <div class="card-stack" id="cardStack">
         <div class="card" id="card">
             <!-- Card will be populated dynamically -->
+            <!-- The notification badge will be added via JavaScript -->
         </div>
     </div>
     
