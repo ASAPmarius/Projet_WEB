@@ -860,12 +860,17 @@ router.get('/', authorizationMiddleware, async (ctx) => {
           console.error('Cannot send message: Missing userId for user', owner);
           return;
         }
+
+        console.log("Recording chat message with:", {
+          userId,
+          messageLength: msg.length
+        });
         
         // Store the message in the database with the user ID
         const gameId = await getOrCreateGame();
         
         try {
-          // Explicitly pass the userId as a number to ensure it's not null
+          // Make sure recordChatMessage accepts and uses all three parameters
           const chatMessage = await recordChatMessage(gameId, userId, msg);
           console.log(`Chat message recorded with ID: ${chatMessage.idMessages}, userId: ${chatMessage.idUser}`);
           
