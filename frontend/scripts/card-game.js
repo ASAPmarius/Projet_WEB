@@ -38,6 +38,7 @@
           initPokerTable();
           addCardNotification();
           setupEventListeners();
+          addHelloPageButton();
           console.log('Components initialization completed');
         } catch (error) {
           console.error('Error during component initialization:', error);
@@ -49,6 +50,20 @@
     } catch (error) {
       console.error('Error during main initialization:', error);
     }
+
+     // Check if we're returning from hello page
+  if (localStorage.getItem('wsWasOpen') === 'true') {
+    // Clear the flag
+    localStorage.removeItem('wsWasOpen');
+    
+    // Make sure we don't redirect to login if returning from hello page
+    setTimeout(() => {
+      if (websocket && websocket.readyState !== WebSocket.OPEN) {
+        console.log('Reconnecting WebSocket after returning from hello page');
+        connectWebSocket();
+      }
+    }, 1000);
+  }
   }
   
   // ====================== WEBSOCKET FUNCTIONALITY ======================
@@ -108,10 +123,13 @@
     goToLogin();
   }
   
-  // Handle WebSocket close
   function handleWebSocketClose(event) {
     console.log('WebSocket connection closed:', event);
-    goToLogin();
+    
+    // Only redirect to login if we're not navigating to hello page
+    if (localStorage.getItem('wsWasOpen') !== 'true') {
+      goToLogin();
+    }
   }
   
   // Handle chat messages
@@ -725,6 +743,28 @@
     
     const data = { auth_token: localStorage.auth_token, type: type };
     websocket.send(JSON.stringify(data));
+  }
+
+  function addHelloPageButton() {
+    // Create the button element
+    const helloButton = document.createElement('button');
+    helloButton.id = 'helloPageButton';
+    helloButton.className = 'hello-page-button';
+    helloButton.textContent = 'Hello Page';
+    
+    // Add click event that prevents WebSocket from closing
+    helloButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      // Store WebSocket state before navigation
+      localStorage.setItem('wsWasOpen', 'true');
+      
+      // Open the hello page in the same tab
+      globalThis.location.href = 'profile.html';
+    });
+    
+    // Add the button to the body
+    document.body.appendChild(helloButton);
   }
   
   // ====================== EXPOSE PUBLIC API ======================
