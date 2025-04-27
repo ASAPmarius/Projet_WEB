@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Card Game Lobby</title>
+    <!-- Authentication check script -->
+    <script src="scripts/auth-check.js"></script>
     <link rel="stylesheet" href="styles/style.css">
     <style>
         /* Game Lobby Styles */
@@ -179,9 +181,27 @@
             border-radius: 50%;
             margin-right: 8px;
         }
+        
+        .logout-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        
+        .logout-btn:hover {
+            background-color: #d32f2f;
+        }
     </style>
 </head>
 <body>
+    <button id="logoutBtn" class="logout-btn" onclick="logout()">Logout</button>
+    
     <div class="lobby-container">
         <div class="lobby-header">
             <h1 class="lobby-title">Card Game Lobby</h1>
@@ -203,7 +223,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Check if user is logged in
+            // Verify authentication status
             const authToken = localStorage.getItem('auth_token');
             if (!authToken) {
                 window.location.href = 'login.html';
@@ -343,12 +363,39 @@
             }
             
             // Function to create a new game
-            function createNewGame() {
-                // Clear current game ID in local storage
-                localStorage.removeItem('currentGameId');
-                
-                // Redirect to game page
-                window.location.href = 'index.html';
+            async function createNewGame() {
+                try {
+                    // Call the server to create a new game
+                    const response = await fetch('http://localhost:3000/create-game', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to create game');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Store the game ID in local storage
+                    if (data && data.game && data.game.idGame) {
+                        localStorage.setItem('currentGameId', data.game.idGame);
+                        
+                        // Set the WebSocket flag to prevent disconnection on navigation
+                        localStorage.setItem('wsWasOpen', 'true');
+                        
+                        // Redirect to the game page
+                        window.location.href = 'index.html';
+                    } else {
+                        throw new Error('Invalid response from server');
+                    }
+                } catch (error) {
+                    console.error('Error creating game:', error);
+                    alert('Failed to create game. Please try again.');
+                }
             }
             
             // Function to join an existing game
@@ -398,6 +445,15 @@
             // Make returnToGame available globally
             window.returnToGame = returnToGame;
         });
+        
+        // Logout function
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('currentUsername');
+            localStorage.removeItem('currentGameId');
+            localStorage.removeItem('wsWasOpen');
+            window.location.href = 'login.html';
+        }
     </script>
 </body>
 </html>

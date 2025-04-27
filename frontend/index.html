@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Card Game</title>
+    <!-- Authentication check script -->
+    <script src="scripts/auth-check.js"></script>
     <!-- Single consolidated CSS file -->
     <link rel="stylesheet" href="styles/main-style.css">
     <!-- Single consolidated JavaScript file -->
@@ -39,5 +41,19 @@
     <div class="hand-container" id="handContainer">
         <!-- Player's hand will be populated dynamically -->
     </div>
+    
+    <!-- Return to Games Lobby button -->
+    <button id="backToLobbyBtn" class="back-to-lobby-btn" onclick="returnToLobby()">Back to Games Lobby</button>
+    
+    <script>
+        // Function to return to the games lobby
+        function returnToLobby() {
+            // Store WebSocket state before navigation
+            localStorage.setItem('wsWasOpen', 'true');
+            
+            // Navigate to games page
+            window.location.href = 'games.html';
+        }
+    </script>
 </body>
 </html>

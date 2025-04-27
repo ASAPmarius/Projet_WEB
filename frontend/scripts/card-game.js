@@ -14,45 +14,81 @@
   // Initialize application when DOM is loaded
   document.addEventListener('DOMContentLoaded', init);
   
-  // Main initialization function with improved error handling
-  function init() {
-    try {
-      // Store references to DOM elements
-      cardElement = document.getElementById('card');
-      originalCardStack = document.getElementById('cardStack');
-      chatContainer = document.querySelector('.container');
-      messageInput = document.getElementById('messageInput');
-      
-      console.log('DOM elements initialization:');
-      console.log('- Card element:', cardElement ? 'found' : 'not found');
-      console.log('- Original card stack:', originalCardStack ? 'found' : 'not found');
-      console.log('- Chat container:', chatContainer ? 'found' : 'not found');
-      console.log('- Message input:', messageInput ? 'found' : 'not found');
-      
-      // Initialize all components with a slight delay to ensure DOM is ready
-      setTimeout(() => {
-        try {
-          console.log('Starting components initialization');
-          initChatToggle();
-          initChatInput();
-          initPokerTable();
-          addCardNotification();
-          setupEventListeners();
-          addHelloPageButton();
-          addFinishGameButton();
-          console.log('Components initialization completed');
-        } catch (error) {
-          console.error('Error during component initialization:', error);
-        }
-      }, 1000); // Increased from 500ms to 1000ms
-      
-      // Initialize WebSocket connection
-      connectWebSocket();
-    } catch (error) {
-      console.error('Error during main initialization:', error);
-    }
+// Update the card-game.js init function to check for active games
 
-     // Check if we're returning from hello page
+// Main initialization function with improved error handling and game check
+async function init() {
+  try {
+    // First, check if user has an active game
+    try {
+      const response = await fetch('http://localhost:3000/active-game', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      // If no active game, redirect to games page
+      if (!response.ok) {
+        console.log('No active game found, redirecting to games page');
+        globalThis.location.href = 'games.html';
+        return;
+      }
+      
+      // Store game data if needed
+      const gameData = await response.json();
+      if (gameData && gameData.game && gameData.game.idGame) {
+        console.log('Active game found:', gameData.game.idGame);
+        // Store in localStorage for navigation
+        localStorage.setItem('currentGameId', gameData.game.idGame);
+      }
+    } catch (error) {
+      console.error('Error checking for active game:', error);
+      globalThis.location.href = 'games.html';
+      return;
+    }
+    
+    // Continue with normal initialization if we have an active game
+    // Store references to DOM elements
+    cardElement = document.getElementById('card');
+    originalCardStack = document.getElementById('cardStack');
+    chatContainer = document.querySelector('.container');
+    messageInput = document.getElementById('messageInput');
+    
+    console.log('DOM elements initialization:');
+    console.log('- Card element:', cardElement ? 'found' : 'not found');
+    console.log('- Original card stack:', originalCardStack ? 'found' : 'not found');
+    console.log('- Chat container:', chatContainer ? 'found' : 'not found');
+    console.log('- Message input:', messageInput ? 'found' : 'not found');
+    
+    // Initialize all components with a slight delay to ensure DOM is ready
+    setTimeout(() => {
+      try {
+        console.log('Starting components initialization');
+        initChatToggle();
+        initChatInput();
+        initPokerTable();
+        addCardNotification();
+        setupEventListeners();
+        addHelloPageButton();
+        addFinishGameButton();
+        addBackToLobbyButton(); // Add a button to return to the games lobby
+        console.log('Components initialization completed');
+      } catch (error) {
+        console.error('Error during component initialization:', error);
+      }
+    }, 1000); // Increased from 500ms to 1000ms
+    
+    // Initialize WebSocket connection
+    connectWebSocket();
+  } catch (error) {
+    console.error('Error during main initialization:', error);
+    // Redirect to games page on critical error
+    globalThis.location.href = 'games.html';
+  }
+
+  // Check if we're returning from hello page
   if (localStorage.getItem('wsWasOpen') === 'true') {
     // Clear the flag
     localStorage.removeItem('wsWasOpen');
@@ -65,7 +101,39 @@
       }
     }, 1000);
   }
-  }
+}
+
+// Add a button to return to the games lobby
+function addBackToLobbyButton() {
+  const backButton = document.createElement('button');
+  backButton.id = 'backToLobbyButton';
+  backButton.className = 'back-to-lobby-button';
+  backButton.textContent = 'Back to Games Lobby';
+  
+  // Position the button
+  backButton.style.position = 'fixed';
+  backButton.style.bottom = '20px';
+  backButton.style.left = '20px';
+  backButton.style.zIndex = '9999';
+  backButton.style.backgroundColor = '#4CAF50';
+  backButton.style.color = 'white';
+  backButton.style.border = 'none';
+  backButton.style.borderRadius = '5px';
+  backButton.style.padding = '10px 15px';
+  backButton.style.cursor = 'pointer';
+  
+  // Add click event
+  backButton.addEventListener('click', function() {
+    // Set WebSocket flag to prevent disconnection errors
+    localStorage.setItem('wsWasOpen', 'true');
+    
+    // Navigate to games page
+    globalThis.location.href = 'games.html';
+  });
+  
+  // Add the button to the body
+  document.body.appendChild(backButton);
+}
   
   // ====================== WEBSOCKET FUNCTIONALITY ======================
   // Connect to the WebSocket server
@@ -118,16 +186,19 @@
     }
   }
   
-  // Handle WebSocket error
   function handleWebSocketError(error) {
     console.error('WebSocket error:', error);
-    goToLogin();
+    
+    // Only redirect to login if not navigating to games page
+    if (localStorage.getItem('wsWasOpen') !== 'true') {
+      goToLogin();
+    }
   }
   
   function handleWebSocketClose(event) {
     console.log('WebSocket connection closed:', event);
     
-    // Only redirect to login if we're not navigating to hello page
+    // Only redirect to login if we're not navigating to another page
     if (localStorage.getItem('wsWasOpen') !== 'true') {
       goToLogin();
     }

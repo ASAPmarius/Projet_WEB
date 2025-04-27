@@ -48,7 +48,8 @@ function login() {
     .then(data => {
       console.log('Login successful, redirecting...');
       localStorage.setItem('auth_token', data.auth_token);
-      globalThis.location.href = '../index.html';
+      localStorage.setItem('currentUsername', username); // Store username for later use
+      globalThis.location.href = 'games.html'; // Redirect to games page instead of index.html
     })
     .catch(error => {
       console.error('Login error:', error);
@@ -67,7 +68,7 @@ if (password) {
   console.warn('Password input element not found');
 }
 
-// eslint-disable-next-line no-unused-vars
+// Function to redirect to account creation page
 function create_account_page() {
-  globalThis.location.href = '../create_acount.html';
+  globalThis.location.href = 'create_acount.html';
 }
