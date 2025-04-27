@@ -1,4 +1,4 @@
-import { Client } from "https://deno.land/x/postgres@v0.19.3/mod.ts";
+import { Client } from "postgres";
 import { readAll } from "https://deno.land/std@0.224.0/io/read_all.ts";
 
 function getEnv(key: string): string {
@@ -59,6 +59,7 @@ async function insertCards() {
     console.log("Starting card insertion...");
 
     // Insert all 52 standard cards
+    let cardId = 1;
     for (const suit of suits) {
       for (const rank of ranks) {
         const id = `${rank}_of_${suit}`;
@@ -67,11 +68,13 @@ async function insertCards() {
           console.log(`Reading image ${path}`);
           const imageBytes = await readImageAsBytes(path);
           
+          // Insert into the Cards table (card types)
           await client.queryObject(
-            'INSERT INTO "Cards" ("Picture") VALUES ($1)',
-            [imageBytes],
+            'INSERT INTO "Cards" ("idCardType", "Picture") VALUES ($1, $2)',
+            [cardId, imageBytes],
           );
-          console.log(`Inserted ${id}`);
+          console.log(`Inserted ${id} with ID ${cardId}`);
+          cardId++;
         } catch (err) {
           console.error(`Failed to insert ${id}:`, (err as Error).message);
         }
@@ -85,10 +88,11 @@ async function insertCards() {
       try {
         const imageBytes = await readImageAsBytes(path);
         await client.queryObject(
-          'INSERT INTO "Cards" ("Picture") VALUES ($1)',
-          [imageBytes],
+          'INSERT INTO "Cards" ("idCardType", "Picture") VALUES ($1, $2)',
+          [cardId, imageBytes],
         );
-        console.log(`Inserted ${name}`);
+        console.log(`Inserted ${name} with ID ${cardId}`);
+        cardId++;
       } catch (err) {
         console.error(`Failed to insert ${name}:`, (err as Error).message);
       }

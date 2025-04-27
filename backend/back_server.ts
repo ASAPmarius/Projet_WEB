@@ -86,11 +86,30 @@ addEventListener('unload', async () => {
   await client.end();
 });
 
-const secretKey = await crypto.subtle.generateKey(
-  { name: 'HMAC', hash: 'SHA-512' },
-  true,
-  ['sign', 'verify'],
-);
+let secretKey: CryptoKey;
+
+try {
+  // Get the JWT secret from environment
+  const jwtSecret = getEnv('SECRET_KEY');
+  
+  // Convert the string to a Uint8Array
+  const encoder = new TextEncoder();
+  const secretKeyData = encoder.encode(jwtSecret);
+  
+  // Import the key
+  secretKey = await crypto.subtle.importKey(
+    'raw',
+    secretKeyData,
+    { name: 'HMAC', hash: 'SHA-512' },
+    false, // extractable
+    ['sign', 'verify']
+  );
+  
+  console.log('JWT secret key imported successfully');
+} catch (error) {
+  console.error('Failed to import JWT secret key:', error);
+  throw new Error('Server configuration error: JWT_SECRET missing or invalid');
+}
 
 // Define interfaces for your database models
 interface User {
@@ -128,6 +147,7 @@ interface Game {
   idGame: number;
   DateCreated: Date;
   GameType: string;
+  GameStatus?: string; // New field: 'active', 'finished', etc.
 }
 
 // Helper function for safely converting binary data to base64
@@ -246,6 +266,85 @@ async function createGame(gameType: string): Promise<number> {
     [gameType]
   );
   return result.rows[0].idGame;
+}
+
+async function getAllActiveGames(): Promise<Game[]> {
+  const result = await client.queryObject<Game>(
+    'SELECT g.* FROM "Game" g ' +
+    'WHERE g."GameStatus" = \'active\' ' +
+    'ORDER BY g."DateCreated" DESC'
+  );
+  return result.rows;
+}
+
+async function getUsersInActiveGame(gameId: number): Promise<User[]> {
+  const result = await client.queryObject<User>(
+    'SELECT u.* FROM "User" u ' +
+    'INNER JOIN "Game_Users" gu ON u."idUser" = gu."idUsers" ' +
+    'WHERE gu."idGame" = $1',
+    [gameId]
+  );
+  return result.rows;
+}
+
+async function getActiveGameForUser(userId: number): Promise<Game | null> {
+  const result = await client.queryObject<Game>(
+    'SELECT g.* FROM "Game" g ' +
+    'INNER JOIN "Game_Users" gu ON g."idGame" = gu."idGame" ' +
+    'WHERE gu."idUsers" = $1 AND g."GameStatus" = \'active\' ' +
+    'ORDER BY g."DateCreated" DESC LIMIT 1',
+    [userId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+async function joinExistingGame(userId: number, gameId: number): Promise<boolean> {
+  try {
+    // Check if the game exists and is active
+    const gameCheck = await client.queryObject<{ count: number }>(
+      'SELECT COUNT(*) as count FROM "Game" WHERE "idGame" = $1 AND "GameStatus" = \'active\'',
+      [gameId]
+    );
+    
+    if (gameCheck.rows[0].count === 0) {
+      return false; // Game doesn't exist or isn't active
+    }
+    
+    // Check if user is already part of this game
+    const userGameCheck = await client.queryObject<{ count: number }>(
+      'SELECT COUNT(*) as count FROM "Game_Users" WHERE "idUsers" = $1 AND "idGame" = $2',
+      [userId, gameId]
+    );
+    
+    if (userGameCheck.rows[0].count === 0) {
+      // User is not part of this game, add them
+      await client.queryObject(
+        'INSERT INTO "Game_Users" ("idUsers", "idGame") VALUES ($1, $2)',
+        [userId, gameId]
+      );
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error joining game ${gameId}:`, error);
+    return false;
+  }
+}
+
+async function markGameAsFinished(gameId: number): Promise<void> {
+  try {
+    await client.queryObject(
+      'UPDATE "Game" SET "GameStatus" = \'finished\' WHERE "idGame" = $1',
+      [gameId]
+    );
+    
+    // Once marked as finished, we can clean up the ActiveCards
+    await cleanupFinishedGame(gameId);
+    
+    console.log(`Game ${gameId} marked as finished`);
+  } catch (error) {
+    console.error(`Error marking game ${gameId} as finished:`, error);
+  }
 }
 
 async function getUserByUsername(username: string): Promise<User | null> {
@@ -407,28 +506,36 @@ await checkAndCleanupFinishedGames();
 // Current game tracking
 let currentGameId: number | null = null;
 
-// Create a new game or get existing one
 async function getOrCreateGame(): Promise<number> {
-  if (currentGameId === null) {
-    currentGameId = await createGame('classic');
-    
-    // Get all card types (excluding the card back which is id 54)
-    const result = await client.queryObject<{ idCardType: number }>(
-      'SELECT "idCardType" FROM "Cards" WHERE "idCardType" < 53 ORDER BY "idCardType"'
-    );
-    
-    const cardTypeIds = result.rows.map(row => row.idCardType);
-    
-    // Shuffle the card types using Fisher-Yates algorithm
-    for (let i = cardTypeIds.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cardTypeIds[i], cardTypeIds[j]] = [cardTypeIds[j], cardTypeIds[i]];
-    }
-    
-    // Create active cards for this game
-    for (const cardTypeId of cardTypeIds) {
-      await createActiveCard(currentGameId, cardTypeId, 'in_deck');
-    }
+  // If we already have a current game ID, return it
+  if (currentGameId !== null) {
+    return currentGameId;
+  }
+  
+  // Create a new game with 'active' status
+  const result = await client.queryObject<{ idGame: number }>(
+    'INSERT INTO "Game" ("GameType", "GameStatus") VALUES ($1, $2) RETURNING "idGame"',
+    ['classic', 'active']
+  );
+  
+  currentGameId = result.rows[0].idGame;
+  
+  // Get all card types (excluding the card back which is id 54)
+  const cardTypesResult = await client.queryObject<{ idCardType: number }>(
+    'SELECT "idCardType" FROM "Cards" WHERE "idCardType" < 53 ORDER BY "idCardType"'
+  );
+  
+  const cardTypeIds = cardTypesResult.rows.map(row => row.idCardType);
+  
+  // Shuffle the card types using Fisher-Yates algorithm
+  for (let i = cardTypeIds.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cardTypeIds[i], cardTypeIds[j]] = [cardTypeIds[j], cardTypeIds[i]];
+  }
+  
+  // Create active cards for this game
+  for (const cardTypeId of cardTypeIds) {
+    await createActiveCard(currentGameId, cardTypeId, 'in_deck');
   }
   
   return currentGameId;
@@ -594,6 +701,133 @@ router.get('/get_cookie', async (ctx) => {
     ctx.response.body = { error: 'Internal server error.' };
   }
 });
+
+router.get('/games', async (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  try {
+    const activeGames = await getAllActiveGames();
+    
+    // For each game, get the players
+    const gamesWithPlayers = await Promise.all(activeGames.map(async (game) => {
+      const players = await getUsersInActiveGame(game.idGame);
+      return {
+        ...game,
+        players: players.map(p => ({ 
+          id: p.idUser,
+          username: p.Username
+        }))
+      };
+    }));
+    
+    ctx.response.status = 200;
+    ctx.response.body = { games: gamesWithPlayers };
+  } catch (error) {
+    console.error('Error fetching active games:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Failed to fetch active games' };
+  }
+});
+
+router.post('/finish-game', authorizationMiddleware, async (ctx) => {
+  // Manual CORS headers
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  const body = await ctx.request.body.json();
+  const { gameId } = body;
+  
+  if (!gameId) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: 'Missing game ID' };
+    return;
+  }
+  
+  try {
+    await markGameAsFinished(gameId);
+    ctx.response.status = 200;
+    ctx.response.body = { success: true };
+  } catch (error) {
+    console.error(`Error finishing game ${gameId}:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Failed to finish game' };
+  }
+});
+
+router.get('/active-game', authorizationMiddleware, async (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  const userId = ctx.state.tokenData.userId;
+  
+  if (!userId) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: 'Missing user ID' };
+    return;
+  }
+  
+  try {
+    const activeGame = await getActiveGameForUser(userId);
+    
+    if (activeGame) {
+      // Get players in this game
+      const players = await getUsersInActiveGame(activeGame.idGame);
+      
+      ctx.response.status = 200;
+      ctx.response.body = { 
+        game: {
+          ...activeGame,
+          players: players.map(p => ({ 
+            id: p.idUser,
+            username: p.Username
+          }))
+        }
+      };
+    } else {
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'No active game found' };
+    }
+  } catch (error) {
+    console.error('Error fetching active game:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Failed to fetch active game' };
+  }
+});
+
+router.post('/join-game', authorizationMiddleware, async (ctx) => {
+  // Manual CORS headers
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  const body = await ctx.request.body.json();
+  const { gameId } = body;
+  const userId = ctx.state.tokenData.userId;
+  
+  if (!gameId || !userId) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: 'Missing game ID or user ID' };
+    return;
+  }
+  
+  try {
+    const success = await joinExistingGame(userId, gameId);
+    
+    if (success) {
+      // Set current game ID
+      currentGameId = gameId;
+      ctx.response.status = 200;
+      ctx.response.body = { success: true };
+    } else {
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'Game not found or not active' };
+    }
+  } catch (error) {
+    console.error(`Error joining game ${gameId}:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Failed to join game' };
+  }
+}); 
 
 router.get('/', authorizationMiddleware, async (ctx) => {
   if (!ctx.isUpgradable) {
@@ -1023,14 +1257,10 @@ router.get('/', authorizationMiddleware, async (ctx) => {
     notifyAllUsers({ type: 'connected_users', users: connectedUsers });
     console.log(`- websocket disconnected (${connections.length})`);
     
-    // Check if the game is finished (no more players)
+    // Instead of cleaning up the game when everyone disconnects,
+    // we just log that no players are connected
     if (connections.length === 0 && currentGameId !== null) {
-      // Clean up the finished game's ActiveCards
-      await cleanupFinishedGame(currentGameId);
-      currentGameId = null; // Reset for a new game
-    } else {
-      // Check for other finished games that might need cleanup
-      await checkAndCleanupFinishedGames();
+      console.log(`No players connected to game ${currentGameId}, keeping game alive`);
     }
   };
 });

@@ -39,6 +39,7 @@
           addCardNotification();
           setupEventListeners();
           addHelloPageButton();
+          addFinishGameButton();
           console.log('Components initialization completed');
         } catch (error) {
           console.error('Error during component initialization:', error);
@@ -699,7 +700,76 @@
       });
     }
   }
+
+  function addFinishGameButton() {
+    const finishGameButton = document.createElement('button');
+    finishGameButton.id = 'finishGameButton';
+    finishGameButton.className = 'finish-game-button';
+    finishGameButton.textContent = 'Finish Game';
+    finishGameButton.addEventListener('click', finishCurrentGame);
+    document.body.appendChild(finishGameButton);
+  }
   
+  function finishCurrentGame() {
+    // First get the current active game from the server
+    fetch('http://localhost:3000/active-game', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
+    })
+    .then(response => {
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('No active game found');
+        }
+        throw new Error('Failed to get active game');
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (!data.game || !data.game.idGame) {
+        console.log('No current game to finish');
+        alert('You don\'t have an active game to finish.');
+        return;
+      }
+      
+      const gameId = data.game.idGame;
+      
+      if (!confirm('Are you sure you want to finish this game? This cannot be undone.')) {
+        return;
+      }
+      
+      // Now finish the game with the retrieved game ID
+      return fetch('http://localhost:3000/finish-game', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ gameId: gameId }),
+        credentials: 'include'
+      });
+    })
+    .then(response => {
+      if (!response || !response.ok) {
+        throw new Error('Failed to finish game');
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log('Successfully finished game:', data);
+      alert('Game finished successfully!');
+      
+      // Redirect to game selection
+      globalThis.location.href = 'games.html';
+    })
+    .catch(error => {
+      console.error('Error in finish game process:', error);
+      alert('Error: ' + error.message);
+    });
+  }
+
   // ====================== WEBSOCKET REQUEST FUNCTIONS ======================
   // Send chat message
   function sendJson() {
@@ -771,6 +841,7 @@
   // Expose functions that need to be accessible from HTML onclick handlers
   globalThis.sendJson = sendJson;
   globalThis.goToLogin = goToLogin;
+  globalThis.finishCurrentGame = finishCurrentGame;
   
   // Debugging function for card badges
   globalThis.debugCardBadges = function(count) {
