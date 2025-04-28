@@ -398,21 +398,51 @@
                 }
             }
             
-            // Function to join an existing game
             async function joinGame(gameId) {
                 try {
+                    console.log(`Attempting to join game ${gameId}`);
+                    
+                    // Find the join button for this game
+                    const joinButton = document.querySelector(`.join-btn[data-game-id="${gameId}"]`);
+                    if (joinButton) {
+                    joinButton.textContent = 'Joining...';
+                    joinButton.disabled = true;
+                    }
+                    
+                    // First, make sure we're logged in
+                    const authToken = localStorage.getItem('auth_token');
+                    if (!authToken) {
+                    console.error('No auth token found');
+                    alert('You need to log in first');
+                    window.location.href = 'login.html';
+                    return;
+                    }
+                    
+                    // Join the game
                     const response = await fetch('http://localhost:3000/join-game', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ gameId }),
-                        credentials: 'include'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ gameId }),
+                    credentials: 'include'
                     });
                     
-                    if (!response.ok) {
-                        throw new Error('Failed to join game');
+                    let responseData;
+                    try {
+                    responseData = await response.json();
+                    } catch (e) {
+                    console.error('Failed to parse response JSON:', e);
+                    responseData = {}; // Empty object as fallback
                     }
+                    
+                    if (!response.ok) {
+                    console.error('Join game failed:', response.status, responseData);
+                    throw new Error(responseData.error || 'Failed to join game');
+                    }
+                    
+                    console.log('Join game successful:', responseData);
                     
                     // Store the game ID in local storage
                     localStorage.setItem('currentGameId', gameId);
@@ -420,11 +450,27 @@
                     // Set the WebSocket flag to prevent disconnection on navigation
                     localStorage.setItem('wsWasOpen', 'true');
                     
-                    // Redirect to the game page
-                    window.location.href = 'index.html';
+                    // Show progress in the button
+                    if (joinButton) {
+                    joinButton.textContent = 'Redirecting...';
+                    }
+                    
+                    // Use a short delay to improve UX
+                    setTimeout(() => {
+                    // Go directly to game page with gameId in URL
+                    window.location.href = `index.html?gameId=${gameId}`;
+                    }, 800);
+                    
                 } catch (error) {
                     console.error('Error joining game:', error);
-                    alert('Failed to join game. Please try again.');
+                    alert('Failed to join game: ' + error.message);
+                    
+                    // Reset button state
+                    const joinButton = document.querySelector(`.join-btn[data-game-id="${gameId}"]`);
+                    if (joinButton) {
+                    joinButton.textContent = 'Join Game';
+                    joinButton.disabled = false;
+                    }
                 }
             }
             

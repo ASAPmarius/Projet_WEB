@@ -192,12 +192,18 @@ const is_authorized = async (auth_token: string) => {
   return false;
 };
 
-// Middleware to verify JWT token
+// Update the authorizationMiddleware to better handle tokens and debugging
 const authorizationMiddleware = async (ctx: Context, next: () => Promise<unknown>) => {
   const cookie = ctx.request.headers.get('cookie');
   const authToken = cookie?.split('; ').find((row) => row.startsWith('auth_token='))?.split('=')[1];
 
-  if (!authToken) {
+  // Also check Authorization header as fallback (for clients not using cookies)
+  const headerToken = ctx.request.headers.get('Authorization')?.replace('Bearer ', '');
+  
+  const tokenToUse = authToken || headerToken;
+
+  if (!tokenToUse) {
+    console.log('No token found in request');
     ctx.response.status = 401;
     ctx.response.body = { error: 'Unauthorized: Missing token' };
     return;
@@ -205,10 +211,26 @@ const authorizationMiddleware = async (ctx: Context, next: () => Promise<unknown
 
   try {
     // Verify the token
-    const tokenData = await verify(authToken, secretKey);
-    ctx.state.tokenData = tokenData; // Store data in ctx.state for use in other middlewares/routes
+    const tokenData = await verify(tokenToUse, secretKey);
+    
+    // Log token data for debugging (remove in production)
+    console.log('Token verified successfully:', {
+      userName: tokenData.userName,
+      userId: tokenData.userId
+    });
+    
+    // Ensure userId exists in token
+    if (!tokenData.userId) {
+      console.error('Token missing userId property');
+      ctx.response.status = 401;
+      ctx.response.body = { error: 'Unauthorized: Invalid token format' };
+      return;
+    }
+    
+    ctx.state.tokenData = tokenData;
     await next();
-  } catch {
+  } catch (error) {
+    console.error('Token verification failed:', error);
     ctx.response.status = 401;
     ctx.response.body = { error: 'Unauthorized: Invalid token' };
   }
@@ -336,14 +358,19 @@ async function getGameById(gameId: number): Promise<number | null> {
 
 async function joinExistingGame(userId: number, gameId: number): Promise<boolean> {
   try {
+    console.log(`Attempting to join user ${userId} to game ${gameId}`);
+    
     // Check if the game exists and is active
     const gameCheck = await client.queryObject<{ count: number }>(
       'SELECT COUNT(*) as count FROM "Game" WHERE "idGame" = $1 AND "GameStatus" = \'active\'',
       [gameId]
     );
     
+    console.log(`Game exists check: ${gameCheck.rows[0].count > 0}`);
+    
     if (gameCheck.rows[0].count === 0) {
-      return false; // Game doesn't exist or isn't active
+      console.log(`Game ${gameId} doesn't exist or isn't active`);
+      return false;
     }
     
     // Check if user is already part of this game
@@ -352,15 +379,27 @@ async function joinExistingGame(userId: number, gameId: number): Promise<boolean
       [userId, gameId]
     );
     
-    if (userGameCheck.rows[0].count === 0) {
-      // User is not part of this game, add them
-      await client.queryObject(
-        'INSERT INTO "Game_Users" ("idUsers", "idGame") VALUES ($1, $2)',
-        [userId, gameId]
-      );
-    }
+    console.log(`User already in game check: ${userGameCheck.rows[0].count > 0}`);
     
-    return true;
+    if (userGameCheck.rows[0].count > 0) {
+      // User is already part of this game, that's fine
+      console.log(`User ${userId} is already in game ${gameId}, still returning success`);
+      return true; // Return true since user is already in the game - this is NOT an error
+    } else {
+      // User is not part of this game, add them
+      console.log(`Adding user ${userId} to game ${gameId}`);
+      try {
+        await client.queryObject(
+          'INSERT INTO "Game_Users" ("idUsers", "idGame") VALUES ($1, $2)',
+          [userId, gameId]
+        );
+        console.log(`User ${userId} successfully added to game ${gameId}`);
+        return true;
+      } catch (insertError) {
+        console.error(`Failed to add user to game:`, insertError);
+        throw insertError; // Re-throw to trigger the catch block
+      }
+    }
   } catch (error) {
     console.error(`Error joining game ${gameId}:`, error);
     return false;
@@ -826,94 +865,233 @@ router.post('/finish-game', authorizationMiddleware, async (ctx) => {
 });
 
 // Enhanced active-game endpoint with player card counts
+// Add OPTIONS handler for active-game
+router.options('/active-game', (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  ctx.response.status = 204; // No content for OPTIONS
+});
 
-router.get('/active-game', authorizationMiddleware, async (ctx) => {
+// Improve the active-game endpoint further
+router.get('/active-game', async (ctx) => {
+  // Set CORS headers first
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
-  const userId = ctx.state.tokenData.userId;
-  
-  if (!userId) {
-    ctx.response.status = 400;
-    ctx.response.body = { error: 'Missing user ID' };
-    return;
-  }
-  
   try {
-    const activeGame = await getActiveGameForUser(userId);
+    // Get token from multiple sources
+    const cookie = ctx.request.headers.get('cookie');
+    const authToken = cookie?.split('; ').find((row) => row.startsWith('auth_token='))?.split('=')[1];
+    const headerToken = ctx.request.headers.get('Authorization')?.replace('Bearer ', '');
     
-    if (activeGame) {
-      // Get players in this game
-      const players = await getUsersInActiveGame(activeGame.idGame);
-      
-      // Get card counts for each player
-      const playersWithCardCounts = await Promise.all(players.map(async (player) => {
-        // Get cards for this player
-        const playerCards = await getActiveCardsInHand(activeGame.idGame, player.idUser);
-        
-        return { 
-          id: player.idUser,
-          username: player.Username,
-          cardCount: playerCards.length
-        };
-      }));
-      
-      // Get number of cards left in deck
-      const cardsInDeck = await getActiveCardsInDeck(activeGame.idGame);
-      
-      ctx.response.status = 200;
-      ctx.response.body = { 
-        game: {
-          ...activeGame,
-          players: playersWithCardCounts,
-          cardsInDeck: cardsInDeck.length
-        }
-      };
-    } else {
+    const tokenToUse = authToken || headerToken;
+    
+    if (!tokenToUse) {
+      console.log('No token provided for active-game check');
+      ctx.response.status = 401;
+      ctx.response.body = { error: 'Unauthorized: Missing token' };
+      return;
+    }
+    
+    // Verify token directly in this endpoint
+    let tokenData;
+    try {
+      tokenData = await verify(tokenToUse, secretKey);
+      console.log('Token verified in active-game endpoint:', tokenData);
+    } catch (tokenError) {
+      console.error('Token verification error:', tokenError);
+      ctx.response.status = 401;
+      ctx.response.body = { error: 'Unauthorized: Invalid token' };
+      return;
+    }
+    
+    const userId = tokenData.userId;
+    if (!userId) {
+      console.error('Token missing userId');
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Missing user ID in token' };
+      return;
+    }
+    
+    console.log(`Checking active game for user ${userId}`);
+    
+    // Check all games this user is part of
+    const userGamesResult = await client.queryObject<{idGame: number}>(
+      'SELECT "idGame" FROM "Game_Users" WHERE "idUsers" = $1',
+      [userId]
+    );
+    
+    console.log(`User ${userId} is part of ${userGamesResult.rows.length} games`);
+    
+    // If user is not in any games, return 404
+    if (userGamesResult.rows.length === 0) {
+      console.log(`No games found for user ${userId}`);
       ctx.response.status = 404;
       ctx.response.body = { error: 'No active game found' };
+      return;
     }
+    
+    // Get the most recent active game
+    const gameIds = userGamesResult.rows.map(row => row.idGame);
+    console.log('Game IDs for user:', gameIds);
+    
+    const activeGameResult = await client.queryObject<Game>(
+      'SELECT * FROM "Game" WHERE "idGame" = ANY($1::int[]) AND "GameStatus" = \'active\' ' +
+      'ORDER BY "DateCreated" DESC LIMIT 1',
+      [gameIds]
+    );
+    
+    if (activeGameResult.rows.length === 0) {
+      console.log(`No active games found for user ${userId}`);
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'No active game found' };
+      return;
+    }
+    
+    const activeGame = activeGameResult.rows[0];
+    console.log(`Found active game ${activeGame.idGame} for user ${userId}`);
+    
+    // Get players in this game
+    const players = await getUsersInActiveGame(activeGame.idGame);
+    
+    // Get card counts for each player
+    const playersWithCardCounts = await Promise.all(players.map(async (player) => {
+      // Get cards for this player
+      const playerCards = await getActiveCardsInHand(activeGame.idGame, player.idUser);
+      
+      return { 
+        id: player.idUser,
+        username: player.Username,
+        cardCount: playerCards.length
+      };
+    }));
+    
+    // Get number of cards left in deck
+    const cardsInDeck = await getActiveCardsInDeck(activeGame.idGame);
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      game: {
+        ...activeGame,
+        players: playersWithCardCounts,
+        cardsInDeck: cardsInDeck.length
+      }
+    };
   } catch (error) {
-    console.error('Error fetching active game:', error);
+    console.error('Error in active-game endpoint:', error);
     ctx.response.status = 500;
-    ctx.response.body = { error: 'Failed to fetch active game' };
+    ctx.response.body = { error: 'Internal server error' };
   }
 });
 
-router.post('/join-game', authorizationMiddleware, async (ctx) => {
-  // Manual CORS headers
+// Add OPTIONS handler for join-game
+router.options('/join-game', (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  ctx.response.status = 204; // No content for OPTIONS
+});
+
+// Improved join-game endpoint with explicit type conversions
+// Improved join-game endpoint with explicit type conversions
+router.post('/join-game', async (ctx) => {
+  // Set CORS headers first
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
-  const body = await ctx.request.body.json();
-  const { gameId } = body;
-  const userId = ctx.state.tokenData.userId;
-  
-  if (!gameId || !userId) {
-    ctx.response.status = 400;
-    ctx.response.body = { error: 'Missing game ID or user ID' };
-    return;
-  }
-  
   try {
+    // Get token directly in this endpoint
+    const cookie = ctx.request.headers.get('cookie');
+    const authToken = cookie?.split('; ').find((row) => row.startsWith('auth_token='))?.split('=')[1];
+    const headerToken = ctx.request.headers.get('Authorization')?.replace('Bearer ', '');
+    
+    const tokenToUse = authToken || headerToken;
+    
+    if (!tokenToUse) {
+      console.log('No token provided for join-game');
+      ctx.response.status = 401;
+      ctx.response.body = { error: 'Unauthorized: Missing token' };
+      return;
+    }
+    
+    // Verify token
+    let tokenData;
+    try {
+      tokenData = await verify(tokenToUse, secretKey);
+      console.log('Token verified in join-game endpoint:', tokenData);
+    } catch (tokenError) {
+      console.error('Token verification error:', tokenError);
+      ctx.response.status = 401;
+      ctx.response.body = { error: 'Unauthorized: Invalid token' };
+      return;
+    }
+    
+    // Explicitly convert userId to number with proper type checking
+    let userId: number;
+    if (typeof tokenData.userId === 'number') {
+      userId = tokenData.userId;
+    } else if (typeof tokenData.userId === 'string') {
+      userId = parseInt(tokenData.userId, 10);
+      if (isNaN(userId)) {
+        ctx.response.status = 400;
+        ctx.response.body = { error: 'Invalid user ID format in token' };
+        return;
+      }
+    } else {
+      console.error('Token has invalid userId type:', typeof tokenData.userId);
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Missing or invalid user ID in token' };
+      return;
+    }
+    
+    const body = await ctx.request.body.json();
+    
+    // Explicitly convert gameId to number with proper type checking
+    let gameId: number;
+    if (typeof body.gameId === 'number') {
+      gameId = body.gameId;
+    } else if (typeof body.gameId === 'string') {
+      gameId = parseInt(body.gameId, 10);
+      if (isNaN(gameId)) {
+        ctx.response.status = 400;
+        ctx.response.body = { error: 'Invalid game ID format' };
+        return;
+      }
+    } else {
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Missing game ID' };
+      return;
+    }
+    
+    console.log(`Processing join request for user ${userId} to game ${gameId}`);
+    
+    // Use the joinExistingGame function with explicit number types
     const success = await joinExistingGame(userId, gameId);
     
-    if (success) {
-      // Set current game ID
-      currentGameId = gameId;
-      ctx.response.status = 200;
-      ctx.response.body = { success: true };
-    } else {
+    if (!success) {
       ctx.response.status = 404;
       ctx.response.body = { error: 'Game not found or not active' };
+      return;
     }
+    
+    // Set current game ID (also convert to number for consistency)
+    currentGameId = gameId;
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      success: true, 
+      message: 'Successfully joined game',
+      gameId: gameId
+    };
   } catch (error) {
-    console.error(`Error joining game ${gameId}:`, error);
+    console.error(`Error in join-game endpoint:`, error);
     ctx.response.status = 500;
-    ctx.response.body = { error: 'Failed to join game' };
+    ctx.response.body = { error: 'Internal server error' };
   }
-}); 
-
+});
 // In back_server.ts, replace the WebSocket upgrade handler
 
 router.get('/', authorizationMiddleware, async (ctx) => {
