@@ -36,6 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to check if user is in a game
     async function checkUserGameStatus() {
         try {
+            // Clear any stale game ID from localStorage to prevent confusion
+            localStorage.removeItem('currentGameId');
+            
+            // Update user status while checking
+            userStatus.textContent = 'Checking your game status...';
+            
             // Instead of relying just on localStorage, check with the server
             const response = await fetch('http://localhost:3000/active-game', {
                 method: 'GET',
@@ -59,26 +65,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     userStatus.innerHTML = `You are currently in Game #${data.game.idGame}. <a href="#" onclick="returnToGame()">Return to your game</a> or join another.`;
                     returnBtn.style.display = 'block';
+                    console.log('Active game found:', data.game.idGame);
                 } else {
-                    // User doesn't have an active game
+                    // User doesn't have an active game - explicitly call handler
+                    console.log('No active game found in response data');
                     handleNoActiveGame();
                 }
             } else if (response.status === 404) {
                 // Handle case where user has no active game
+                console.log('Server returned 404 - No active game found');
                 handleNoActiveGame();
             } else {
                 // Handle other API errors
                 console.error('Error checking game status:', await response.text());
                 userStatus.textContent = 'Unable to check your game status. Please try again later.';
+                // Still hide the return button on error
+                returnBtn.style.display = 'none';
             }
         } catch (error) {
             console.error('Error checking game status:', error);
             userStatus.textContent = 'Unable to check your game status. Please try again later.';
+            // Still hide the return button on error
+            returnBtn.style.display = 'none';
         }
     }
     
     // Handle case where user has no active game
     function handleNoActiveGame() {
+        console.log('Handling no active game state');
         currentUser.inGame = false;
         currentUser.currentGameId = null;
         
@@ -86,7 +100,9 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.removeItem('currentGameId');
         
         userStatus.textContent = 'You are not currently in any game. Join one below or create a new game.';
-        returnBtn.style.display = 'none';
+        
+        // Force hide the return button with !important to override any CSS
+        returnBtn.style.cssText = 'display: none !important;';
     }
     
     // Function to load all active games
@@ -292,6 +308,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to return to current game
     async function returnToGame() {
+        // Double-check we have a game before proceeding
+        if (!returnBtn.style.display || returnBtn.style.display === 'none') {
+            console.log('Return button is hidden, but was clicked - stopping return attempt');
+            alert('You are not currently in an active game.');
+            return;
+        }
+        
         // Check with server first if the game is still active
         try {
             const response = await fetch('http://localhost:3000/active-game', {
@@ -312,21 +335,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     localStorage.setItem('wsWasOpen', 'true');
                     globalThis.location.href = 'index.html';
                 } else {
-                    // No active game found
+                    // No active game found even though server returned OK
+                    console.log('Server returned OK but no game data');
                     handleNoActiveGame();
                     alert('You are not currently in an active game.');
                 }
             } else if (response.status === 404) {
                 // No active game found
+                console.log('Server returned 404 - No active game found during return');
                 handleNoActiveGame();
                 alert('You are not currently in an active game.');
             } else {
                 console.error('Error checking active game:', await response.text());
                 alert('Unable to check your game status. Please try again later.');
+                // Hide the button on error as a safety measure
+                returnBtn.style.display = 'none';
             }
         } catch (error) {
             console.error('Error checking active game:', error);
             alert('Unable to check your game status. Please try again later.');
+            // Hide the button on error as a safety measure
+            returnBtn.style.display = 'none';
         }
     }
     

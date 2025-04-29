@@ -325,12 +325,12 @@ async function getUsersInActiveGame(gameId: number): Promise<User[]> {
   const result = await client.queryObject<User>(
     'SELECT u.* FROM "User" u ' +
     'INNER JOIN "Game_Users" gu ON u."idUser" = gu."idUsers" ' +
-    'WHERE gu."idGame" = $1',
+    'INNER JOIN "Game" g ON gu."idGame" = g."idGame" ' +
+    'WHERE gu."idGame" = $1 AND g."GameStatus" = \'active\'',
     [gameId]
   );
   return result.rows;
 }
-
 async function getActiveGameForUser(userId: number): Promise<Game | null> {
   const result = await client.queryObject<Game>(
     'SELECT g.* FROM "Game" g ' +
@@ -919,15 +919,17 @@ router.get('/active-game', async (ctx) => {
     
     // Check all games this user is part of
     const userGamesResult = await client.queryObject<{idGame: number}>(
-      'SELECT "idGame" FROM "Game_Users" WHERE "idUsers" = $1',
+      'SELECT gu."idGame" FROM "Game_Users" gu ' +
+      'JOIN "Game" g ON gu."idGame" = g."idGame" ' +
+      'WHERE gu."idUsers" = $1 AND g."GameStatus" = \'active\'',
       [userId]
     );
     
-    console.log(`User ${userId} is part of ${userGamesResult.rows.length} games`);
+    console.log(`User ${userId} is part of ${userGamesResult.rows.length} active games`);
     
-    // If user is not in any games, return 404
+    // If user is not in any active games, return 404
     if (userGamesResult.rows.length === 0) {
-      console.log(`No games found for user ${userId}`);
+      console.log(`No active games found for user ${userId}`);
       ctx.response.status = 404;
       ctx.response.body = { error: 'No active game found' };
       return;
@@ -935,7 +937,7 @@ router.get('/active-game', async (ctx) => {
     
     // Get the most recent active game
     const gameIds = userGamesResult.rows.map(row => row.idGame);
-    console.log('Game IDs for user:', gameIds);
+    console.log('Active game IDs for user:', gameIds);
     
     const activeGameResult = await client.queryObject<Game>(
       'SELECT * FROM "Game" WHERE "idGame" = ANY($1::int[]) AND "GameStatus" = \'active\' ' +
@@ -944,7 +946,7 @@ router.get('/active-game', async (ctx) => {
     );
     
     if (activeGameResult.rows.length === 0) {
-      console.log(`No active games found for user ${userId}`);
+      console.log(`No active games found for user ${userId} (double-check)`);
       ctx.response.status = 404;
       ctx.response.body = { error: 'No active game found' };
       return;
@@ -952,6 +954,14 @@ router.get('/active-game', async (ctx) => {
     
     const activeGame = activeGameResult.rows[0];
     console.log(`Found active game ${activeGame.idGame} for user ${userId}`);
+    
+    // Double-check the game is indeed active
+    if (activeGame.GameStatus !== 'active') {
+      console.log(`Game ${activeGame.idGame} is not active, status: ${activeGame.GameStatus}`);
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'No active game found' };
+      return;
+    }
     
     // Get players in this game
     const players = await getUsersInActiveGame(activeGame.idGame);
