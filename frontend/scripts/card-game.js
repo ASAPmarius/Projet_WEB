@@ -71,14 +71,11 @@ async function init() {
         initPokerTable();
         addCardNotification();
         setupEventListeners();
-        addHelloPageButton();
-        addFinishGameButton();
-        addBackToLobbyButton(); // Add a button to return to the games lobby
         console.log('Components initialization completed');
       } catch (error) {
         console.error('Error during component initialization:', error);
       }
-    }, 1000); // Increased from 500ms to 1000ms
+    }, 1000);
     
     // Initialize WebSocket connection
     connectWebSocket();
@@ -131,38 +128,6 @@ function handlePageUnload(event) {
     // Clear the wsWasOpen flag since we've processed it
     localStorage.removeItem('wsWasOpen');
   }
-}
-
-// Add a button to return to the games lobby
-function addBackToLobbyButton() {
-  const backButton = document.createElement('button');
-  backButton.id = 'backToLobbyButton';
-  backButton.className = 'back-to-lobby-button';
-  backButton.textContent = 'Back to Games Lobby';
-  
-  // Position the button
-  backButton.style.position = 'fixed';
-  backButton.style.bottom = '20px';
-  backButton.style.left = '20px';
-  backButton.style.zIndex = '9999';
-  backButton.style.backgroundColor = '#4CAF50';
-  backButton.style.color = 'white';
-  backButton.style.border = 'none';
-  backButton.style.borderRadius = '5px';
-  backButton.style.padding = '10px 15px';
-  backButton.style.cursor = 'pointer';
-  
-  // Add click event
-  backButton.addEventListener('click', function() {
-    // Set WebSocket flag to prevent disconnection errors
-    localStorage.setItem('wsWasOpen', 'true');
-    
-    // Navigate to games page
-    globalThis.location.href = 'games.html';
-  });
-  
-  // Add the button to the body
-  document.body.appendChild(backButton);
 }
   
   // ====================== WEBSOCKET FUNCTIONALITY ======================
@@ -801,15 +766,6 @@ function addBackToLobbyButton() {
       });
     }
   }
-
-  function addFinishGameButton() {
-    const finishGameButton = document.createElement('button');
-    finishGameButton.id = 'finishGameButton';
-    finishGameButton.className = 'finish-game-button';
-    finishGameButton.textContent = 'Finish Game';
-    finishGameButton.addEventListener('click', finishCurrentGame);
-    document.body.appendChild(finishGameButton);
-  }
   
   function finishCurrentGame() {
     // First get the current active game from the server
@@ -914,28 +870,6 @@ function addBackToLobbyButton() {
     
     const data = { auth_token: localStorage.auth_token, type: type };
     websocket.send(JSON.stringify(data));
-  }
-
-  function addHelloPageButton() {
-    // Create the button element
-    const helloButton = document.createElement('button');
-    helloButton.id = 'helloPageButton';
-    helloButton.className = 'hello-page-button';
-    helloButton.textContent = 'Hello Page';
-    
-    // Add click event that prevents WebSocket from closing
-    helloButton.addEventListener('click', function(e) {
-      e.preventDefault();
-      
-      // Store WebSocket state before navigation
-      localStorage.setItem('wsWasOpen', 'true');
-      
-      // Open the hello page in the same tab
-      globalThis.location.href = 'profile.html';
-    });
-    
-    // Add the button to the body
-    document.body.appendChild(helloButton);
   }
   
   // ====================== EXPOSE PUBLIC API ======================
