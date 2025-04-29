@@ -14,8 +14,10 @@ services:
       - ALLOW_ORIGIN=localhost:8080  # Make sure this is explicitly set
     command: ["run", "--allow-net","--allow-ffi", "--allow-write", "--allow-env", "--allow-read", "--unstable-ffi", "--no-lock", "back_server.ts", "3000", "localhost:8080"]
     depends_on:
-      - db
-      - db-init  # Add dependency on db-init service
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     volumes:
       - ./backend/cards_images:/app/cards_images  # Mount card images only, not the source code
       - ./backend/convertIMG.ts:/app/convertIMG.ts  # Mount the convertIMG.ts file
@@ -34,7 +36,8 @@ services:
     volumes:
       - ./backend/cards_images:/app/cards_images
     depends_on:
-      - db
+      db:
+        condition: service_healthy  # Wait for DB to be healthy
     command: ["run", "--allow-net", "--allow-read", "--allow-env", "--unstable-ffi", "--no-lock", "insert_cards.ts"]
 
   frontend:
@@ -62,7 +65,7 @@ services:
     networks:
       - app-network
 
-  # Database service
+  # Database service with health check
   db:
     image: postgres:14
     container_name: DataBase
@@ -78,6 +81,12 @@ services:
       - ./db/init/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 # Networks section
 networks:
