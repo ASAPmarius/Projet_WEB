@@ -209,11 +209,11 @@ function handlePageUnload(event) {
     const data = JSON.parse(event.data);
     console.log('WebSocket message received:', data.type, data);
     
-    // If the message includes a gameId, verify it matches our current game
-    if (data.gameId && data.gameId != currentGameId) {
-      console.log(`Ignoring message for different game: ${data.gameId}`);
-      return;
-    }
+  // If the message includes a gameId, verify it matches our current game
+  if (data.gameId && data.gameId != currentGameId) {
+    console.log(`Ignoring message for different game: ${data.gameId}, our game: ${currentGameId}`);
+    return;
+  }
     
     // Handle different message types
     switch(data.type) {
@@ -899,7 +899,7 @@ function handlePageUnload(event) {
     const message = messageInput.value;
     if (!message) return;
     
-    const data = { auth_token: localStorage.auth_token, message: message };
+    const data = { auth_token: localStorage.auth_token, message: message, gameId: currentGameId};
     websocket.send(JSON.stringify(data));
     messageInput.value = '';
   }
@@ -932,7 +932,7 @@ function handlePageUnload(event) {
   function sendCardRequest(type) {
     if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
     
-    const data = { auth_token: localStorage.auth_token, type: type };
+    const data = { auth_token: localStorage.auth_token, type: type, gameId: currentGameId};
     websocket.send(JSON.stringify(data));
   }
   

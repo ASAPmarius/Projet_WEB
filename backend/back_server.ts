@@ -1381,7 +1381,7 @@ ws.onmessage = async (event) => {
     }));
     return;
   }
-  
+
   // Get the user's current active game
   const activeGame = await getActiveGameForUser(userId);
   if (!activeGame) {
@@ -1579,7 +1579,8 @@ ws.onmessage = async (event) => {
             owner: owner,
             user_pp_path: userProfilePicture,
             username: client.username,
-            userId: userId
+            userId: userId,
+            gameId: gameId
           }),
         );
       });
