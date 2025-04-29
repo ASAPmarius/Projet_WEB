@@ -10,6 +10,7 @@
   let chatContainer = null;
   let chatToggle = null;
   let messageInput = null;
+  let currentGameId = null; // Store the current game ID
 
   // Initialize application when DOM is loaded
   document.addEventListener('DOMContentLoaded', init);
@@ -98,6 +99,35 @@ async function init() {
       }
     }, 1000);
   }
+
+  currentGameId = getGameId();
+  if (!currentGameId) {
+    console.error('No game ID found, redirecting to games page');
+    globalThis.location.href = 'games.html';
+    return;
+  }
+
+  // Add a helper function to get the game ID:
+  function getGameId() {
+    // First check URL for gameId parameter
+    const urlParams = new URLSearchParams(globalThis.location.search);
+    const gameIdParam = urlParams.get('gameId');
+    
+    if (gameIdParam) {
+      console.log(`Game ID found in URL: ${gameIdParam}`);
+      localStorage.setItem('currentGameId', gameIdParam);
+      return gameIdParam;
+    }
+    
+    // Then check localStorage
+    const storedGameId = localStorage.getItem('currentGameId');
+    if (storedGameId) {
+      console.log(`Game ID found in localStorage: ${storedGameId}`);
+      return storedGameId;
+    }
+    
+    return null;
+  }
 }
 
 // Replace the handlePageUnload function in card-game.js
@@ -178,6 +208,12 @@ function handlePageUnload(event) {
   function handleWebSocketMessage(event) {
     const data = JSON.parse(event.data);
     console.log('WebSocket message received:', data.type, data);
+    
+    // If the message includes a gameId, verify it matches our current game
+    if (data.gameId && data.gameId != currentGameId) {
+      console.log(`Ignoring message for different game: ${data.gameId}`);
+      return;
+    }
     
     // Handle different message types
     switch(data.type) {
@@ -449,6 +485,7 @@ function handlePageUnload(event) {
   // ====================== CHAT FUNCTIONALITY ======================
   // Initialize chat toggle button
   function initChatToggle() {
+    updateChatHeader();
     // Create chat toggle button if it doesn't exist
     if (!document.getElementById('chatToggle')) {
       chatToggle = document.createElement('div');
@@ -847,6 +884,13 @@ function handlePageUnload(event) {
     });
   }
 
+  function updateChatHeader() {
+    const chatHeader = document.querySelector('.container h1');
+    if (chatHeader && currentGameId) {
+      chatHeader.textContent = `Game #${currentGameId} Chat`;
+    }
+  }
+
   // ====================== WEBSOCKET REQUEST FUNCTIONS ======================
   // Send chat message
   function sendJson() {
@@ -864,7 +908,7 @@ function handlePageUnload(event) {
   function requestUsersProfile() {
     if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
     
-    const data = { auth_token: localStorage.auth_token, type: 'connected_users' };
+    const data = {auth_token: localStorage.auth_token, type: 'connected_users', gameId: currentGameId};
     websocket.send(JSON.stringify(data));
   }
   
@@ -872,7 +916,7 @@ function handlePageUnload(event) {
   function requestCard() {
     if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
     
-    const data = { auth_token: localStorage.auth_token, type: 'card_request' };
+    const data = {auth_token: localStorage.auth_token, type: 'card_request', gameId: currentGameId};
     websocket.send(JSON.stringify(data));
   }
   
@@ -880,7 +924,7 @@ function handlePageUnload(event) {
   function requestHand() {
     if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
     
-    const data = { auth_token: localStorage.auth_token, type: 'hand_request' };
+    const data = {auth_token: localStorage.auth_token, type: 'hand_request', gameId: currentGameId};
     websocket.send(JSON.stringify(data));
   }
   

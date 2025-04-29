@@ -261,6 +261,7 @@ const tokens: { [key: string]: string } = {};
 const connections: { 
   ws: WebSocket; 
   username: string; 
+  gameId: number | null;  // Add gameId to track which game the user is connected to
   hand: number[]; 
   handCards?: { idCard: number; picture: string; cardType: number }[] 
 }[] = [];
@@ -275,9 +276,12 @@ function removeTokenByUser(user: string) {
 }
 
 // deno-lint-ignore no-explicit-any
-function notifyAllUsers(json: any) {
+function notifyGameUsers(gameId: number, json: any) {
   connections.forEach((client) => {
-    client.ws.send(JSON.stringify(json));
+    // Only send to clients in the same game
+    if (client.gameId === gameId) {
+      client.ws.send(JSON.stringify(json));
+    }
   });
 }
 
@@ -1248,7 +1252,7 @@ router.post('/disconnect-from-game', async (ctx) => {
         });
       
       // Notify all remaining connected users
-      notifyAllUsers({ type: 'connected_users', users: connectedUsers });
+      notifyGameUsers(gameId, { type: 'connected_users', users: connectedUsers });
     }
     
     ctx.response.status = 200;
@@ -1293,8 +1297,8 @@ router.get('/', authorizationMiddleware, async (ctx) => {
   const hand = userCards.map(card => card.idCard);
 
   // Add connection to the list
-  connections.push({ ws, username, hand });
-  console.log(`+ websocket connected (${connections.length})`);
+  connections.push({ ws, username, gameId, hand });
+  console.log(`+ websocket connected: ${username} to game ${gameId} (total: ${connections.length})`);  console.log(`+ websocket connected (${connections.length})`);
 
   // Send initial card back when user connects
   const cardsInDeck = await getActiveCardsInDeck(gameId);
@@ -1335,7 +1339,7 @@ router.get('/', authorizationMiddleware, async (ctx) => {
   ws.send(JSON.stringify({ type: 'connected_users', users: connectedUsers }));
   
   // Notify all other users about the new connection
-  notifyAllUsers({ type: 'connected_users', users: connectedUsers });
+  notifyGameUsers(gameId, { type: 'connected_users', users: connectedUsers });
 
   ws.onerror = (_error) => {
     const index = connections.findIndex((conn) => conn.ws === ws);
@@ -1366,6 +1370,17 @@ ws.onmessage = async (event) => {
   }
   
   const userId = user.idUser;
+  const userConnection = connections.find(conn => conn.username === owner);
+  const gameId = data.gameId || (userConnection ? userConnection.gameId : null);
+
+  if (!gameId) {
+    console.log('No game ID found for request');
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'No active game found. Please join or create a game first.'
+    }));
+    return;
+  }
   
   // Get the user's current active game
   const activeGame = await getActiveGameForUser(userId);
@@ -1377,13 +1392,11 @@ ws.onmessage = async (event) => {
     }));
     return;
   }
-
-  const gameId = activeGame.idGame;
   
   // Handle player_hand_update
   if (data.type === 'player_hand_update' && owner === data.username) {
     // Broadcast the card count update to all connected users
-    notifyAllUsers({
+    notifyGameUsers(gameId, {
       type: 'player_hand_update',
       username: data.username,
       cardCount: data.cardCount
@@ -1440,7 +1453,7 @@ ws.onmessage = async (event) => {
         }));
         
         // Broadcast the card count update to all connected users
-        notifyAllUsers({
+        notifyGameUsers(gameId, {
           type: 'player_hand_update',
           username: owner,
           cardCount: updatedCards.length
@@ -1459,7 +1472,7 @@ ws.onmessage = async (event) => {
           // Convert card back image to base64
           const base64String = safelyConvertToBase64(cardBackImage);
           
-          notifyAllUsers({ 
+          notifyGameUsers(gameId, { 
             type: 'card_change', 
             card: {
               idCard: remainingCardsInDeck[0].idCard,
@@ -1473,7 +1486,7 @@ ws.onmessage = async (event) => {
         }
       } else {
         // Notify that the deck is empty
-        notifyAllUsers({ 
+        notifyGameUsers(gameId, { 
           type: 'card_change', 
           card: {
             idCard: null,
@@ -1528,7 +1541,7 @@ ws.onmessage = async (event) => {
       username: owner // Add current username for client identification
     };
     
-    notifyAllUsers(response);
+    notifyGameUsers(gameId, response);
     return;
   }
 
@@ -1707,9 +1720,7 @@ ws.onclose = async () => {
                   pp_path: ppPath
                 };
               });
-            
-            // Send the updated user list to all remaining connected users
-            notifyAllUsers({ type: 'connected_users', users: connectedUsers });
+              notifyGameUsers(gameId, { type: 'connected_users', users: connectedUsers });
           }
         }
       }
