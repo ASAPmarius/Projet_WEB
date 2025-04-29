@@ -1,261 +1,338 @@
-// ====================== MAIN APPLICATION LOGIC ======================
-// Immediately-invoked function expression for encapsulation
-(function() {
-  // Global variables
-  let websocket = null;
-  let pokerTable = null;
-  let drawPile = null;
-  let originalCardStack = null;
-  let cardElement = null;
-  let chatContainer = null;
-  let chatToggle = null;
-  let messageInput = null;
-  let currentGameId = null; // Store the current game ID
-  let componentsInitialized = false; // New flag to track initialization status
+// card-game.js - Base Card Game Framework
+// This framework provides core functionality for building various card games
 
-  // Initialize application when DOM is loaded
-  document.addEventListener('DOMContentLoaded', init);
-  globalThis.addEventListener('beforeunload', handlePageUnload);
-
-  // Main initialization function with proper sequential flow
-  async function init() {
+// ====================== CARD GAME FRAMEWORK ======================
+class CardGameFramework {
+  constructor(options = {}) {
+    // Game state
+    this.websocket = null;
+    this.currentGameId = null;
+    this.currentPlayerId = null;
+    this.currentUsername = null;
+    this.players = [];
+    this.gameState = {
+      phase: 'waiting', // waiting, setup, playing, finished
+      currentTurn: null,
+      turnDirection: 1, // 1 for clockwise, -1 for counter-clockwise
+      round: 1
+    };
+    
+    // UI Elements
+    this.uiElements = {
+      cardElement: null,
+      cardStack: null,
+      chatContainer: null,
+      messageInput: null,
+      pokerTable: null,
+      drawPile: null,
+      handContainer: null,
+      discardPile: null,
+      chatToggle: null
+    };
+    
+    // Game settings with defaults
+    this.settings = {
+      maxPlayers: options.maxPlayers || 4,
+      startingHandSize: options.startingHandSize || 7,
+      winCondition: options.winCondition || 'empty-hand', // empty-hand, points, etc.
+      allowedActions: options.allowedActions || ['draw', 'play', 'discard']
+    };
+    
+    // Card collections
+    this.cardCollections = {
+      deck: [],
+      discardPile: [],
+      playArea: []
+    };
+    
+    // Flag to track initialization status
+    this.componentsInitialized = false;
+    
+    // Bind methods to this instance
+    this.init = this.init.bind(this);
+    this.connectWebSocket = this.connectWebSocket.bind(this);
+    this.handleWebSocketOpen = this.handleWebSocketOpen.bind(this);
+    this.handleWebSocketMessage = this.handleWebSocketMessage.bind(this);
+    this.handleWebSocketError = this.handleWebSocketError.bind(this);
+    this.handleWebSocketClose = this.handleWebSocketClose.bind(this);
+    this.handlePageUnload = this.handlePageUnload.bind(this);
+    
+    // Initialize game when DOM is loaded
+    document.addEventListener('DOMContentLoaded', this.init);
+    globalThis.addEventListener('beforeunload', this.handlePageUnload);
+  }
+  
+  // ====================== INITIALIZATION ======================
+  async init() {
     try {
-      // First, check if user has an active game
-      try {
-        const response = await fetch('http://localhost:3000/active-game', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        // If no active game, redirect to games page
-        if (!response.ok) {
-          console.log('No active game found, redirecting to games page');
-          globalThis.location.href = 'games.html';
-          return;
-        }
-        
-        // Store game data if needed
-        const gameData = await response.json();
-        if (gameData && gameData.game && gameData.game.idGame) {
-          console.log('Active game found:', gameData.game.idGame);
-          // Store in localStorage for navigation
-          localStorage.setItem('currentGameId', gameData.game.idGame);
-          currentGameId = gameData.game.idGame;
-        }
-      } catch (error) {
-        console.error('Error checking for active game:', error);
+      // Get game ID from URL parameters or localStorage
+      const urlParams = new URLSearchParams(globalThis.location.search);
+      const gameIdParam = urlParams.get('gameId');
+      this.currentGameId = gameIdParam || localStorage.getItem('currentGameId');
+      
+      // Get username from localStorage
+      this.currentUsername = localStorage.getItem('currentUsername');
+      
+      // If we don't have a game ID, check for active game
+      if (!this.currentGameId) {
+        await this.checkActiveGame();
+      }
+      
+      if (!this.currentGameId) {
+        console.log('No active game found, redirecting to games page');
         globalThis.location.href = 'games.html';
         return;
       }
       
-      console.log(`Initializing game UI for game ID: ${currentGameId}`);
+      console.log(`Initializing game UI for game ID: ${this.currentGameId}`);
       
-      // Continue with normal initialization if we have an active game
-      // Store references to DOM elements
-      cardElement = document.getElementById('card');
-      originalCardStack = document.getElementById('cardStack');
-      chatContainer = document.querySelector('.container');
-      messageInput = document.getElementById('messageInput');
+      // Initialize UI elements
+      this.initUIElements();
       
-      console.log('DOM elements initialization:');
-      console.log('- Card element:', cardElement ? 'found' : 'not found');
-      console.log('- Original card stack:', originalCardStack ? 'found' : 'not found');
-      console.log('- Chat container:', chatContainer ? 'found' : 'not found');
-      console.log('- Message input:', messageInput ? 'found' : 'not found');
+      // Setup game components with a delay to ensure DOM is ready
+      setTimeout(() => {
+        try {
+          this.initGameComponents();
+          this.componentsInitialized = true;
+          console.log('Game components initialized');
+          
+          // Connect to WebSocket after components are initialized
+          this.connectWebSocket();
+        } catch (error) {
+          console.error('Error initializing game components:', error);
+        }
+      }, 1000);
       
-      // IMPORTANT: Wait for components to initialize before connecting WebSocket
-      // Use a Promise to ensure sequential execution
-      await new Promise((resolve) => {
-        setTimeout(() => {
-          try {
-            console.log('Starting components initialization');
-            initChatToggle();
-            initChatInput();
-            initPokerTable();
-            addCardNotification();
-            setupEventListeners();
-            componentsInitialized = true;
-            console.log('Components initialization completed');
-            resolve();
-          } catch (error) {
-            console.error('Error during component initialization:', error);
-            resolve(); // Still resolve to continue with WebSocket connection
-          }
-        }, 1500); // Increased timeout for safer initialization
-      });
-      
-      // Initialize WebSocket connection ONLY after all components are ready
-      console.log('UI components initialized, now connecting WebSocket...');
-      connectWebSocket();
+      // Clear navigation flags
+      localStorage.removeItem('intentionalNavigation');
+      localStorage.removeItem('wsWasOpen');
     } catch (error) {
-      console.error('Error during main initialization:', error);
-      // Redirect to games page on critical error
+      console.error('Error during game initialization:', error);
       globalThis.location.href = 'games.html';
     }
-
-    // Check if we're returning from hello page
-    if (localStorage.getItem('wsWasOpen') === 'true') {
-      // Clear the flag
-      localStorage.removeItem('wsWasOpen');
-    }
-  }
-
-  // Updated WebSocket handling with additional safety checks
-  function connectWebSocket() {
-    websocket = new WebSocket('ws://localhost:3000');
-    
-    websocket.onopen = handleWebSocketOpen;
-    websocket.onmessage = handleWebSocketMessage;
-    websocket.onerror = handleWebSocketError;
-    websocket.onclose = handleWebSocketClose;
-  }
-// Replace the handlePageUnload function in card-game.js
-function handlePageUnload(event) {
-  // Check if this is intentional navigation between our pages
-  if (localStorage.getItem('intentionalNavigation') === 'true' || 
-      localStorage.getItem('wsWasOpen') === 'true') {
-    console.log('Intentional navigation detected, skipping disconnect');
-    return;
   }
   
-  // This appears to be a genuine page close/refresh
-  const authToken = localStorage.getItem('auth_token');
-  
-  if (authToken) {
+  // Check if user has an active game
+  async checkActiveGame() {
     try {
-      console.log('User is leaving the page, sending disconnect signal');
-      
-      // Use navigator.sendBeacon instead of XHR when available (more reliable for unload events)
-      if (navigator.sendBeacon) {
-        const headers = {
+      const response = await fetch('http://localhost:3000/active-game', {
+        method: 'GET',
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        };
-        
-        // Create a blob with the headers
-        const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
-        
-        // Send the beacon with the auth token in the URL as a fallback approach
-        const success = navigator.sendBeacon(
-          `http://localhost:3000/disconnect-from-game?auth_token=${encodeURIComponent(authToken)}`, 
-          blob
-        );
-        
-        console.log('Disconnect beacon sent:', success);
-      } else {
-        // Fallback to synchronous XHR
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:3000/disconnect-from-game', false); // false makes it synchronous
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
-        xhr.withCredentials = true;
-        xhr.send();
-        
-        console.log('Disconnect XHR sent');
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return false;
       }
+      
+      const gameData = await response.json();
+      if (gameData && gameData.game && gameData.game.idGame) {
+        console.log('Active game found:', gameData.game.idGame);
+        this.currentGameId = gameData.game.idGame;
+        localStorage.setItem('currentGameId', this.currentGameId);
+        return true;
+      }
+      
+      return false;
     } catch (error) {
-      console.error('Failed to send disconnect signal:', error);
+      console.error('Error checking for active game:', error);
+      return false;
     }
   }
-}
   
-  // ====================== WEBSOCKET FUNCTIONALITY ======================
-  // Handle WebSocket open event with safety checks
-  function handleWebSocketOpen() {
-    console.log('WebSocket connection established.');
+  // Initialize UI element references
+  initUIElements() {
+    this.uiElements.cardElement = document.getElementById('card');
+    this.uiElements.cardStack = document.getElementById('cardStack');
+    this.uiElements.chatContainer = document.querySelector('.container');
+    this.uiElements.messageInput = document.getElementById('messageInput');
+    this.uiElements.handContainer = document.getElementById('handContainer');
+    
+    console.log('UI elements initialized');
+  }
+  
+  // Initialize game components
+  initGameComponents() {
+    // Create and initialize the poker table
+    this.initPokerTable();
+    
+    // Initialize the chat toggle
+    this.initChatToggle();
+    
+    // Initialize the chat input
+    this.initChatInput();
+    
+    // Add card notification badge
+    this.addCardNotification();
+    
+    // Setup event listeners
+    this.setupEventListeners();
+    
+    // Create discard pile if it doesn't exist
+    this.createDiscardPile();
+    
+    console.log('Game components initialized');
+  }
+  
+  // ====================== WEBSOCKET HANDLING ======================
+  connectWebSocket() {
+    this.websocket = new WebSocket('ws://localhost:3000');
+    
+    this.websocket.onopen = this.handleWebSocketOpen;
+    this.websocket.onmessage = this.handleWebSocketMessage;
+    this.websocket.onerror = this.handleWebSocketError;
+    this.websocket.onclose = this.handleWebSocketClose;
+    
+    console.log('WebSocket connection initialized');
+  }
+  
+  handleWebSocketOpen() {
+    console.log('WebSocket connection established');
     
     // Only request data if UI components are ready
-    if (componentsInitialized && pokerTable) {
+    if (this.componentsInitialized) {
       console.log('UI components are ready, requesting initial data');
-      requestUsersProfile();
-      requestCard();
-      requestHand();
+      this.requestUsersProfile();
+      this.requestGameState();
+      this.requestCard();
+      this.requestHand();
     } else {
       // If components aren't ready yet, wait and then request data
       console.log('UI components not fully initialized, waiting before requesting data...');
       const checkInterval = setInterval(() => {
-        if (componentsInitialized && pokerTable && drawPile) {
+        if (this.componentsInitialized) {
           clearInterval(checkInterval);
           console.log('UI components now initialized, requesting data...');
-          requestUsersProfile();
-          console.log('Requested users profiles');
-          requestCard();
-          console.log('Requested card');
-          requestHand();
-          console.log('Requested hand');
+          this.requestUsersProfile();
+          this.requestGameState();
+          this.requestCard();
+          this.requestHand();
         }
       }, 200);
+    }
+  }
+  
+  handleWebSocketMessage(event) {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('WebSocket message received:', data.type);
       
-      // Safety timeout after 5 seconds
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        if (!componentsInitialized || !pokerTable) {
-          console.warn('Timeout waiting for UI components - requesting data anyway');
-          requestUsersProfile();
-          requestCard();
-          requestHand();
-        }
-      }, 5000);
+      // If the message includes a gameId, verify it matches our current game
+      if (data.gameId && data.gameId != this.currentGameId) {
+        console.log(`Ignoring message for different game: ${data.gameId}, our game: ${this.currentGameId}`);
+        return;
+      }
+      
+      // Handle different message types
+      switch(data.type) {
+        case 'message':
+          this.handleChatMessage(data);
+          break;
+        case 'connected_users':
+          this.handleConnectedUsers(data);
+          break;
+        case 'card_change':
+          this.handleCardChange(data);
+          break;
+        case 'player_hand':
+          this.handlePlayerHand(data);
+          break;
+        case 'player_hand_update':
+          this.handlePlayerHandUpdate(data);
+          break;
+        case 'game_state':
+          this.handleGameState(data);
+          break;
+        case 'turn_change':
+          this.handleTurnChange(data);
+          break;
+        case 'card_played':
+          this.handleCardPlayed(data);
+          break;
+        case 'error':
+          this.handleError(data);
+          break;
+        default:
+          console.log('Unknown message type:', data.type);
+      }
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
     }
   }
   
-  // Handle WebSocket messages
-  function handleWebSocketMessage(event) {
-    const data = JSON.parse(event.data);
-    console.log('WebSocket message received:', data.type, data);
-    
-  // If the message includes a gameId, verify it matches our current game
-  if (data.gameId && data.gameId != currentGameId) {
-    console.log(`Ignoring message for different game: ${data.gameId}, our game: ${currentGameId}`);
-    return;
-  }
-    
-    // Handle different message types
-    switch(data.type) {
-      case 'message':
-        handleChatMessage(data);
-        break;
-      case 'connected_users':
-        handleConnectedUsers(data);
-        break;
-      case 'card_change':
-        handleCardChange(data);
-        break;
-      case 'player_hand':
-        handlePlayerHand(data);
-        break;
-      case 'player_hand_update':
-        requestUsersProfile(); // Request updated user list
-        break;
-      default:
-        console.log('Unknown message type:', data.type);
-    }
-  }
-  
-  function handleWebSocketError(error) {
+  handleWebSocketError(error) {
     console.error('WebSocket error:', error);
     
     // Only redirect to login if not navigating to games page
     if (localStorage.getItem('wsWasOpen') !== 'true') {
-      goToLogin();
+      this.goToLogin();
     }
   }
   
-  function handleWebSocketClose(event) {
+  handleWebSocketClose(event) {
     console.log('WebSocket connection closed:', event);
     
     // Only redirect to login if we're not navigating to another page
     if (localStorage.getItem('wsWasOpen') !== 'true') {
-      goToLogin();
+      this.goToLogin();
     }
   }
   
-  // Handle chat messages
-  function handleChatMessage(data) {
-    console.log('Received message:', data);
+  handlePageUnload(event) {
+    // Check if this is intentional navigation between our pages
+    if (localStorage.getItem('intentionalNavigation') === 'true' || 
+        localStorage.getItem('wsWasOpen') === 'true') {
+      console.log('Intentional navigation detected, skipping disconnect');
+      return;
+    }
+    
+    // This appears to be a genuine page close/refresh
+    const authToken = localStorage.getItem('auth_token');
+    
+    if (authToken) {
+      try {
+        console.log('User is leaving the page, sending disconnect signal');
+        
+        // Use navigator.sendBeacon instead of XHR when available (more reliable for unload events)
+        if (navigator.sendBeacon) {
+          const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          };
+          
+          // Create a blob with the headers
+          const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
+          
+          // Send the beacon with the auth token in the URL as a fallback approach
+          const success = navigator.sendBeacon(
+            `http://localhost:3000/disconnect-from-game?auth_token=${encodeURIComponent(authToken)}`, 
+            blob
+          );
+          
+          console.log('Disconnect beacon sent:', success);
+        } else {
+          // Fallback to synchronous XHR
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', 'http://localhost:3000/disconnect-from-game', false); // false makes it synchronous
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+          xhr.withCredentials = true;
+          xhr.send();
+          
+          console.log('Disconnect XHR sent');
+        }
+      } catch (error) {
+        console.error('Failed to send disconnect signal:', error);
+      }
+    }
+  }
+  
+  // ====================== MESSAGE HANDLERS ======================
+  handleChatMessage(data) {
+    console.log('Processing chat message');
     const message = data;
     const messageBox = document.createElement('div');
     messageBox.className = 'message-box';
@@ -296,8 +373,7 @@ function handlePageUnload(event) {
     messageBox.appendChild(messageContent);
 
     // Check if it's a message from the current user
-    const currentUser = data.username;
-    console.log('Current user:', currentUser);
+    const currentUser = this.currentUsername || data.username;
     if (message.owner === currentUser) {
       messageBox.classList.add('my-message');
     } else {
@@ -312,67 +388,29 @@ function handlePageUnload(event) {
     }
   }
   
-  // Handle connected users update
-  function handleConnectedUsers(data) {
-    console.log('Received connected users:', data.users);
+  handleConnectedUsers(data) {
+    console.log('Processing connected users update');
     const users = data.users;
     
+    // Store the players
+    this.players = users;
+    
     // Update the user profiles sidebar
-    updateProfilesSidebar(users);
+    this.updateProfilesSidebar(users);
     
     // Get current username
-    let currentUsername = data.username;
-    if (!currentUsername) {
-      currentUsername = localStorage.getItem('currentUsername');
-    }
-    if (!currentUsername && data.owner) {
-      currentUsername = data.owner;
-      storeCurrentUsername(currentUsername);
+    this.currentUsername = data.username || this.currentUsername || localStorage.getItem('currentUsername');
+    if (!this.currentUsername && data.owner) {
+      this.currentUsername = data.owner;
+      localStorage.setItem('currentUsername', this.currentUsername);
     }
     
     // Update the poker table players
-    updateTablePlayers(users, currentUsername);
+    this.updateTablePlayers(users, this.currentUsername);
   }
   
-  // Update the profiles sidebar
-  function updateProfilesSidebar(users) {
-    const profileContainer = document.getElementById('profiles');
-    if (!profileContainer) return;
-    
-    console.log('Updating profiles sidebar');
-    profileContainer.innerHTML = ''; // Clear existing profiles
-
-    users.forEach((user) => {
-      const profileBox = document.createElement('div');
-      profileBox.className = 'profile-box';
-
-      const profilePicture = document.createElement('img');
-      
-      // Check if pp_path is base64 or a regular path
-      if (user.pp_path && user.pp_path.startsWith('data:image')) {
-        profilePicture.src = user.pp_path;
-      } else if (user.pp_path) {
-        profilePicture.src = user.pp_path;
-      } else {
-        profilePicture.src = 'profile_pictures/default.jpg';
-      }
-      
-      profilePicture.alt = 'Profile Picture';
-      profilePicture.className = 'profile-picture';
-
-      const profileName = document.createElement('div');
-      profileName.className = 'profile-name';
-      profileName.textContent = user.username;
-
-      profileBox.appendChild(profilePicture);
-      profileBox.appendChild(profileName);
-      profileContainer.appendChild(profileBox);
-    });
-  }
-  
-  // Enhanced card change handler with better error reporting
-  function handleCardChange(data) {
-    console.log('Received card data:', data);
+  handleCardChange(data) {
+    console.log('Processing card change');
     
     // Check if we have valid card data
     if (!data.card) {
@@ -386,54 +424,23 @@ function handlePageUnload(event) {
     }
     
     // Use the card's picture from the database (base64 encoded)
-    updateCardDisplay(data.card.picture, data.card.idCard);
+    this.updateCardDisplay(data.card.picture, data.card.idCard);
     
     // Update the draw pile on the poker table
-    updateDrawPileCard(data.card.picture);
+    this.updateDrawPileCard(data.card.picture);
     
     // Update pile count if available
     if (data.pileCount !== undefined) {
-      updatePileCount(data.pileCount);
+      this.updatePileCount(data.pileCount);
     }
   }
   
-  // Improved card display update with proper error handling
-  function updateCardDisplay(picture, idCard) {
-    if (!cardElement) {
-      console.warn("Card element not found when trying to update card display");
-      return;
-    }
+  handlePlayerHand(data) {
+    console.log('Processing player hand update');
     
-    console.log(`Updating card display for card ${idCard} with image data length: ${picture ? picture.length : 0}`);
+    // Store my hand
+    this.myHand = data.hand || [];
     
-    // Clear existing content
-    cardElement.innerHTML = '';
-    
-    // Create an image element to display the card
-    const cardImage = document.createElement('img');
-    cardImage.src = picture;
-    cardImage.alt = `Card ${idCard}`;
-    cardImage.className = 'card-image';
-    
-    // Add error handling for image loading
-    cardImage.onerror = function() {
-      console.error(`Failed to load card image for card ${idCard}`);
-      this.src = ''; // Clear the broken image
-      this.alt = 'Card image failed to load';
-    };
-    
-    // Append the image to the card element
-    cardElement.appendChild(cardImage);
-    
-    // Add the pile count if it doesn't exist
-    if (!cardElement.querySelector('.pile-count')) {
-      addCardNotification();
-    }
-  }
-  
-  // Handle player hand update
-  function handlePlayerHand(data) {
-    console.log('Received hand data:', data);
     const handContainer = document.getElementById('handContainer');
 
     if (!handContainer) {
@@ -470,6 +477,8 @@ function handlePageUnload(event) {
       
       const cardElement = document.createElement('div');
       cardElement.className = 'hand-card';
+      cardElement.dataset.cardId = card.idCard;
+      cardElement.dataset.cardType = card.cardType;
       
       // Create an image element to display the card
       const cardImage = document.createElement('img');
@@ -485,148 +494,143 @@ function handlePageUnload(event) {
       cardElement.style.left = `${position}px`;
       cardElement.style.zIndex = index; // Ensure proper stacking order
 
+      // Add click handler for playing cards
+      cardElement.addEventListener('click', () => this.handleCardClick(card));
+
       handContainer.appendChild(cardElement);
     });
     
     // Update player's card count in the table view
-    const currentUsername = localStorage.getItem('currentUsername');
-    if (currentUsername && websocket && websocket.readyState === WebSocket.OPEN) {
+    if (this.currentUsername && this.websocket && this.websocket.readyState === WebSocket.OPEN) {
       const cardCount = data.hand.length;
       
       // Send update to server to broadcast this player's card count
-      websocket.send(JSON.stringify({
+      this.websocket.send(JSON.stringify({
         auth_token: localStorage.auth_token,
         type: 'player_hand_update',
-        username: currentUsername,
-        cardCount: cardCount
+        username: this.currentUsername,
+        cardCount: cardCount,
+        gameId: this.currentGameId
       }));
     }
   }
   
-  // ====================== CHAT FUNCTIONALITY ======================
-  // Initialize chat toggle button
-  function initChatToggle() {
-    updateChatHeader();
-    // Create chat toggle button if it doesn't exist
-    if (!document.getElementById('chatToggle')) {
-      chatToggle = document.createElement('div');
-      chatToggle.className = 'chat-toggle';
-      chatToggle.id = 'chatToggle';
-      document.body.appendChild(chatToggle);
+  handlePlayerHandUpdate(data) {
+    console.log('Processing player hand count update');
+    
+    // Update the player's card count in our players array
+    const playerIndex = this.players.findIndex(p => p.username === data.username);
+    if (playerIndex !== -1) {
+      this.players[playerIndex].cardCount = data.cardCount;
       
-      // Initialize chat state from localStorage (default to visible)
-      const chatHidden = localStorage.getItem('chatHidden') === 'true';
-      if (chatHidden && chatContainer) {
-        chatContainer.classList.add('chat-hidden');
-        chatToggle.classList.add('chat-hidden');
-      }
-      
-      // Toggle chat visibility when button is clicked
-      chatToggle.addEventListener('click', toggleChat);
+      // Update the table visualization
+      this.updateTablePlayers(this.players, this.currentUsername);
+    }
+    
+    // If this update is for the current player, we can optionally do something here
+    if (data.username === this.currentUsername) {
+      console.log('My hand count updated to:', data.cardCount);
     }
   }
   
-  // Toggle chat visibility
-  function toggleChat() {
-    if (!chatContainer || !chatToggle) return;
+  handleGameState(data) {
+    console.log('Processing game state update');
     
-    // Toggle classes
-    chatContainer.classList.toggle('chat-hidden');
-    chatToggle.classList.toggle('chat-hidden');
+    // Update the local game state
+    this.gameState = data.gameState;
     
-    // Save state to localStorage
-    const isHidden = chatContainer.classList.contains('chat-hidden');
-    localStorage.setItem('chatHidden', isHidden.toString());
+    // Update the current turn indicator
+    if (this.gameState.currentTurn) {
+      this.highlightCurrentPlayer(this.gameState.currentTurn);
+    }
+    
+    // Update UI elements based on game state
+    this.updateGamePhaseUI(this.gameState.phase);
+    
+    // Update round indicator if needed
+    if (this.gameState.round) {
+      this.updateRoundIndicator(this.gameState.round);
+    }
   }
   
-  // Initialize chat input
-  function initChatInput() {
-    if (!messageInput) return;
+  handleTurnChange(data) {
+    console.log('Processing turn change');
     
-    // Ensure the input has high z-index and is focusable
-    messageInput.style.zIndex = "1100";
-    messageInput.style.position = "relative";
-    messageInput.style.pointerEvents = "auto";
+    // Update the current turn in our game state
+    this.gameState.currentTurn = data.playerId;
     
-    // Add event listeners with stopPropagation to prevent events from being blocked
-    messageInput.addEventListener('click', function(e) {
-      e.stopPropagation();
-    });
+    // Highlight the current player
+    this.highlightCurrentPlayer(data.playerId);
     
-    messageInput.addEventListener('focus', function(e) {
-      e.stopPropagation();
-    });
+    // If it's my turn, enable appropriate actions
+    const isMyTurn = data.playerId === this.currentPlayerId;
+    this.setMyTurnState(isMyTurn);
     
-    // Also fix the button
-    const sendButton = document.querySelector('.input-area button');
-    if (sendButton) {
-      sendButton.style.zIndex = "1100";
-      sendButton.style.position = "relative";
-      sendButton.style.pointerEvents = "auto";
-      
-      sendButton.addEventListener('click', function(e) {
-        e.stopPropagation();
-      });
+    // Show a notification about whose turn it is
+    this.showTurnNotification(data.username);
+  }
+  
+  handleCardPlayed(data) {
+    console.log('Processing card played');
+    
+    // Add the card to the play area
+    this.addCardToPlayArea(data.card);
+    
+    // Update the discard pile if applicable
+    if (data.toDiscard) {
+      this.updateDiscardPile(data.card);
     }
     
-    // Fix the input area container
-    const inputArea = document.querySelector('.input-area');
-    if (inputArea) {
-      inputArea.style.zIndex = "1090";
-      inputArea.style.position = "relative";
-      inputArea.style.pointerEvents = "auto";
+    // Remove the card from the player's hand if it's the current player
+    if (data.playerId === this.currentPlayerId) {
+      this.removeCardFromHand(data.card.idCard);
     }
     
-    // Make sure the container and chatbox don't block events
-    const chatbox = document.querySelector('.chatbox');
-    if (chatContainer) chatContainer.style.pointerEvents = "auto";
-    if (chatbox) chatbox.style.pointerEvents = "auto";
+    // Show notification about the played card
+    this.showCardPlayedNotification(data.username, data.card);
+  }
+  
+  handleError(data) {
+    console.error('Game error:', data.message);
+    
+    // Show error to user
+    this.showErrorNotification(data.message);
   }
   
   // ====================== POKER TABLE FUNCTIONALITY ======================
-  // Improved poker table initialization with robust retry logic
-  function initPokerTable() {
+  initPokerTable() {
     console.log('Initializing poker table');
     
-    if (!originalCardStack || !cardElement) {
-      console.warn('Original card stack or card element not found, will retry');
-      setTimeout(initPokerTable, 200);
+    // Check if we have the necessary elements
+    if (!this.uiElements.cardStack) {
+      console.warn('Original card stack not found');
       return;
     }
     
     // Create the poker table if it doesn't exist
     if (!document.getElementById('pokerTableContainer')) {
       try {
-        createPokerTable();
-        console.log('Poker table created successfully');
+        this.createPokerTable();
         
-        // Double-check pokerTable and drawPile references are set
-        pokerTable = document.getElementById('pokerTableContainer');
-        drawPile = document.getElementById('drawPile');
-        
-        if (!pokerTable || !drawPile) {
-          console.error('Poker table or draw pile references missing after creation');
-          setTimeout(initPokerTable, 200); // Retry
-          return;
-        }
+        // Update our reference to the poker table
+        this.uiElements.pokerTable = document.getElementById('pokerTableContainer');
+        this.uiElements.drawPile = document.getElementById('drawPile');
         
         // Hide the original card stack
-        hideOriginalCardStack();
+        this.hideOriginalCardStack();
       } catch (error) {
         console.error('Error creating poker table:', error);
-        setTimeout(initPokerTable, 300);
       }
     } else {
-      console.log('Poker table already exists');
-      // Make sure references are set
-      pokerTable = document.getElementById('pokerTableContainer');
-      drawPile = document.getElementById('drawPile');
+      // Make sure our references are up to date
+      this.uiElements.pokerTable = document.getElementById('pokerTableContainer');
+      this.uiElements.drawPile = document.getElementById('drawPile');
     }
   }
-  // Create the poker table
-  function createPokerTable() {
+  
+  createPokerTable() {
     // Create the table container
-    pokerTable = document.createElement('div');
+    const pokerTable = document.createElement('div');
     pokerTable.id = 'pokerTableContainer';
     pokerTable.className = 'poker-table-container';
     
@@ -635,11 +639,11 @@ function handlePageUnload(event) {
     tableCenter.className = 'table-center';
     
     // Create draw pile
-    drawPile = document.createElement('div');
+    const drawPile = document.createElement('div');
     drawPile.id = 'drawPile';
     drawPile.className = 'draw-pile';
     
-    // Create card count indicator with fixed size and positioning
+    // Create card count indicator
     const pileCount = document.createElement('div');
     pileCount.className = 'pile-count';
     pileCount.id = 'pileCount';
@@ -663,33 +667,69 @@ function handlePageUnload(event) {
     document.body.appendChild(pokerTable);
     
     // Add click event to the draw pile
-    drawPile.addEventListener('click', function() {
-      // Trigger the same action as the original card stack
-      if (cardElement) {
-        cardElement.click();
-      }
-    });
+    drawPile.addEventListener('click', () => this.handleDrawPileClick());
   }
   
-  // Hide the original card stack without removing it
-  function hideOriginalCardStack() {
-    if (originalCardStack) {
-      originalCardStack.style.visibility = 'hidden';
-      originalCardStack.style.pointerEvents = 'none';
+  createDiscardPile() {
+    // Only create if we have a poker table and don't already have a discard pile
+    if (!this.uiElements.pokerTable || document.getElementById('discardPile')) {
+      return;
+    }
+    
+    // Create discard pile
+    const discardPile = document.createElement('div');
+    discardPile.id = 'discardPile';
+    discardPile.className = 'discard-pile';
+    
+    // Position it next to the draw pile in the table center
+    const tableCenter = this.uiElements.pokerTable.querySelector('.table-center');
+    if (tableCenter) {
+      // Create the card image for the discard pile
+      const cardImage = document.createElement('img');
+      cardImage.id = 'discardPileImage';
+      cardImage.className = 'card-image';
+      cardImage.style.width = '100%';
+      cardImage.style.height = '100%';
+      cardImage.alt = 'Discard Pile';
+      cardImage.style.opacity = '0.7'; // Make it slightly transparent when empty
+      
+      // Create counter for discard pile
+      const discardCount = document.createElement('div');
+      discardCount.className = 'pile-count';
+      discardCount.id = 'discardCount';
+      discardCount.textContent = '0';
+      
+      // Add them to the discard pile
+      discardPile.appendChild(cardImage);
+      discardPile.appendChild(discardCount);
+      
+      // Position the discard pile
+      discardPile.style.position = 'absolute';
+      discardPile.style.left = '160px'; // Position to the right of draw pile
+      
+      // Add it to the table center
+      tableCenter.appendChild(discardPile);
+      
+      // Store reference
+      this.uiElements.discardPile = discardPile;
     }
   }
   
-  // Update the player positions around the table
-  function updateTablePlayers(players, currentUsername) {
-    if (!pokerTable) {
+  hideOriginalCardStack() {
+    if (this.uiElements.cardStack) {
+      this.uiElements.cardStack.style.visibility = 'hidden';
+      this.uiElements.cardStack.style.pointerEvents = 'none';
+    }
+  }
+  
+  updateTablePlayers(players, currentUsername) {
+    if (!this.uiElements.pokerTable) {
       console.warn('Poker table not initialized');
       return;
     }
     
-    console.log('Updating table players:', players);
-    
     // Remove existing player seats
-    const existingSeats = pokerTable.querySelectorAll('.player-seat');
+    const existingSeats = this.uiElements.pokerTable.querySelectorAll('.player-seat');
     existingSeats.forEach(seat => seat.remove());
     
     // Add new player seats
@@ -701,6 +741,11 @@ function handlePageUnload(event) {
       // Mark current player
       if (player.username === currentUsername) {
         seat.classList.add('current-player');
+      }
+      
+      // Highlight active player (player whose turn it is)
+      if (this.gameState && this.gameState.currentTurn === player.id) {
+        seat.classList.add('active-player');
       }
       
       // Create player info section
@@ -752,24 +797,72 @@ function handlePageUnload(event) {
       seat.appendChild(playerInfo);
       
       // Add the seat to the table
-      pokerTable.appendChild(seat);
+      this.uiElements.pokerTable.appendChild(seat);
     });
   }
   
-  // Improved draw pile card update with robust error handling
-  function updateDrawPileCard(imageUrl) {
-    if (!drawPile) {
+  highlightCurrentPlayer(playerId) {
+    // Remove active-player class from all seats
+    const allSeats = document.querySelectorAll('.player-seat');
+    allSeats.forEach(seat => seat.classList.remove('active-player'));
+    
+    // Find the player by ID
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) {
+      console.warn(`Player with ID ${playerId} not found`);
+      return;
+    }
+    
+    // Add active-player class to the current player's seat
+    const seat = document.getElementById(`player-seat-${player.username}`);
+    if (seat) {
+      seat.classList.add('active-player');
+    }
+  }
+  
+  // ====================== CARD HANDLING ======================
+  updateCardDisplay(picture, idCard) {
+    if (!this.uiElements.cardElement) {
+      console.warn("Card element not found when trying to update card display");
+      return;
+    }
+    
+    // Clear existing content
+    this.uiElements.cardElement.innerHTML = '';
+    
+    // Create an image element to display the card
+    const cardImage = document.createElement('img');
+    cardImage.src = picture;
+    cardImage.alt = `Card ${idCard}`;
+    cardImage.className = 'card-image';
+    
+    // Add error handling for image loading
+    cardImage.onerror = function() {
+      console.error(`Failed to load card image for card ${idCard}`);
+      this.src = ''; // Clear the broken image
+      this.alt = 'Card image failed to load';
+    };
+    
+    // Append the image to the card element
+    this.uiElements.cardElement.appendChild(cardImage);
+    
+    // Add the pile count if it doesn't exist
+    if (!this.uiElements.cardElement.querySelector('.pile-count')) {
+      this.addCardNotification();
+    }
+  }
+  
+  updateDrawPileCard(imageUrl) {
+    if (!this.uiElements.drawPile) {
       console.warn("Draw pile not found when trying to update draw pile card");
       
       // Try to find it again
-      drawPile = document.getElementById('drawPile');
-      if (!drawPile) {
+      this.uiElements.drawPile = document.getElementById('drawPile');
+      if (!this.uiElements.drawPile) {
         console.error("Draw pile still not found - cannot update draw pile card");
         return;
       }
     }
-    
-    console.log(`Updating draw pile card with image URL length: ${imageUrl ? imageUrl.length : 0}`);
     
     let cardImage = document.getElementById('drawPileImage');
     
@@ -781,7 +874,7 @@ function handlePageUnload(event) {
       cardImage.className = 'card-image';
       cardImage.style.width = '100%';
       cardImage.style.height = '100%';
-      drawPile.appendChild(cardImage);
+      this.uiElements.drawPile.appendChild(cardImage);
     }
     
     // Set the image source
@@ -792,20 +885,46 @@ function handlePageUnload(event) {
     };
   }
   
-  // Enhanced pile count update with proper error handling
-  function updatePileCount(count) {
-    console.log(`Updating pile count to: ${count}`);
+  updateDiscardPile(card) {
+    if (!this.uiElements.discardPile) {
+      console.warn("Discard pile not found");
+      return;
+    }
     
+    let cardImage = document.getElementById('discardPileImage');
+    if (!cardImage) {
+      console.warn("Discard pile image element not found");
+      return;
+    }
+    
+    // Update the image
+    cardImage.src = card.picture;
+    cardImage.style.opacity = '1'; // Make fully visible when cards are present
+    
+    // Update the count
+    const discardCount = document.getElementById('discardCount');
+    if (discardCount) {
+      // Increment the count
+      const currentCount = parseInt(discardCount.textContent) || 0;
+      discardCount.textContent = (currentCount + 1).toString();
+      
+      // Add double-digit class if needed
+      if (currentCount + 1 > 9) {
+        discardCount.classList.add('double-digit');
+      }
+    }
+  }
+  
+  updatePileCount(count) {
     // Update count on draw pile
     let pileCount = document.getElementById('pileCount');
-    if (!pileCount && drawPile) {
+    if (!pileCount && this.uiElements.drawPile) {
       // Try to create the pile count element if it doesn't exist
-      console.warn("Pile count element not found on draw pile, creating it");
       pileCount = document.createElement('div');
       pileCount.className = 'pile-count';
       pileCount.id = 'pileCount';
-      if (drawPile) {
-        drawPile.appendChild(pileCount);
+      if (this.uiElements.drawPile) {
+        this.uiElements.drawPile.appendChild(pileCount);
       }
     }
     
@@ -822,14 +941,13 @@ function handlePageUnload(event) {
     
     // Update count on original card stack
     let cardPileCount = document.getElementById('cardPileCount');
-    if (!cardPileCount && cardElement) {
+    if (!cardPileCount && this.uiElements.cardElement) {
       // Try to create the card pile count element if it doesn't exist
-      console.warn("Pile count element not found on original card, creating it");
       cardPileCount = document.createElement('div');
       cardPileCount.className = 'pile-count';
       cardPileCount.id = 'cardPileCount';
-      if (cardElement) {
-        cardElement.appendChild(cardPileCount);
+      if (this.uiElements.cardElement) {
+        this.uiElements.cardElement.appendChild(cardPileCount);
       }
     }
     
@@ -844,217 +962,708 @@ function handlePageUnload(event) {
     }
   }
   
-  // ====================== CARD NOTIFICATION FUNCTIONALITY ======================
- // Enhanced card notification handling
- function addCardNotification() {
-  if (!cardElement) {
-    console.warn("Cannot add card notification - card element not found");
-    return;
-  }
-  
-  // Remove any existing card count
-  const existingCount = cardElement.querySelector('.pile-count');
-  if (existingCount) {
-    existingCount.remove();
-  }
+  addCardNotification() {
+    if (!this.uiElements.cardElement) {
+      console.warn("Cannot add card notification - card element not found");
+      return;
+    }
+    
+    // Remove any existing card count
+    const existingCount = this.uiElements.cardElement.querySelector('.pile-count');
+    if (existingCount) {
+      existingCount.remove();
+    }
 
-  // Create a new count element
-  const pileCount = document.createElement('div');
-  pileCount.className = 'pile-count';
-  pileCount.id = 'cardPileCount';
-  pileCount.textContent = '0'; // Start with 0
-  pileCount.style.position = 'absolute';
-  pileCount.style.top = '-10px';
-  pileCount.style.right = '-10px';
-  pileCount.style.zIndex = '9999';
-  
-  // Add it to the card
-  cardElement.appendChild(pileCount);
-  
-  // Make sure the card and card stack have proper overflow and positioning
-  cardElement.style.overflow = 'visible';
-  cardElement.style.position = 'relative';
-  
-  if (originalCardStack) {
-    originalCardStack.style.overflow = 'visible';
-    originalCardStack.style.position = 'relative';
+    // Create a new count element
+    const pileCount = document.createElement('div');
+    pileCount.className = 'pile-count';
+    pileCount.id = 'cardPileCount';
+    pileCount.textContent = '0'; // Start with 0
+    pileCount.style.position = 'absolute';
+    pileCount.style.top = '-10px';
+    pileCount.style.right = '-10px';
+    pileCount.style.zIndex = '9999';
+    
+    // Add it to the card
+    this.uiElements.cardElement.appendChild(pileCount);
+    
+    // Make sure the card and card stack have proper overflow and positioning
+    this.uiElements.cardElement.style.overflow = 'visible';
+    this.uiElements.cardElement.style.position = 'relative';
+    
+    if (this.uiElements.cardStack) {
+      this.uiElements.cardStack.style.overflow = 'visible';
+      this.uiElements.cardStack.style.position = 'relative';
+    }
   }
   
-  console.log('Added notification badge to card');
-}
-  
-  // ====================== UTILITY FUNCTIONS ======================
-  // Store current username
-  function storeCurrentUsername(username) {
-    localStorage.setItem('currentUsername', username);
+  // ====================== TURN MANAGEMENT ======================
+  startNextTurn() {
+    if (!this.gameState.currentTurn) {
+      // If no current turn, start with the first player
+      const firstPlayer = this.players[0];
+      if (firstPlayer) {
+        this.setCurrentTurn(firstPlayer.id);
+      }
+      return;
+    }
+    
+    // Find the current player's index
+    const currentPlayerIndex = this.players.findIndex(p => p.id === this.gameState.currentTurn);
+    if (currentPlayerIndex === -1) {
+      console.error('Current player not found in players array');
+      return;
+    }
+    
+    // Calculate the next player index based on turn direction
+    let nextPlayerIndex = (currentPlayerIndex + this.gameState.turnDirection) % this.players.length;
+    // Handle negative index if going counter-clockwise
+    if (nextPlayerIndex < 0) nextPlayerIndex = this.players.length - 1;
+    
+    // Set the next player's turn
+    const nextPlayer = this.players[nextPlayerIndex];
+    this.setCurrentTurn(nextPlayer.id);
   }
   
-  // Redirect to login page
-  function goToLogin() {
-    location.href = 'login.html';
+  setCurrentTurn(playerId) {
+    // Update local game state
+    this.gameState.currentTurn = playerId;
+    
+    // Highlight the current player
+    this.highlightCurrentPlayer(playerId);
+    
+    // Send turn change to server
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      this.websocket.send(JSON.stringify({
+        auth_token: localStorage.auth_token,
+        type: 'turn_change',
+        playerId: playerId,
+        gameId: this.currentGameId
+      }));
+    }
+    
+    // Update UI for current player
+    const isMyTurn = playerId === this.currentPlayerId;
+    this.setMyTurnState(isMyTurn);
   }
   
-  // Setup event listeners
-  function setupEventListeners() {
-    // Card click event for drawing cards
+  setMyTurnState(isMyTurn) {
+    // Enable/disable appropriate actions based on whose turn it is
+    if (isMyTurn) {
+      console.log('It is now my turn');
+      document.body.classList.add('my-turn');
+      
+      // Enable interactive elements
+      if (this.uiElements.drawPile) {
+        this.uiElements.drawPile.classList.add('active');
+      }
+      
+      // Enable hand cards for playing
+      const handCards = document.querySelectorAll('.hand-card');
+      handCards.forEach(card => {
+        card.classList.add('playable');
+      });
+    } else {
+      console.log('It is not my turn');
+      document.body.classList.remove('my-turn');
+      
+      // Disable interactive elements
+      if (this.uiElements.drawPile) {
+        this.uiElements.drawPile.classList.remove('active');
+      }
+      
+      // Disable hand cards
+      const handCards = document.querySelectorAll('.hand-card');
+      handCards.forEach(card => {
+        card.classList.remove('playable');
+      });
+    }
+  }
+  
+  // ====================== PLAYER ACTIONS ======================
+  handleDrawPileClick() {
+    // Check if it's the player's turn (if turn-based game is enabled)
+    if (this.gameState.currentTurn && this.gameState.currentTurn !== this.currentPlayerId) {
+      this.showNotification("It's not your turn to draw");
+      return;
+    }
+    
+    // Request to draw a card
+    this.drawCard();
+  }
+  
+  drawCard() {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      console.warn('Cannot draw card - WebSocket not connected');
+      return;
+    }
+    
+    console.log('Requesting to draw a card');
+    this.websocket.send(JSON.stringify({
+      auth_token: localStorage.auth_token,
+      type: 'add_card_to_hand',
+      gameId: this.currentGameId
+    }));
+  }
+  
+  handleCardClick(card) {
+    // Check if it's the player's turn (if turn-based game is enabled)
+    if (this.gameState.currentTurn && this.gameState.currentTurn !== this.currentPlayerId) {
+      this.showNotification("It's not your turn to play");
+      return;
+    }
+    
+    // Implement card playing logic
+    this.playCard(card);
+  }
+  
+  playCard(card) {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      console.warn('Cannot play card - WebSocket not connected');
+      return;
+    }
+    
+    console.log('Playing card:', card);
+    this.websocket.send(JSON.stringify({
+      auth_token: localStorage.auth_token,
+      type: 'play_card',
+      cardId: card.idCard,
+      cardType: card.cardType,
+      gameId: this.currentGameId
+    }));
+  }
+  
+  addCardToPlayArea(card) {
+    // If we have a discard pile, update it
+    if (this.uiElements.discardPile) {
+      this.updateDiscardPile(card);
+    } else {
+      // Otherwise, create a simple visualization in the center of the table
+      this.createPlayedCardEffect(card);
+    }
+  }
+  
+  removeCardFromHand(cardId) {
+    // Find the card element
+    const cardElement = document.querySelector(`.hand-card[data-card-id="${cardId}"]`);
     if (cardElement) {
-      cardElement.addEventListener('click', () => {
-        sendCardRequest('add_card_to_hand');
+      // Animate the removal
+      cardElement.classList.add('removing');
+      
+      // Remove after animation
+      setTimeout(() => {
+        cardElement.remove();
+        
+        // Re-request hand to get updated layout
+        this.requestHand();
+      }, 500);
+    } else {
+      // Just request updated hand
+      this.requestHand();
+    }
+  }
+  
+  createPlayedCardEffect(card) {
+    // Create a temporary div for the played card animation
+    const playedCard = document.createElement('div');
+    playedCard.className = 'played-card';
+    playedCard.style.position = 'absolute';
+    playedCard.style.zIndex = '100';
+    
+    // Create an image for the card
+    const cardImage = document.createElement('img');
+    cardImage.src = card.picture;
+    cardImage.alt = 'Played Card';
+    cardImage.className = 'card-image';
+    
+    // Add to the played card div
+    playedCard.appendChild(cardImage);
+    
+    // Add to the poker table
+    const tableCenter = this.uiElements.pokerTable.querySelector('.table-center');
+    if (tableCenter) {
+      tableCenter.appendChild(playedCard);
+      
+      // Animate the card
+      setTimeout(() => {
+        playedCard.classList.add('played');
+        
+        // Remove after animation
+        setTimeout(() => {
+          playedCard.remove();
+        }, 1000);
+      }, 100);
+    }
+  }
+  
+  // ====================== GAME STATE MANAGEMENT ======================
+  updateGamePhaseUI(phase) {
+    // Remove any existing phase classes
+    document.body.classList.remove('phase-waiting', 'phase-setup', 'phase-playing', 'phase-finished');
+    
+    // Add the current phase class
+    document.body.classList.add(`phase-${phase}`);
+    
+    // Update any phase-specific UI elements
+    switch (phase) {
+      case 'waiting':
+        this.showNotification('Waiting for players to join...');
+        break;
+      case 'setup':
+        this.showNotification('Game is being set up...');
+        break;
+      case 'playing':
+        this.showNotification('Game in progress');
+        break;
+      case 'finished':
+        this.showNotification('Game has ended');
+        this.showGameResults();
+        break;
+    }
+  }
+  
+  updateRoundIndicator(round) {
+    // Create or update round indicator
+    let roundIndicator = document.getElementById('roundIndicator');
+    if (!roundIndicator) {
+      roundIndicator = document.createElement('div');
+      roundIndicator.id = 'roundIndicator';
+      roundIndicator.className = 'round-indicator';
+      document.body.appendChild(roundIndicator);
+    }
+    
+    roundIndicator.textContent = `Round ${round}`;
+  }
+  
+  showGameResults() {
+    // Create a results overlay
+    const resultsOverlay = document.createElement('div');
+    resultsOverlay.className = 'results-overlay';
+    
+    const resultsContainer = document.createElement('div');
+    resultsContainer.className = 'results-container';
+    
+    const resultsTitle = document.createElement('h2');
+    resultsTitle.textContent = 'Game Results';
+    
+    const resultsList = document.createElement('div');
+    resultsList.className = 'results-list';
+    
+    // Add player results
+    this.players.forEach(player => {
+      const playerResult = document.createElement('div');
+      playerResult.className = 'player-result';
+      
+      const playerName = document.createElement('div');
+      playerName.className = 'player-name';
+      playerName.textContent = player.username;
+      
+      const playerScore = document.createElement('div');
+      playerScore.className = 'player-score';
+      playerScore.textContent = player.score || 'N/A';
+      
+      // Highlight winner
+      if (player.winner) {
+        playerResult.classList.add('winner');
+        playerName.textContent += ' (Winner!)';
+      }
+      
+      playerResult.appendChild(playerName);
+      playerResult.appendChild(playerScore);
+      resultsList.appendChild(playerResult);
+    });
+    
+    // Add button to return to lobby
+    const returnButton = document.createElement('button');
+    returnButton.textContent = 'Return to Lobby';
+    returnButton.addEventListener('click', () => {
+      localStorage.setItem('intentionalNavigation', 'true');
+      globalThis.location.href = 'games.html';
+    });
+    
+    // Assemble the results view
+    resultsContainer.appendChild(resultsTitle);
+    resultsContainer.appendChild(resultsList);
+    resultsContainer.appendChild(returnButton);
+    resultsOverlay.appendChild(resultsContainer);
+    
+    // Add to document
+    document.body.appendChild(resultsOverlay);
+  }
+  
+  // ====================== CHAT FUNCTIONALITY ======================
+  initChatToggle() {
+    // Create chat toggle button if it doesn't exist
+    if (!document.getElementById('chatToggle')) {
+      const chatToggle = document.createElement('div');
+      chatToggle.className = 'chat-toggle';
+      chatToggle.id = 'chatToggle';
+      document.body.appendChild(chatToggle);
+      
+      // Store reference
+      this.uiElements.chatToggle = chatToggle;
+      
+      // Initialize chat state from localStorage (default to visible)
+      const chatHidden = localStorage.getItem('chatHidden') === 'true';
+      if (chatHidden && this.uiElements.chatContainer) {
+        this.uiElements.chatContainer.classList.add('chat-hidden');
+        chatToggle.classList.add('chat-hidden');
+      }
+      
+      // Toggle chat visibility when button is clicked
+      chatToggle.addEventListener('click', () => this.toggleChat());
+    }
+    
+    // Update chat header with game information
+    this.updateChatHeader();
+  }
+  
+  toggleChat() {
+    if (!this.uiElements.chatContainer || !this.uiElements.chatToggle) return;
+    
+    // Toggle classes
+    this.uiElements.chatContainer.classList.toggle('chat-hidden');
+    this.uiElements.chatToggle.classList.toggle('chat-hidden');
+    
+    // Save state to localStorage
+    const isHidden = this.uiElements.chatContainer.classList.contains('chat-hidden');
+    localStorage.setItem('chatHidden', isHidden.toString());
+  }
+  
+  initChatInput() {
+    if (!this.uiElements.messageInput) return;
+    
+    // Ensure the input has high z-index and is focusable
+    this.uiElements.messageInput.style.zIndex = "1100";
+    this.uiElements.messageInput.style.position = "relative";
+    this.uiElements.messageInput.style.pointerEvents = "auto";
+    
+    // Add event listeners with stopPropagation to prevent events from being blocked
+    this.uiElements.messageInput.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+    
+    this.uiElements.messageInput.addEventListener('focus', function(e) {
+      e.stopPropagation();
+    });
+    
+    this.uiElements.messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        this.sendChatMessage();
+      }
+    });
+    
+    // Also fix the button
+    const sendButton = document.querySelector('.input-area button');
+    if (sendButton) {
+      sendButton.style.zIndex = "1100";
+      sendButton.style.position = "relative";
+      sendButton.style.pointerEvents = "auto";
+      
+      sendButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.sendChatMessage();
       });
     }
     
-    // Enter key event for chat input
-    if (messageInput) {
-      messageInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-          sendJson();
-        }
-      });
+    // Fix the input area container
+    const inputArea = document.querySelector('.input-area');
+    if (inputArea) {
+      inputArea.style.zIndex = "1090";
+      inputArea.style.position = "relative";
+      inputArea.style.pointerEvents = "auto";
+    }
+    
+    // Make sure the container and chatbox don't block events
+    const chatbox = document.querySelector('.chatbox');
+    if (this.uiElements.chatContainer) this.uiElements.chatContainer.style.pointerEvents = "auto";
+    if (chatbox) chatbox.style.pointerEvents = "auto";
+  }
+  
+  updateChatHeader() {
+    const chatHeader = document.querySelector('.container h1');
+    if (chatHeader && this.currentGameId) {
+      chatHeader.textContent = `Game #${this.currentGameId} Chat`;
     }
   }
   
-  function finishCurrentGame() {
-    // First get the current active game from the server
-    fetch('http://localhost:3000/active-game', {
-      method: 'GET',
+  sendChatMessage() {
+    if (!this.uiElements.messageInput || !this.websocket || this.websocket.readyState !== WebSocket.OPEN) return;
+    
+    const message = this.uiElements.messageInput.value.trim();
+    if (!message) return;
+    
+    const data = { 
+      auth_token: localStorage.auth_token, 
+      message: message, 
+      gameId: this.currentGameId
+    };
+    this.websocket.send(JSON.stringify(data));
+    this.uiElements.messageInput.value = '';
+  }
+  
+  // ====================== NOTIFICATION SYSTEM ======================
+  showNotification(message, type = 'info') {
+    // Create notification if it doesn't exist
+    let notification = document.getElementById('gameNotification');
+    if (!notification) {
+      notification = document.createElement('div');
+      notification.id = 'gameNotification';
+      notification.className = 'game-notification';
+      document.body.appendChild(notification);
+    }
+    
+    // Set notification content and type
+    notification.textContent = message;
+    notification.className = `game-notification ${type}`;
+    
+    // Show the notification
+    notification.classList.add('show');
+    
+    // Hide after timeout
+    setTimeout(() => {
+      notification.classList.remove('show');
+    }, 3000);
+  }
+  
+  showErrorNotification(message) {
+    this.showNotification(message, 'error');
+  }
+  
+  showTurnNotification(username) {
+    // Customize the message based on whether it's the current player's turn
+    const message = username === this.currentUsername
+      ? "It's your turn!"
+      : `It's ${username}'s turn`;
+    
+    this.showNotification(message, 'turn');
+  }
+  
+  showCardPlayedNotification(username, card) {
+    const message = `${username} played a card`;
+    this.showNotification(message, 'card-played');
+  }
+  
+  // ====================== PROFILE UI ======================
+  updateProfilesSidebar(users) {
+    const profileContainer = document.getElementById('profiles');
+    if (!profileContainer) return;
+    
+    profileContainer.innerHTML = ''; // Clear existing profiles
+
+    users.forEach((user) => {
+      const profileBox = document.createElement('div');
+      profileBox.className = 'profile-box';
+
+      const profilePicture = document.createElement('img');
+      
+      // Check if pp_path is base64 or a regular path
+      if (user.pp_path && user.pp_path.startsWith('data:image')) {
+        profilePicture.src = user.pp_path;
+      } else if (user.pp_path) {
+        profilePicture.src = user.pp_path;
+      } else {
+        profilePicture.src = 'profile_pictures/default.jpg';
+      }
+      
+      profilePicture.alt = 'Profile Picture';
+      profilePicture.className = 'profile-picture';
+
+      const profileName = document.createElement('div');
+      profileName.className = 'profile-name';
+      profileName.textContent = user.username;
+      
+      // Add card count if available
+      if (user.cardCount !== undefined) {
+        const cardCountBadge = document.createElement('div');
+        cardCountBadge.className = 'card-count-badge';
+        cardCountBadge.textContent = user.cardCount;
+        profileBox.appendChild(cardCountBadge);
+      }
+
+      profileBox.appendChild(profilePicture);
+      profileBox.appendChild(profileName);
+      profileContainer.appendChild(profileBox);
+    });
+  }
+  
+  // ====================== EVENT LISTENERS ======================
+  setupEventListeners() {
+    // Card click event for drawing cards
+    if (this.uiElements.cardElement) {
+      this.uiElements.cardElement.addEventListener('click', () => this.drawCard());
+    }
+    
+    // Add button for finishing the game
+    this.createGameControlButtons();
+    
+    // Make sure the page doesn't reload on form submissions
+    document.querySelectorAll('form').forEach(form => {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+      });
+    });
+  }
+  
+  createGameControlButtons() {
+    // Create container for game control buttons if it doesn't exist
+    let controlsContainer = document.getElementById('gameControlsContainer');
+    if (!controlsContainer) {
+      controlsContainer = document.createElement('div');
+      controlsContainer.id = 'gameControlsContainer';
+      controlsContainer.className = 'game-controls-container';
+      document.body.appendChild(controlsContainer);
+    }
+    
+    // Add finish game button
+    const finishButton = document.createElement('button');
+    finishButton.id = 'finishGameBtn';
+    finishButton.className = 'game-control-btn finish-game';
+    finishButton.textContent = 'Finish Game';
+    finishButton.addEventListener('click', () => this.finishGame());
+    
+    // Add return to lobby button
+    const lobbyButton = document.createElement('button');
+    lobbyButton.id = 'backToLobbyBtn';
+    lobbyButton.className = 'game-control-btn back-to-lobby';
+    lobbyButton.textContent = 'Back to Lobby';
+    lobbyButton.addEventListener('click', () => this.returnToLobby());
+    
+    // Add buttons to container
+    controlsContainer.appendChild(finishButton);
+    controlsContainer.appendChild(lobbyButton);
+  }
+  
+  // ====================== GAME ACTIONS ======================
+  finishGame() {
+    if (!confirm('Are you sure you want to finish this game? This cannot be undone.')) {
+      return;
+    }
+    
+    fetch('http://localhost:3000/finish-game', {
+      method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
       },
+      body: JSON.stringify({ gameId: this.currentGameId }),
       credentials: 'include'
     })
     .then(response => {
       if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('No active game found');
-        }
-        throw new Error('Failed to get active game');
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (!data.game || !data.game.idGame) {
-        console.log('No current game to finish');
-        alert('You don\'t have an active game to finish.');
-        return;
-      }
-      
-      const gameId = data.game.idGame;
-      
-      if (!confirm('Are you sure you want to finish this game? This cannot be undone.')) {
-        return;
-      }
-      
-      // Now finish the game with the retrieved game ID
-      return fetch('http://localhost:3000/finish-game', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ gameId: gameId }),
-        credentials: 'include'
-      });
-    })
-    .then(response => {
-      if (!response || !response.ok) {
         throw new Error('Failed to finish game');
       }
       return response.json();
     })
     .then(data => {
       console.log('Successfully finished game:', data);
-      alert('Game finished successfully!');
+      this.showNotification('Game finished successfully!');
       
-      // Redirect to game selection
-      globalThis.location.href = 'games.html';
+      // Update game state
+      this.gameState.phase = 'finished';
+      this.updateGamePhaseUI('finished');
     })
     .catch(error => {
-      console.error('Error in finish game process:', error);
-      alert('Error: ' + error.message);
+      console.error('Error finishing game:', error);
+      this.showErrorNotification('Failed to finish game: ' + error.message);
     });
   }
-
-  function updateChatHeader() {
-    const chatHeader = document.querySelector('.container h1');
-    if (chatHeader && currentGameId) {
-      chatHeader.textContent = `Game #${currentGameId} Chat`;
-    }
-  }
-
-  // ====================== WEBSOCKET REQUEST FUNCTIONS ======================
-  // Send chat message
-  function sendJson() {
-    if (!messageInput || !websocket || websocket.readyState !== WebSocket.OPEN) return;
+  
+  returnToLobby() {
+    // Set a navigation flag that will be checked by other scripts
+    localStorage.setItem('intentionalNavigation', 'true');
+    localStorage.setItem('wsWasOpen', 'true');
     
-    const message = messageInput.value;
-    if (!message) return;
-    
-    const data = { auth_token: localStorage.auth_token, message: message, gameId: currentGameId};
-    websocket.send(JSON.stringify(data));
-    messageInput.value = '';
+    // Small delay to ensure localStorage is updated before navigation
+    setTimeout(() => {
+      // Navigate to games page
+      globalThis.location.href = 'games.html';
+    }, 10);
   }
   
-  // WebSocket request functions
-  function requestUsersProfile() {
-    if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+  // ====================== UTILITY FUNCTIONS ======================
+  goToLogin() {
+    localStorage.removeItem('auth_token');
+    globalThis.location.href = 'login.html';
+  }
+  
+  // ====================== WEBSOCKET REQUEST FUNCTIONS ======================
+  requestUsersProfile() {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
       console.warn('Cannot request users profile - WebSocket not connected');
       return;
     }
     
-    console.log('Requesting user profiles for game:', currentGameId);
-    const data = {auth_token: localStorage.auth_token, type: 'connected_users', gameId: currentGameId};
-    websocket.send(JSON.stringify(data));
+    const data = {
+      auth_token: localStorage.auth_token, 
+      type: 'connected_users', 
+      gameId: this.currentGameId
+    };
+    this.websocket.send(JSON.stringify(data));
+  }
+  
+  requestGameState() {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      console.warn('Cannot request game state - WebSocket not connected');
+      return;
+    }
+    
+    const data = {
+      auth_token: localStorage.auth_token, 
+      type: 'game_state_request', 
+      gameId: this.currentGameId
+    };
+    this.websocket.send(JSON.stringify(data));
   }
 
-  function requestCard() {
-    if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+  requestCard() {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
       console.warn('Cannot request card - WebSocket not connected');
       return;
     }
     
-    console.log('Requesting card for game:', currentGameId);
-    const data = {auth_token: localStorage.auth_token, type: 'card_request', gameId: currentGameId};
-    websocket.send(JSON.stringify(data));
+    const data = {
+      auth_token: localStorage.auth_token, 
+      type: 'card_request', 
+      gameId: this.currentGameId
+    };
+    this.websocket.send(JSON.stringify(data));
   }
 
-  function requestHand() {
-    if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+  requestHand() {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
       console.warn('Cannot request hand - WebSocket not connected');
       return;
     }
     
-    console.log('Requesting hand for game:', currentGameId);
-    const data = {auth_token: localStorage.auth_token, type: 'hand_request', gameId: currentGameId};
-    websocket.send(JSON.stringify(data));
+    const data = {
+      auth_token: localStorage.auth_token, 
+      type: 'hand_request', 
+      gameId: this.currentGameId
+    };
+    this.websocket.send(JSON.stringify(data));
   }
+}
 
-  // Send card request (for drawing cards)
-  function sendCardRequest(type) {
-    if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
-    
-    const data = { auth_token: localStorage.auth_token, type: type, gameId: currentGameId};
-    websocket.send(JSON.stringify(data));
+// ====================== GAME INITIALIZATION ======================
+// Create global instance of the card game framework
+globalThis.cardGame = new CardGameFramework();
+
+// Expose functions for HTML onclick handlers
+globalThis.sendJson = function() {
+  if (globalThis.cardGame) {
+    globalThis.cardGame.sendChatMessage();
   }
-  
-  // ====================== EXPOSE PUBLIC API ======================
-  // Expose functions that need to be accessible from HTML onclick handlers
-  globalThis.sendJson = sendJson;
-  globalThis.goToLogin = goToLogin;
-  globalThis.finishCurrentGame = finishCurrentGame;
-  
-  // Debugging function for card badges
-  globalThis.debugCardBadges = function(count) {
-    // Set the count on all badges
-    const badges = document.querySelectorAll('.pile-count');
-    badges.forEach(badge => {
-      badge.textContent = count || '42';
-      badge.style.display = 'flex'; // Make sure they're visible
-    });
-    
-    // Log badge positions
-    console.log('Badge positions:');
-    badges.forEach((badge, index) => {
-      const rect = badge.getBoundingClientRect();
-      console.log(`Badge ${index}: top=${rect.top}, right=${rect.right}, bottom=${rect.bottom}, left=${rect.left}`);
-    });
-  };
-})();
+};
+
+globalThis.finishCurrentGame = function() {
+  if (globalThis.cardGame) {
+    globalThis.cardGame.finishGame();
+  }
+};
+
+globalThis.returnToLobby = function() {
+  if (globalThis.cardGame) {
+    globalThis.cardGame.returnToLobby();
+  }
+};

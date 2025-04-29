@@ -150,6 +150,20 @@ interface Game {
   GameStatus?: string; // New field: 'active', 'finished', etc.
 }
 
+interface GameState {
+  phase: 'waiting' | 'setup' | 'playing' | 'finished';
+  currentTurn: number | null;
+  turnDirection: number; // 1 for clockwise, -1 for counter-clockwise
+  round: number;
+  startTime?: Date;
+  lastActionTime?: Date;
+}
+
+// Enhanced Game interface to include game state
+interface EnhancedGame extends Game {
+  gameState?: GameState;
+}
+
 // Helper function for safely converting binary data to base64
 function safelyConvertToBase64(binaryData: Uint8Array | null | undefined): string {
   if (!binaryData) {
@@ -312,6 +326,9 @@ async function createNewGame(gameType: string = 'classic'): Promise<number> {
   for (const cardTypeId of cardTypeIds) {
     await createActiveCard(gameId, cardTypeId, 'in_deck');
   }
+
+  const initialState = await initializeGameState(gameId);
+  await updateGameState(gameId, initialState);
   
   return gameId;
 }
@@ -639,6 +656,281 @@ async function getCardBackImage(): Promise<Uint8Array | null> {
     'SELECT "Picture" FROM "Cards" WHERE "idCardType" = 54'
   );
   return result.rows.length > 0 ? result.rows[0].Picture : null;
+}
+
+async function initializeGameState(gameId: number): Promise<GameState> {
+  // Get the players in the game to determine initial player turn
+  const players = await getUsersInGame(gameId);
+  
+  if (players.length === 0) {
+    throw new Error(`No players found in game ${gameId}`);
+  }
+  
+  // Initialize with the first player's turn
+  const initialState: GameState = {
+    phase: 'waiting', // Start in waiting phase
+    currentTurn: null, // No player's turn yet until game starts
+    turnDirection: 1, // Default to clockwise
+    round: 1,
+    startTime: new Date(),
+    lastActionTime: new Date()
+  };
+  
+  return initialState;
+}
+
+async function startGame(gameId: number): Promise<void> {
+  // Get current game state or initialize if not exists
+  let gameState = await getGameState(gameId);
+  if (!gameState) {
+    gameState = await initializeGameState(gameId);
+  }
+  
+  // Change phase to playing
+  gameState.phase = 'playing';
+  
+  // Get the players in the game
+  const players = await getUsersInGame(gameId);
+  
+  if (players.length >= 2) {
+    // Set the first player's turn (could be randomized)
+    gameState.currentTurn = players[0].idUser;
+    
+    // Update the game state
+    await updateGameState(gameId, gameState);
+    
+    // Notify all players that the game has started
+    notifyGameUsers(gameId, {
+      type: 'game_state',
+      gameState: gameState
+    });
+    
+    // Also notify specifically about the turn change
+    notifyGameUsers(gameId, {
+      type: 'turn_change',
+      playerId: gameState.currentTurn,
+      username: players[0].Username
+    });
+  } else {
+    throw new Error('Need at least 2 players to start the game');
+  }
+}
+
+async function advanceTurn(gameId: number): Promise<void> {
+  // Get current game state
+  const gameState = await getGameState(gameId);
+  if (!gameState || gameState.phase !== 'playing') {
+    throw new Error('Game is not in playing phase');
+  }
+  
+  // Get the players in the game
+  const players = await getUsersInGame(gameId);
+  if (players.length < 2) {
+    throw new Error('Need at least 2 players to advance turn');
+  }
+  
+  // Find the current player's index
+  const currentPlayerIndex = players.findIndex(p => p.idUser === gameState.currentTurn);
+  if (currentPlayerIndex === -1) {
+    // If current player not found, start with the first player
+    gameState.currentTurn = players[0].idUser;
+  } else {
+    // Calculate the next player index based on turn direction
+    let nextPlayerIndex = (currentPlayerIndex + gameState.turnDirection) % players.length;
+    // Handle negative index if going counter-clockwise
+    if (nextPlayerIndex < 0) nextPlayerIndex = players.length - 1;
+    
+    // Set the next player's turn
+    gameState.currentTurn = players[nextPlayerIndex].idUser;
+  }
+  
+  // Update last action time
+  gameState.lastActionTime = new Date();
+  
+  // Update the game state in the database
+  await updateGameState(gameId, gameState);
+  
+  // Find the username of the next player
+  const nextPlayer = players.find(p => p.idUser === gameState.currentTurn);
+  
+  // Notify all players about the turn change
+  notifyGameUsers(gameId, {
+    type: 'turn_change',
+    playerId: gameState.currentTurn,
+    username: nextPlayer ? nextPlayer.Username : 'Unknown'
+  });
+}
+
+async function getGameState(gameId: number): Promise<GameState | null> {
+  try {
+    // Check for an existing game state in the database
+    const result = await client.queryObject<{ game_state: string }>(
+      'SELECT "GameState" as game_state FROM "Game" WHERE "idGame" = $1',
+      [gameId]
+    );
+    
+    if (result.rows.length === 0 || !result.rows[0].game_state) {
+      // No game state found
+      return null;
+    }
+    
+    // Parse the stored JSON
+    return JSON.parse(result.rows[0].game_state) as GameState;
+  } catch (error) {
+    console.error(`Error getting game state for game ${gameId}:`, error);
+    return null;
+  }
+}
+
+async function updateGameState(gameId: number, gameState: GameState): Promise<void> {
+  try {
+    // Convert the game state to JSON
+    const gameStateJSON = JSON.stringify(gameState);
+    
+    // Update the game state in the database
+    await client.queryObject(
+      'UPDATE "Game" SET "GameState" = $1 WHERE "idGame" = $2',
+      [gameStateJSON, gameId]
+    );
+    
+    console.log(`Updated game state for game ${gameId}`);
+  } catch (error) {
+    console.error(`Error updating game state for game ${gameId}:`, error);
+    throw error;
+  }
+}
+
+async function playCard(gameId: number, userId: number, cardId: number): Promise<void> {
+  try {
+    // Get the game state
+    const gameState = await getGameState(gameId);
+    if (!gameState || gameState.phase !== 'playing') {
+      throw new Error('Game is not in playing phase');
+    }
+    
+    // Check if it's the player's turn
+    if (gameState.currentTurn !== userId) {
+      throw new Error('Not your turn to play a card');
+    }
+    
+    // Get the card from the player's hand
+    const cardResult = await client.queryObject<ActiveCard & { picture_data: Uint8Array }>(
+      'SELECT ac.*, c."Picture" as picture_data FROM "ActiveCards" ac ' +
+      'JOIN "Cards" c ON ac."cardType" = c."idCardType" ' +
+      'WHERE ac."idCard" = $1 AND ac."idUserHoldingIt" = $2 AND ac."CardState" = \'in_hand\'',
+      [cardId, userId]
+    );
+    
+    if (cardResult.rows.length === 0) {
+      throw new Error('Card not found in player\'s hand');
+    }
+    
+    const card = cardResult.rows[0];
+    
+    // Update the card state to 'played'
+    await updateActiveCardState(cardId, 'played', null);
+    
+    // Get user information
+    const userResult = await client.queryObject<User>(
+      'SELECT * FROM "User" WHERE "idUser" = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      throw new Error('User not found');
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Convert the card image to base64
+    const base64String = safelyConvertToBase64(card.picture_data);
+    const cardPicture = base64String ? `data:image/png;base64,${base64String}` : '';
+    
+    // Notify all players about the played card
+    notifyGameUsers(gameId, {
+      type: 'card_played',
+      username: user.Username,
+      playerId: userId,
+      card: {
+        idCard: card.idCard,
+        picture: cardPicture,
+        cardType: card.cardType
+      },
+      toDiscard: true
+    });
+    
+    // Advance to the next player's turn
+    await advanceTurn(gameId);
+    
+    // Check for game end conditions (e.g., player has no cards left)
+    const playerHandCount = await getPlayerHandCount(gameId, userId);
+    if (playerHandCount === 0) {
+      // Player has no cards left, they win!
+      await endGame(gameId, userId);
+    }
+  } catch (error) {
+    console.error(`Error playing card in game ${gameId}:`, error);
+    throw error;
+  }
+}
+
+async function getPlayerHandCount(gameId: number, userId: number): Promise<number> {
+  const result = await client.queryObject<{ count: number }>(
+    'SELECT COUNT(*) as count FROM "ActiveCards" ' +
+    'WHERE "idGame" = $1 AND "idUserHoldingIt" = $2 AND "CardState" = \'in_hand\'',
+    [gameId, userId]
+  );
+  
+  return result.rows[0].count;
+}
+
+async function endGame(gameId: number, winnerId?: number): Promise<void> {
+  try {
+    // Get the game state
+    const gameState = await getGameState(gameId);
+    if (!gameState) {
+      throw new Error('Game state not found');
+    }
+    
+    // Update the game state to finished
+    gameState.phase = 'finished';
+    await updateGameState(gameId, gameState);
+    
+    // If a winner is specified, record the win
+    if (winnerId) {
+      // Get winner's username
+      const userResult = await client.queryObject<User>(
+        'SELECT * FROM "User" WHERE "idUser" = $1',
+        [winnerId]
+      );
+      
+      if (userResult.rows.length > 0) {
+        const winner = userResult.rows[0];
+        
+        // Notify all players about the game end with winner
+        notifyGameUsers(gameId, {
+          type: 'game_end',
+          gameState: gameState,
+          winner: {
+            id: winnerId,
+            username: winner.Username
+          }
+        });
+      }
+    } else {
+      // Notify all players about the game end without a specific winner
+      notifyGameUsers(gameId, {
+        type: 'game_end',
+        gameState: gameState
+      });
+    }
+    
+    // Mark the game as finished in the database
+    await markGameAsFinished(gameId);
+  } catch (error) {
+    console.error(`Error ending game ${gameId}:`, error);
+    throw error;
+  }
 }
 
 // Add an OPTIONS handler for the login route
@@ -1004,13 +1296,15 @@ router.get('/active-game', async (ctx) => {
     
     // Get number of cards left in deck
     const cardsInDeck = await getActiveCardsInDeck(activeGame.idGame);
-    
+    const gameState = await getGameState(activeGame.idGame);
+
     ctx.response.status = 200;
     ctx.response.body = { 
       game: {
         ...activeGame,
         players: playersWithCardCounts,
-        cardsInDeck: cardsInDeck.length
+        cardsInDeck: cardsInDeck.length,
+        gameState: gameState
       }
     };
   } catch (error) {
@@ -1124,6 +1418,54 @@ router.post('/join-game', async (ctx) => {
     console.error(`Error in join-game endpoint:`, error);
     ctx.response.status = 500;
     ctx.response.body = { error: 'Internal server error' };
+  }
+});
+
+router.post('/start-game', authorizationMiddleware, async (ctx) => {
+  // Set CORS headers
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  try {
+    const body = await ctx.request.body.json();
+    const { gameId } = body;
+    
+    if (!gameId) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Missing game ID' };
+      return;
+    }
+    
+    // Make sure the game exists
+    const game = await getGameById(gameId);
+    if (!game) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'Game not found' };
+      return;
+    }
+    
+    // Check if user is in the game
+    const userId = ctx.state.tokenData.userId;
+    const usersInGame = await getUsersInGame(gameId);
+    const userInGame = usersInGame.some(u => u.idUser === userId);
+    
+    if (!userInGame) {
+      ctx.response.status = 403;
+      ctx.response.body = { error: 'You are not in this game' };
+      return;
+    }
+    
+    // Start the game
+    await startGame(gameId);
+    
+    ctx.response.status = 200;
+    ctx.response.body = { success: true };
+  } catch (error) {
+    console.error('Error starting game:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { 
+      error: error instanceof Error ? error.message : 'Failed to start game' 
+    };
   }
 });
 
@@ -1658,6 +2000,84 @@ ws.onmessage = async (event) => {
       }));
     } catch (error) {
       console.error('Error converting hand images to base64:', error);
+    }
+    return;
+  }
+
+  // Handle game_state_request
+  if (data.type === 'game_state_request') {
+    const gameState = await getGameState(gameId);
+    
+    if (gameState) {
+      ws.send(JSON.stringify({
+        type: 'game_state',
+        gameState: gameState
+      }));
+    } else {
+      // If no game state exists, initialize one
+      const initialState = await initializeGameState(gameId);
+      await updateGameState(gameId, initialState);
+      
+      ws.send(JSON.stringify({
+        type: 'game_state',
+        gameState: initialState
+      }));
+    }
+    return;
+  }
+  
+  // Handle turn_change request
+  if (data.type === 'turn_change' && userId) {
+    try {
+      // Only admin or current turn player can change turns
+      const gameState = await getGameState(gameId);
+      
+      if (!gameState) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Game state not found'
+        }));
+        return;
+      }
+      
+      if (user.isAdmin || gameState.currentTurn === userId) {
+        await advanceTurn(gameId);
+      } else {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Not authorized to change turns'
+        }));
+      }
+    } catch (error) {
+      console.error('Error changing turn:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'Failed to change turn'
+      }));
+    }
+    return;
+  }
+  
+  // Handle play_card request
+  if (data.type === 'play_card' && userId) {
+    try {
+      const cardId = data.cardId;
+      
+      if (!cardId) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Missing card ID'
+        }));
+        return;
+      }
+      
+      await playCard(gameId, userId, cardId);
+    } catch (error) {
+      console.error('Error playing card:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to play card'
+      }));
     }
     return;
   }

@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Card Game</title>
+    <title>Card Game - War</title>
     <!-- Authentication check script -->
     <script src="scripts/auth-check.js"></script>
     <!-- Single consolidated CSS file -->
     <link rel="stylesheet" href="styles/main-style.css">
-    <!-- Single consolidated JavaScript file -->
+    <!-- Add War game specific styles -->
+    <link rel="stylesheet" href="styles/war-styles.css">
+    <!-- Load the base card game framework first -->
     <script src="scripts/card-game.js" defer></script>
+    <!-- Then load the War game implementation -->
+    <script src="scripts/war-game.js" defer></script>
 </head>
 <body>
     <div class="profile-container">
@@ -22,7 +26,7 @@
     <!-- Poker table will be inserted here dynamically via JavaScript -->
     
     <div class="container">
-        <h1>Le miaou</h1>
+        <h1>War Card Game</h1>
         <div class="chatbox">
             <div class="messages" id="messages"></div>
             <div class="input-area">
@@ -58,6 +62,19 @@
             window.location.href = 'games.html';
             }, 10);
         }
+        
+        // Initialize the War game when the window is fully loaded
+        window.addEventListener('load', function() {
+            // Create the game instance
+            globalThis.warGame = new WarGame();
+            
+            // Expose functions for HTML onclick handlers
+            globalThis.playWarCards = function() {
+                if (globalThis.warGame) {
+                    globalThis.warGame.playTopCard();
+                }
+            };
+        });
     </script>
 </body>
 </html>

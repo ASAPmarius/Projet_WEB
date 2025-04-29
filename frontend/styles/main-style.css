@@ -583,8 +583,6 @@ input[type="text"] {
   }
 }
 
-/* Add this to your main-style.css file */
-
 .hello-page-button {
   position: fixed;
   bottom: 20px;
@@ -603,4 +601,279 @@ input[type="text"] {
 
 .hello-page-button:hover {
   background-color: #45a049;
+}
+
+/* Additional CSS for Card Game Framework
+ * Add this to your main-style.css file
+ */
+
+/* ====================== GAME PHASE STYLING ====================== */
+body.phase-waiting .poker-table-container {
+  background-color: #3a5a3c;
+  box-shadow: 0 0 0 20px #5a3c38;
+}
+
+body.phase-setup .poker-table-container {
+  background-color: #2f4f4f;
+  box-shadow: 0 0 0 20px #614a31;
+}
+
+body.phase-playing .poker-table-container {
+  background-color: #2a7d2e; /* Default green */
+  box-shadow: 0 0 0 20px #763c28;
+}
+
+body.phase-finished .poker-table-container {
+  background-color: #4a4a4a;
+  box-shadow: 0 0 0 20px #3c3c3c;
+  opacity: 0.9;
+}
+
+/* ====================== TURN-BASED INDICATORS ====================== */
+.player-seat.active-player {
+  border: 3px solid #ffd700; /* Gold border */
+  background-color: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.7);
+  transform: scale(1.05);
+  z-index: 25;
+}
+
+.player-seat.active-player .player-avatar {
+  border: 2px solid #ffd700;
+}
+
+.player-seat.active-player .player-name {
+  color: #ffd700;
+  font-weight: bold;
+}
+
+/* My turn indicator */
+body.my-turn .hand-container {
+  animation: pulse-highlight 2s infinite;
+}
+
+@keyframes pulse-highlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+  }
+}
+
+/* ====================== DISCARD PILE ====================== */
+.discard-pile {
+  position: relative;
+  width: 120px;
+  height: 180px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: visible !important;
+  transition: transform 0.2s ease;
+}
+
+.discard-pile:hover {
+  transform: scale(1.05);
+}
+
+/* ====================== CARD ACTIONS ====================== */
+.hand-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: default; /* Default to non-interactive */
+}
+
+.hand-card.playable {
+  cursor: pointer;
+}
+
+.hand-card.playable:hover {
+  transform: translateY(-60px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 20;
+}
+
+/* Card being removed animation */
+.hand-card.removing {
+  animation: card-remove 0.5s forwards;
+  pointer-events: none;
+}
+
+@keyframes card-remove {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-150px) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+/* Played card animation */
+.played-card {
+  width: 100px;
+  height: 150px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  opacity: 0;
+  z-index: 100;
+  transition: all 0.5s ease;
+}
+
+.played-card.played {
+  transform: translate(-50%, -50%) scale(1.2);
+  opacity: 1;
+}
+
+/* ====================== GAME CONTROLS ====================== */
+.game-controls-container {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.game-control-btn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  background-color: #4CAF50;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.game-control-btn:hover {
+  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.game-control-btn.finish-game {
+  background-color: #f44336;
+}
+
+.game-control-btn.finish-game:hover {
+  background-color: #d32f2f;
+}
+
+.game-control-btn.back-to-lobby {
+  background-color: #555;
+}
+
+.game-control-btn.back-to-lobby:hover {
+  background-color: #333;
+}
+
+/* ====================== NOTIFICATION SYSTEM ====================== */
+.game-notification {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  background-color: rgba(0, 0, 0, 0.75);
+  color: white;
+  border-radius: 5px;
+  font-weight: bold;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  max-width: 80%;
+  text-align: center;
+}
+
+.game-notification.show {
+  opacity: 1;
+}
+
+.game-notification.error {
+  background-color: rgba(244, 67, 54, 0.9);
+}
+
+.game-notification.turn {
+  background-color: rgba(255, 193, 7, 0.9);
+  color: #333;
+}
+
+.game-notification.card-played {
+  background-color: rgba(33, 150, 243, 0.9);
+}
+
+/* ====================== ROUND INDICATOR ====================== */
+.round-indicator {
+  position: fixed;
+  top: 20px;
+  right: 460px; /* Keep space for chat panel */
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 15px;
+  border-radius: 5px;
+  font-weight: bold;
+  z-index: 100;
+}
+
+/* ====================== GAME RESULTS OVERLAY ====================== */
+.results-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.results-container {
+  background-color: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 600px;
+  text-align: center;
+}
+
+.results-container h2 {
+  color: #4CAF50;
+  margin-bottom: 20px;
+  font-size: 2em;
+}
+
+.results-list {
+  margin: 20px 0;
+}
+
+.player-result {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 15px;
+  margin: 5px 0;
+  background-color: #f5f5f5;
+  border-radius: 5px;
+  font-size: 1.2em;
+}
+
+.player-result.winner {
+  background-color: #d4edda;
+  border: 2px solid #4CAF50;
+  font-weight: bold;
 }
