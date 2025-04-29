@@ -100,33 +100,53 @@ async function init() {
   }
 }
 
+// Replace the handlePageUnload function in card-game.js
 function handlePageUnload(event) {
-  // Only run if we're not navigating between our own pages
-  if (!localStorage.getItem('wsWasOpen')) {
-    // Send a disconnect signal to the server
-    // We use a synchronous approach here since this is an unload event
-    const authToken = localStorage.getItem('auth_token');
-    
-    if (authToken) {
-      try {
-        console.log('User is leaving the page, sending disconnect signal');
+  // Check if this is intentional navigation between our pages
+  if (localStorage.getItem('intentionalNavigation') === 'true' || 
+      localStorage.getItem('wsWasOpen') === 'true') {
+    console.log('Intentional navigation detected, skipping disconnect');
+    return;
+  }
+  
+  // This appears to be a genuine page close/refresh
+  const authToken = localStorage.getItem('auth_token');
+  
+  if (authToken) {
+    try {
+      console.log('User is leaving the page, sending disconnect signal');
+      
+      // Use navigator.sendBeacon instead of XHR when available (more reliable for unload events)
+      if (navigator.sendBeacon) {
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
         
-        // Create a synchronous request
+        // Create a blob with the headers
+        const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
+        
+        // Send the beacon with the auth token in the URL as a fallback approach
+        const success = navigator.sendBeacon(
+          `http://localhost:3000/disconnect-from-game?auth_token=${encodeURIComponent(authToken)}`, 
+          blob
+        );
+        
+        console.log('Disconnect beacon sent:', success);
+      } else {
+        // Fallback to synchronous XHR
         const xhr = new XMLHttpRequest();
         xhr.open('POST', 'http://localhost:3000/disconnect-from-game', false); // false makes it synchronous
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
         xhr.withCredentials = true;
-        xhr.send(); // No need for JSON.stringify({}) since we don't need a request body
+        xhr.send();
         
-        console.log('Disconnect signal sent');
-      } catch (error) {
-        console.error('Failed to send disconnect signal:', error);
+        console.log('Disconnect XHR sent');
       }
+    } catch (error) {
+      console.error('Failed to send disconnect signal:', error);
     }
-  } else {
-    // Clear the wsWasOpen flag since we've processed it
-    localStorage.removeItem('wsWasOpen');
   }
 }
   

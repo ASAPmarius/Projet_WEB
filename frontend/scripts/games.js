@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
+    localStorage.removeItem('intentionalNavigation');
+    localStorage.removeItem('wsWasOpen');
     // Verify authentication status
     const authToken = localStorage.getItem('auth_token');
     if (!authToken) {

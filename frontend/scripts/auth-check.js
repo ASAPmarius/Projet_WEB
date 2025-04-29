@@ -8,11 +8,17 @@
   globalThis.addEventListener('beforeunload', handleAuthBeforeUnload);
 })();
 
-// Handle beforeunload event for auth-related cleanup
 function handleAuthBeforeUnload(event) {
-  // Only perform disconnect if we're on the game page (index.html) and not navigating within our app
-  if (globalThis.location.pathname.includes('index.html') && !localStorage.getItem('wsWasOpen')) {
-    console.log('Leaving game page, sending disconnect signal');
+  // Check if this is intentional navigation within our app
+  if (localStorage.getItem('intentionalNavigation') === 'true' || 
+      localStorage.getItem('wsWasOpen') === 'true') {
+    console.log('Intentional navigation detected, skipping disconnect');
+    return;
+  }
+  
+  // Only perform disconnect if we're on the game page
+  if (globalThis.location.pathname.includes('index.html')) {
+    console.log('Unintentional page exit, sending disconnect signal');
     
     try {
       // Send a synchronous request to disconnect from game
@@ -31,6 +37,7 @@ function handleAuthBeforeUnload(event) {
   }
 }
 
+
 // Main function to check authentication and redirect if needed
 function checkAuthAndRedirect() {
   const authToken = localStorage.getItem('auth_token');
@@ -44,20 +51,37 @@ function checkAuthAndRedirect() {
   verifyTokenWithServer(authToken);
 }
 
-// Verify token with the server
+// Replace the verifyTokenWithServer function in auth-check.js
 function verifyTokenWithServer(token) {
+  // Add a check to see if we're navigating internally
+  if (localStorage.getItem('intentionalNavigation') === 'true') {
+    console.log('Internal navigation detected, skipping token verification');
+    // Clear the flag after we've acknowledged it
+    localStorage.removeItem('intentionalNavigation');
+    return; // Skip verification during internal navigation
+  }
+
+  // For regular auth checks, use a more reliable approach
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), 5000); // 5 second timeout
+  
   fetch('http://localhost:3000/test_cookie', {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    credentials: 'include'
+    credentials: 'include',
+    signal: abortController.signal
   })
   .then(response => {
+    clearTimeout(timeoutId);
     if (!response.ok) {
       console.log('Token verification failed, status:', response.status);
-      redirectToLogin();
+      // Don't immediately redirect - check if this is a network error first
+      if (response.status === 401 || response.status === 403) {
+        redirectToLogin();
+      }
       throw new Error('Token verification failed');
     }
     return response.json();
@@ -80,9 +104,13 @@ function verifyTokenWithServer(token) {
     }
   })
   .catch(error => {
+    clearTimeout(timeoutId);
     console.error('Auth verification error:', error);
+    
     // Only redirect to login if it's a real auth error, not just a network error
-    if (error.message === 'Token verification failed') {
+    // We don't want to log users out if the server is temporarily down
+    if (error.message === 'Token verification failed' && 
+        !(error.name === 'AbortError' || error.name === 'TypeError')) {
       redirectToLogin();
     }
   });

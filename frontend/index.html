@@ -48,11 +48,15 @@
     <script>
         // Function to return to the games lobby
         function returnToLobby() {
-            // Store WebSocket state before navigation
-            localStorage.setItem('wsWasOpen', 'true');
-            
+        // Set a navigation flag that will be checked by other scripts
+        localStorage.setItem('intentionalNavigation', 'true');
+        localStorage.setItem('wsWasOpen', 'true');
+        
+            // Small delay to ensure localStorage is updated before navigation
+            setTimeout(() => {
             // Navigate to games page
             window.location.href = 'games.html';
+            }, 10);
         }
     </script>
 </body>

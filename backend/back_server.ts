@@ -1132,19 +1132,23 @@ router.options('/disconnect-from-game', (ctx) => {
   ctx.response.status = 204; // No content for OPTIONS
 });
 
-// Add explicit disconnect endpoint
+// Update disconnect-from-game endpoint to support navigator.sendBeacon
 router.post('/disconnect-from-game', async (ctx) => {
   // Set CORS headers first
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
   try {
-    // Get token from multiple sources
+    // Get token from multiple sources including URL query for sendBeacon
     const cookie = ctx.request.headers.get('cookie');
     const authToken = cookie?.split('; ').find((row) => row.startsWith('auth_token='))?.split('=')[1];
     const headerToken = ctx.request.headers.get('Authorization')?.replace('Bearer ', '');
     
-    const tokenToUse = authToken || headerToken;
+    // Check URL query parameters (for navigator.sendBeacon)
+    const urlParams = ctx.request.url.searchParams;
+    const queryToken = urlParams.get('auth_token');
+    
+    const tokenToUse = authToken || headerToken || queryToken;
     
     if (!tokenToUse) {
       console.log('No token provided for disconnect-from-game');
@@ -1200,8 +1204,8 @@ router.post('/disconnect-from-game', async (ctx) => {
     
     if (!userActiveGame) {
       console.log(`No active game found for user ${username}`);
-      ctx.response.status = 404;
-      ctx.response.body = { error: 'No active game found' };
+      ctx.response.status = 200; // Still return success to avoid errors during navigation
+      ctx.response.body = { success: true, message: 'No active game found' };
       return;
     }
     
