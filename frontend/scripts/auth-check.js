@@ -3,7 +3,33 @@
 // Check authentication status immediately when page loads
 (function() {
   checkAuthAndRedirect();
+  
+  // Register beforeunload event to handle page navigation
+  globalThis.addEventListener('beforeunload', handleAuthBeforeUnload);
 })();
+
+// Handle beforeunload event for auth-related cleanup
+function handleAuthBeforeUnload(event) {
+  // Only perform disconnect if we're on the game page (index.html) and not navigating within our app
+  if (globalThis.location.pathname.includes('index.html') && !localStorage.getItem('wsWasOpen')) {
+    console.log('Leaving game page, sending disconnect signal');
+    
+    try {
+      // Send a synchronous request to disconnect from game
+      const authToken = localStorage.getItem('auth_token');
+      if (authToken) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://localhost:3000/disconnect-from-game', false); // false for synchronous
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+        xhr.withCredentials = true;
+        xhr.send();
+      }
+    } catch (error) {
+      console.error('Error sending disconnect signal:', error);
+    }
+  }
+}
 
 // Main function to check authentication and redirect if needed
 function checkAuthAndRedirect() {

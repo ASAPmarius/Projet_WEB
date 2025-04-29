@@ -408,17 +408,37 @@ async function joinExistingGame(userId: number, gameId: number): Promise<boolean
 
 async function markGameAsFinished(gameId: number): Promise<void> {
   try {
+    console.log(`Marking game ${gameId} as finished`);
+    
+    // First check if the game is already finished to avoid unnecessary updates
+    const gameCheck = await client.queryObject<{ GameStatus: string }>(
+      'SELECT "GameStatus" FROM "Game" WHERE "idGame" = $1',
+      [gameId]
+    );
+    
+    if (gameCheck.rows.length === 0) {
+      console.log(`Game ${gameId} not found, cannot mark as finished`);
+      return;
+    }
+    
+    if (gameCheck.rows[0].GameStatus === 'finished') {
+      console.log(`Game ${gameId} is already marked as finished`);
+      return;
+    }
+    
+    // Update the game status to 'finished'
     await client.queryObject(
       'UPDATE "Game" SET "GameStatus" = \'finished\' WHERE "idGame" = $1',
       [gameId]
     );
     
+    console.log(`Game ${gameId} successfully marked as finished`);
+    
     // Once marked as finished, we can clean up the ActiveCards
     await cleanupFinishedGame(gameId);
-    
-    console.log(`Game ${gameId} marked as finished`);
   } catch (error) {
     console.error(`Error marking game ${gameId} as finished:`, error);
+    throw error; // Re-throw so caller can handle if needed
   }
 }
 
@@ -1102,7 +1122,139 @@ router.post('/join-game', async (ctx) => {
     ctx.response.body = { error: 'Internal server error' };
   }
 });
-// In back_server.ts, replace the WebSocket upgrade handler
+
+// Add OPTIONS handler for disconnect-from-game
+router.options('/disconnect-from-game', (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  ctx.response.status = 204; // No content for OPTIONS
+});
+
+// Add explicit disconnect endpoint
+router.post('/disconnect-from-game', async (ctx) => {
+  // Set CORS headers first
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  try {
+    // Get token from multiple sources
+    const cookie = ctx.request.headers.get('cookie');
+    const authToken = cookie?.split('; ').find((row) => row.startsWith('auth_token='))?.split('=')[1];
+    const headerToken = ctx.request.headers.get('Authorization')?.replace('Bearer ', '');
+    
+    const tokenToUse = authToken || headerToken;
+    
+    if (!tokenToUse) {
+      console.log('No token provided for disconnect-from-game');
+      ctx.response.status = 401;
+      ctx.response.body = { error: 'Unauthorized: Missing token' };
+      return;
+    }
+    
+    // Verify token
+    let tokenData;
+    try {
+      tokenData = await verify(tokenToUse, secretKey);
+    } catch (tokenError) {
+      console.error('Token verification error:', tokenError);
+      ctx.response.status = 401;
+      ctx.response.body = { error: 'Unauthorized: Invalid token' };
+      return;
+    }
+    
+    // Extract userId with proper type conversion
+    let userId: number;
+    if (typeof tokenData.userId === 'number') {
+      userId = tokenData.userId;
+    } else if (typeof tokenData.userId === 'string') {
+      userId = parseInt(tokenData.userId, 10);
+      if (isNaN(userId)) {
+        console.error('Invalid userId format in token:', tokenData.userId);
+        ctx.response.status = 400;
+        ctx.response.body = { error: 'Invalid user ID format' };
+        return;
+      }
+    } else {
+      console.error('Token contains invalid userId type:', typeof tokenData.userId);
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Missing or invalid user ID in token' };
+      return;
+    }
+    
+    const username = tokenData.userName;
+    
+    if (!username) {
+      console.error('Token missing userName');
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Missing username in token' };
+      return;
+    }
+    
+    console.log(`User ${username} (ID: ${userId}) explicitly disconnecting from game`);
+    
+    // Now userId is guaranteed to be a proper number
+    // Get active game for this user
+    const userActiveGame = await getActiveGameForUser(userId);
+    
+    if (!userActiveGame) {
+      console.log(`No active game found for user ${username}`);
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'No active game found' };
+      return;
+    }
+    
+    const gameId = userActiveGame.idGame;
+    
+    // Find and remove this user's connection
+    const connectionIndex = connections.findIndex(conn => conn.username === username);
+    if (connectionIndex !== -1) {
+      console.log(`Removing connection for user ${username}`);
+      connections.splice(connectionIndex, 1);
+    } else {
+      console.log(`No active connection found for user ${username}`);
+    }
+    
+    // Check if any other user from this game is still connected
+    const usersInGame = await getUsersInGame(gameId);
+    const anyUserStillConnected = usersInGame.some(user => 
+      connections.some(conn => conn.username === user.Username)
+    );
+    
+    // If no users are connected, mark the game as finished
+    if (!anyUserStillConnected) {
+      console.log(`No players connected to game ${gameId}, marking as finished`);
+      await markGameAsFinished(gameId);
+    } else {
+      // Otherwise, notify remaining users
+      const connectedUsers = usersInGame
+        .filter(user => connections.some(conn => conn.username === user.Username))
+        .map(user => {
+          let ppPath = '';
+          if (user.Profile_picture) {
+            const base64String = safelyConvertToBase64(user.Profile_picture);
+            ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
+          }
+          
+          return {
+            username: user.Username,
+            pp_path: ppPath
+          };
+        });
+      
+      // Notify all remaining connected users
+      notifyAllUsers({ type: 'connected_users', users: connectedUsers });
+    }
+    
+    ctx.response.status = 200;
+    ctx.response.body = { success: true };
+  } catch (error) {
+    console.error('Error in disconnect-from-game endpoint:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Internal server error' };
+  }
+});
 
 router.get('/', authorizationMiddleware, async (ctx) => {
   if (!ctx.isUpgradable) {
@@ -1518,41 +1670,42 @@ ws.onclose = async () => {
         if (userActiveGame) {
           const gameId = userActiveGame.idGame;
           
-          // Update the connected users list for this game
+          // Get all users in this game
           const usersInGame = await getUsersInGame(gameId);
           
-          const connectedUsers = usersInGame
-            .filter(user => connections.some(conn => conn.username === user.Username))
-            .map(user => {
-              let ppPath = '';
-              if (user.Profile_picture) {
-                const base64String = safelyConvertToBase64(user.Profile_picture);
-                ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
-              }
-              
-              return {
-                username: user.Username,
-                pp_path: ppPath
-              };
-            });
+          // Check if any user from this game is still connected
+          const anyUserStillConnected = usersInGame.some(user => 
+            connections.some(conn => conn.username === user.Username)
+          );
           
-          // Send the updated user list to all remaining connected users
-          notifyAllUsers({ type: 'connected_users', users: connectedUsers });
-          
-          // Check if there are any active connections for this game
-          const connectionsForThisGame = connections.filter(conn => {
-            return usersInGame.some(user => user.Username === conn.username);
-          });
-          
-          // If no connections left for this game, clean it up
-          if (connectionsForThisGame.length === 0) {
-            console.log(`No players connected to game ${gameId}, cleaning up`);
+          // If no users from this game are still connected, mark the game as finished
+          if (!anyUserStillConnected) {
+            console.log(`No players connected to game ${gameId}, marking as finished`);
             await markGameAsFinished(gameId);
             
             // If this was the current game, reset currentGameId
             if (currentGameId === gameId) {
               currentGameId = null;
             }
+          } else {
+            // Update the connected users list for this game
+            const connectedUsers = usersInGame
+              .filter(user => connections.some(conn => conn.username === user.Username))
+              .map(user => {
+                let ppPath = '';
+                if (user.Profile_picture) {
+                  const base64String = safelyConvertToBase64(user.Profile_picture);
+                  ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
+                }
+                
+                return {
+                  username: user.Username,
+                  pp_path: ppPath
+                };
+              });
+            
+            // Send the updated user list to all remaining connected users
+            notifyAllUsers({ type: 'connected_users', users: connectedUsers });
           }
         }
       }

@@ -13,7 +13,7 @@
 
   // Initialize application when DOM is loaded
   document.addEventListener('DOMContentLoaded', init);
-  
+  globalThis.addEventListener('beforeunload', handlePageUnload);
 // Update the card-game.js init function to check for active games
 
 // Main initialization function with improved error handling and game check
@@ -100,6 +100,36 @@ async function init() {
         connectWebSocket();
       }
     }, 1000);
+  }
+}
+
+function handlePageUnload(event) {
+  // Only run if we're not navigating between our own pages
+  if (!localStorage.getItem('wsWasOpen')) {
+    // Send a disconnect signal to the server
+    // We use a synchronous approach here since this is an unload event
+    const authToken = localStorage.getItem('auth_token');
+    
+    if (authToken) {
+      try {
+        console.log('User is leaving the page, sending disconnect signal');
+        
+        // Create a synchronous request
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://localhost:3000/disconnect-from-game', false); // false makes it synchronous
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+        xhr.withCredentials = true;
+        xhr.send(); // No need for JSON.stringify({}) since we don't need a request body
+        
+        console.log('Disconnect signal sent');
+      } catch (error) {
+        console.error('Failed to send disconnect signal:', error);
+      }
+    }
+  } else {
+    // Clear the wsWasOpen flag since we've processed it
+    localStorage.removeItem('wsWasOpen');
   }
 }
 
