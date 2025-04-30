@@ -659,64 +659,67 @@ async function getCardBackImage(): Promise<Uint8Array | null> {
 }
 
 async function initializeGameState(gameId: number): Promise<GameState> {
-  // Get the players in the game to determine initial player turn
+  // Get the players in the game
   const players = await getUsersInGame(gameId);
   
-  // Initialize state regardless of player count (no error if no players)
+  // Initialize with a more complete state
   const initialState: GameState = {
-    phase: 'waiting', // Start in waiting phase
-    currentTurn: null, // No player's turn yet until game starts
+    phase: players.length >= 2 ? 'playing' : 'waiting', // Start in playing phase if enough players
+    currentTurn: players.length > 0 ? players[0].idUser : null, // Set first player's turn
     turnDirection: 1, // Default to clockwise
     round: 1,
     startTime: new Date(),
     lastActionTime: new Date()
   };
   
-  // If we have players, we could set the initial player's turn (optional)
-  if (players.length > 0) {
-    // You can uncomment this if you want to set a turn immediately
-    // initialState.currentTurn = players[0].idUser;
-  }
-  
+  console.log(`Initialized game state for game ${gameId}: ${JSON.stringify(initialState)}`);
   return initialState;
 }
 
 async function startGame(gameId: number): Promise<void> {
-  // Get current game state or initialize if not exists
-  let gameState = await getGameState(gameId);
-  if (!gameState) {
-    gameState = await initializeGameState(gameId);
-  }
-  
-  // Change phase to playing
-  gameState.phase = 'playing';
-  
-  // Get the players in the game
-  const players = await getUsersInGame(gameId);
-  
-  if (players.length >= 2) {
-    // Set the first player's turn (could be randomized)
-    gameState.currentTurn = players[0].idUser;
+  try {
+    // Get current game state or initialize if not exists
+    let gameState = await getGameState(gameId);
+    if (!gameState) {
+      gameState = await initializeGameState(gameId);
+    }
     
-    // Update the game state
-    await updateGameState(gameId, gameState);
+    // Change phase to playing
+    gameState.phase = 'playing';
     
-    // Notify all players that the game has started
-    notifyGameUsers(gameId, {
-      type: 'game_state',
-      gameState: gameState
-    });
+    // Get the players in the game
+    const players = await getUsersInGame(gameId);
     
-    // Also notify specifically about the turn change
-    notifyGameUsers(gameId, {
-      type: 'turn_change',
-      playerId: gameState.currentTurn,
-      username: players[0].Username
-    });
-  } else {
-    throw new Error('Need at least 2 players to start the game');
+    if (players.length >= 2) {
+      // Set the first player's turn (could be randomized)
+      gameState.currentTurn = players[0].idUser;
+      
+      // Update the game state
+      await updateGameState(gameId, gameState);
+      
+      // Notify all players that the game has started
+      notifyGameUsers(gameId, {
+        type: 'game_state',
+        gameState: gameState
+      });
+      
+      // Also notify specifically about the turn change
+      notifyGameUsers(gameId, {
+        type: 'turn_change',
+        playerId: gameState.currentTurn,
+        username: players[0].Username
+      });
+      
+      console.log(`Game ${gameId} successfully started with ${players.length} players`);
+    } else {
+      throw new Error('Need at least 2 players to start the game');
+    }
+  } catch (error) {
+    console.error(`Error starting game ${gameId}:`, error);
+    throw error;
   }
 }
+
 
 async function advanceTurn(gameId: number): Promise<void> {
   // Get current game state
@@ -766,18 +769,39 @@ async function advanceTurn(gameId: number): Promise<void> {
 async function getGameState(gameId: number): Promise<GameState | null> {
   try {
     // Check for an existing game state in the database
-    const result = await client.queryObject<{ game_state: string }>(
+    const result = await client.queryObject<{ game_state: string | Record<string, any> }>(
       'SELECT "GameState" as game_state FROM "Game" WHERE "idGame" = $1',
       [gameId]
     );
     
-    if (result.rows.length === 0 || !result.rows[0].game_state) {
+    if (result.rows.length === 0) {
       // No game state found
       return null;
     }
     
-    // Parse the stored JSON
-    return JSON.parse(result.rows[0].game_state) as GameState;
+    // Handle case where game_state is already an object (no need to parse)
+    if (!result.rows[0].game_state) {
+      return null;
+    }
+    
+    // Check if we need to parse the JSON
+    if (typeof result.rows[0].game_state === 'string') {
+      try {
+        // Parse the stored JSON
+        return JSON.parse(result.rows[0].game_state) as GameState;
+      } catch (parseError) {
+        console.error(`Error parsing game state JSON for game ${gameId}:`, parseError);
+        
+        // If parsing fails, create a new default game state
+        console.log(`Creating default game state for game ${gameId} due to parsing error`);
+        const newState = await initializeGameState(gameId);
+        await updateGameState(gameId, newState);
+        return newState;
+      }
+    } else {
+      // It's already an object
+      return result.rows[0].game_state as GameState;
+    }
   } catch (error) {
     console.error(`Error getting game state for game ${gameId}:`, error);
     return null;
@@ -786,7 +810,13 @@ async function getGameState(gameId: number): Promise<GameState | null> {
 
 async function updateGameState(gameId: number, gameState: GameState): Promise<void> {
   try {
-    // Convert the game state to JSON
+    // Make sure we have a valid object
+    if (!gameState || typeof gameState !== 'object') {
+      console.error(`Invalid game state for game ${gameId}:`, gameState);
+      return;
+    }
+    
+    // Convert the game state to JSON string
     const gameStateJSON = JSON.stringify(gameState);
     
     // Update the game state in the database
@@ -795,7 +825,7 @@ async function updateGameState(gameId: number, gameState: GameState): Promise<vo
       [gameStateJSON, gameId]
     );
     
-    console.log(`Updated game state for game ${gameId}`);
+    console.log(`Updated game state for game ${gameId}: ${gameStateJSON}`);
   } catch (error) {
     console.error(`Error updating game state for game ${gameId}:`, error);
     throw error;
@@ -1948,41 +1978,129 @@ ws.onmessage = async (event) => {
     return;
   }
 
-  // Card request handler
-  if (data.type === 'card_request') {
+  if (data.type === 'add_card_to_hand' && userId) {
+    // Check game phase first
+    const gameState = await getGameState(gameId);
+    if (!gameState) {
+      // If no game state, initialize one and set to playing
+      const newState = await initializeGameState(gameId);
+      newState.phase = 'playing'; // Force to playing phase
+      await updateGameState(gameId, newState);
+      console.log(`Created new game state for game ${gameId} and set to playing phase`);
+    } else if (gameState.phase !== 'playing') {
+      // If game exists but not in playing phase, change it
+      gameState.phase = 'playing';
+      await updateGameState(gameId, gameState);
+      console.log(`Updated game ${gameId} to playing phase`);
+      
+      // Notify all players about the game state change
+      notifyGameUsers(gameId, {
+        type: 'game_state',
+        gameState: gameState
+      });
+    }
+    
+    // Find a card in the deck - use the specific game ID, not a global one
     const cardsInDeck = await getActiveCardsInDeck(gameId);
     
     if (cardsInDeck.length > 0) {
       const card = cardsInDeck[0];
-      // Get the card back image (id 54)
-      const cardBackImage = await getCardBackImage();
       
+      // Update the card state
+      await updateActiveCardState(card.idCard, 'in_hand', userId);
+      
+      // Update the player's hand in memory
+      const connectionIndex = connections.findIndex(conn => conn.username === owner);
+      if (connectionIndex !== -1) {
+        connections[connectionIndex].hand.push(card.idCard);
+      }
+      
+      // Send the updated hand back to the client
+      const updatedCards = await getActiveCardsInHand(gameId, userId);
+      
+      // Convert binary data to base64 strings for JSON safely
       try {
-        // Convert card back image to base64
-        const base64String = safelyConvertToBase64(cardBackImage);
-        
-        ws.send(JSON.stringify({ 
-          type: 'card_change', 
-          card: {
+        const handCards = updatedCards.map(card => {
+          // Safely convert binary data to base64
+          const picture_data = card.picture_data;
+          let base64String = '';
+          
+          if (picture_data) {
+            base64String = safelyConvertToBase64(picture_data);
+          }
+          
+          return {
             idCard: card.idCard,
             picture: base64String ? `data:image/png;base64,${base64String}` : '',
-            cardType: 54 // Indicate it's a card back
-          },
-          pileCount: cardsInDeck.length
+            cardType: card.cardType
+          };
+        });
+        
+        // Update the connection's handCards
+        if (connectionIndex !== -1) {
+          connections[connectionIndex].handCards = handCards;
+        }
+        
+        ws.send(JSON.stringify({ 
+          type: 'player_hand', 
+          hand: handCards
         }));
+        
+        // Broadcast the card count update to all connected users
+        notifyGameUsers(gameId, {
+          type: 'player_hand_update',
+          username: owner,
+          cardCount: updatedCards.length
+        });
       } catch (error) {
-        console.error('Error converting card back image to base64:', error);
+        console.error('Error converting hand images to base64:', error);
+      }
+      
+      // Notify all users about the card change (show card back)
+      const remainingCardsInDeck = await getActiveCardsInDeck(gameId);
+      if (remainingCardsInDeck.length > 0) {
+        // Get the card back image instead of the actual card
+        const cardBackImage = await getCardBackImage();
+        
+        try {
+          // Convert card back image to base64
+          const base64String = safelyConvertToBase64(cardBackImage);
+          
+          // Update deck count for all users
+          notifyGameUsers(gameId, {
+            type: 'deck_update',
+            pileCount: remainingCardsInDeck.length
+          });
+          
+          notifyGameUsers(gameId, { 
+            type: 'card_change', 
+            card: {
+              idCard: remainingCardsInDeck[0].idCard,
+              picture: base64String ? `data:image/png;base64,${base64String}` : '',
+              cardType: 54 // Indicate it's a card back
+            },
+            pileCount: remainingCardsInDeck.length // Add the deck count
+          });
+        } catch (error) {
+          console.error('Error converting card back image to base64:', error);
+        }
+      } else {
+        // Notify that the deck is empty
+        notifyGameUsers(gameId, { 
+          type: 'card_change', 
+          card: {
+            idCard: null,
+            picture: '',
+            cardType: null
+          },
+          pileCount: 0
+        });
       }
     } else {
-      // If no cards left, show empty pile or some indication
-      ws.send(JSON.stringify({ 
-        type: 'card_change', 
-        card: {
-          idCard: null,
-          picture: '',
-          cardType: null
-        },
-        pileCount: 0
+      console.log('No cards left in the pile');
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'No cards left in the deck'
       }));
     }
     return;

@@ -174,6 +174,13 @@ class CardGameFramework {
     // Create discard pile if it doesn't exist
     this.createDiscardPile();
     
+    // Request initial pile count update
+    setTimeout(() => {
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        this.refreshDeckInfo();
+      }
+    }, 1500);
+    
     console.log('Game components initialized');
   }
   
@@ -252,6 +259,13 @@ class CardGameFramework {
         case 'card_played':
           this.handleCardPlayed(data);
           break;
+        case 'deck_update':
+          // Direct handler for deck count updates
+          if (data.pileCount !== undefined) {
+            console.log('Updating pile count to', data.pileCount);
+            this.updatePileCount(data.pileCount);
+          }
+          break;
         case 'error':
           this.handleError(data);
           break;
@@ -262,6 +276,7 @@ class CardGameFramework {
       console.error('Error handling WebSocket message:', error);
     }
   }
+  
   
   handleWebSocketError(error) {
     console.error('WebSocket error:', error);
@@ -588,6 +603,9 @@ class CardGameFramework {
     
     // Show notification about the played card
     this.showCardPlayedNotification(data.username, data.card);
+    
+    // Refresh deck info after card is played
+    this.refreshDeckInfo();
   }
   
   handleError(data) {
@@ -916,6 +934,8 @@ class CardGameFramework {
   }
   
   updatePileCount(count) {
+    console.log('Updating pile count to:', count);
+    
     // Update count on draw pile
     let pileCount = document.getElementById('pileCount');
     if (!pileCount && this.uiElements.drawPile) {
@@ -1099,11 +1119,26 @@ class CardGameFramework {
     }
     
     console.log('Requesting to draw a card');
+    
+    // Disable the draw pile temporarily to prevent multiple clicks
+    if (this.uiElements.drawPile) {
+      this.uiElements.drawPile.classList.add('drawing');
+      this.uiElements.drawPile.style.pointerEvents = 'none';
+    }
+    
     this.websocket.send(JSON.stringify({
       auth_token: localStorage.auth_token,
       type: 'add_card_to_hand',
       gameId: this.currentGameId
     }));
+    
+    // Re-enable after a short delay
+    setTimeout(() => {
+      if (this.uiElements.drawPile) {
+        this.uiElements.drawPile.classList.remove('drawing');
+        this.uiElements.drawPile.style.pointerEvents = 'auto';
+      }
+    }, 500);
   }
   
   handleCardClick(card) {
@@ -1156,11 +1191,32 @@ class CardGameFramework {
         
         // Re-request hand to get updated layout
         this.requestHand();
+        
+        // Also request card pile update
+        this.requestCard();
       }, 500);
     } else {
       // Just request updated hand
       this.requestHand();
+      
+      // Also request card pile update
+      this.requestCard();
     }
+  }
+  
+  // Add a new method for refreshing deck information
+  refreshDeckInfo() {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      console.warn('Cannot refresh deck info - WebSocket not connected');
+      return;
+    }
+    
+    // Request updated card information to get the current pile count
+    this.websocket.send(JSON.stringify({
+      auth_token: localStorage.auth_token,
+      type: 'card_request',
+      gameId: this.currentGameId
+    }));
   }
   
   createPlayedCardEffect(card) {
