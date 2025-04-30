@@ -662,11 +662,7 @@ async function initializeGameState(gameId: number): Promise<GameState> {
   // Get the players in the game to determine initial player turn
   const players = await getUsersInGame(gameId);
   
-  if (players.length === 0) {
-    throw new Error(`No players found in game ${gameId}`);
-  }
-  
-  // Initialize with the first player's turn
+  // Initialize state regardless of player count (no error if no players)
   const initialState: GameState = {
     phase: 'waiting', // Start in waiting phase
     currentTurn: null, // No player's turn yet until game starts
@@ -675,6 +671,12 @@ async function initializeGameState(gameId: number): Promise<GameState> {
     startTime: new Date(),
     lastActionTime: new Date()
   };
+  
+  // If we have players, we could set the initial player's turn (optional)
+  if (players.length > 0) {
+    // You can uncomment this if you want to set a turn immediately
+    // initialState.currentTurn = players[0].idUser;
+  }
   
   return initialState;
 }
@@ -1079,11 +1081,24 @@ router.post('/create-game', authorizationMiddleware, async (ctx) => {
       return;
     }
     
-    // Create a new game (this already initializes the deck)
-    const gameId = await createNewGame('classic');
+    // Create a new game without initializing state yet
+    // Modify createNewGame to not call initializeGameState, or create a simpler version here:
+    const result = await client.queryObject<{ idGame: number }>(
+      'INSERT INTO "Game" ("GameType", "GameStatus") VALUES ($1, $2) RETURNING "idGame"',
+      ['classic', 'active']
+    );
     
-    // Add user to the game
+    const gameId = result.rows[0].idGame;
+    
+    // Add user to the game BEFORE initializing state
     await addUserToGame(userId, gameId);
+    
+    // Now initialize the deck
+    await initializeGameDeck(gameId);
+    
+    // Now initialize the game state (after user is added)
+    const initialState = await initializeGameState(gameId);
+    await updateGameState(gameId, initialState);
     
     // Set current game ID
     currentGameId = gameId;
