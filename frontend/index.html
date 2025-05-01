@@ -48,6 +48,11 @@
     
     <!-- Return to Games Lobby button -->
     <button id="backToLobbyBtn" class="back-to-lobby-btn" onclick="returnToLobby()">Back to Games Lobby</button>
+
+    <div id="gameActions" class="game-actions">
+        <!-- Explicit onclick handler for the start game button -->
+        <button id="startGameBtn" class="game-control-btn start-game" onclick="startGame()">Start Game</button>
+    </div>
     
     <script>
         // Function to return to the games lobby
@@ -75,6 +80,99 @@
                 }
             };
         });
+
+        function startGame() {
+            console.log('Start game button clicked');
+            
+            // Get the game ID from localStorage
+            const gameId = localStorage.getItem('currentGameId');
+            if (!gameId) {
+                alert('No active game found');
+                return;
+            }
+            
+            // Show loading state
+            const startBtn = document.getElementById('startGameBtn');
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.textContent = 'Starting...';
+            }
+            
+            // Call the backend API directly
+            fetch('http://localhost:3000/start-game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                },
+                body: JSON.stringify({ gameId: parseInt(gameId, 10) }),
+                credentials: 'include'
+            })
+            .then(response => {
+                console.log('Start game response status:', response.status);
+                
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Failed to start game');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Game started successfully:', data);
+                
+                // Instead of reloading the page, we'll request game state update via WebSocket
+                if (globalThis.cardGame && globalThis.cardGame.websocket && 
+                    globalThis.cardGame.websocket.readyState === WebSocket.OPEN) {
+                    
+                    // Request updated game state
+                    globalThis.cardGame.websocket.send(JSON.stringify({
+                        auth_token: localStorage.getItem('auth_token'),
+                        type: 'game_state_request',
+                        gameId: gameId
+                    }));
+                    
+                    // Hide the start button
+                    if (startBtn) {
+                        startBtn.style.display = 'none';
+                    }
+                    
+                    // Show success message
+                    alert('Game started! Waiting for server update...');
+                } else {
+                    // If WebSocket isn't available, set intentional navigation flag and reload
+                    console.log('WebSocket not available, using page reload');
+                    localStorage.setItem('intentionalNavigation', 'true');
+                    localStorage.setItem('wsWasOpen', 'true');
+                    
+                    // Reload after a small delay
+                    setTimeout(() => {
+                        location.reload();
+                    }, 100);
+                }
+            })
+            .catch(error => {
+                console.error('Error starting game:', error);
+                alert('Error starting game: ' + error.message);
+                
+                // Reset button state
+                if (startBtn) {
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start Game';
+                }
+            });
+        }
+    
+    // Connect the button to the start function
+    document.addEventListener('DOMContentLoaded', function() {
+        const startBtn = document.getElementById('startGameBtn');
+        if (startBtn) {
+            startBtn.onclick = startGame;
+            console.log('Start game button connected');
+        } else {
+            console.error('Start game button not found');
+        }
+    });
     </script>
 </body>
 </html>
