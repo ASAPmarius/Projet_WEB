@@ -36,6 +36,8 @@
         </div>
     </div>
     
+    <div class="chat-toggle" id="chatToggle"></div>
+    
     <div class="card-stack" id="cardStack">
         <div class="card" id="card">
             <!-- Card will be populated dynamically -->
@@ -54,22 +56,35 @@
         <button id="startGameBtn" class="game-control-btn start-game" onclick="startGame()">Start Game</button>
     </div>
     
+    <!-- Link to profile page -->
+    <button class="hello-page-button" onclick="goToProfilePage()">View Profile</button>
+    
     <script>
         // Function to return to the games lobby
         function returnToLobby() {
-        // Set a navigation flag that will be checked by other scripts
-        localStorage.setItem('intentionalNavigation', 'true');
-        localStorage.setItem('wsWasOpen', 'true');
-        
+            // Set a navigation flag that will be checked by other scripts
+            localStorage.setItem('intentionalNavigation', 'true');
+            localStorage.setItem('wsWasOpen', 'true');
+            
             // Small delay to ensure localStorage is updated before navigation
             setTimeout(() => {
-            // Navigate to games page
-            window.location.href = 'games.html';
+                // Navigate to games page
+                globalThis.location.href = 'games.html';
+            }, 10);
+        }
+        
+        // Function to navigate to profile page
+        function goToProfilePage() {
+            localStorage.setItem('intentionalNavigation', 'true');
+            localStorage.setItem('wsWasOpen', 'true');
+            
+            setTimeout(() => {
+                globalThis.location.href = 'profile.html';
             }, 10);
         }
         
         // Initialize the War game when the window is fully loaded
-        window.addEventListener('load', function() {
+        globalThis.addEventListener('load', function() {
             // Create the game instance
             globalThis.warGame = new WarGame();
             
@@ -163,16 +178,16 @@
             });
         }
     
-    // Connect the button to the start function
-    document.addEventListener('DOMContentLoaded', function() {
-        const startBtn = document.getElementById('startGameBtn');
-        if (startBtn) {
-            startBtn.onclick = startGame;
-            console.log('Start game button connected');
-        } else {
-            console.error('Start game button not found');
-        }
-    });
+        // Connect the button to the start function
+        document.addEventListener('DOMContentLoaded', function() {
+            const startBtn = document.getElementById('startGameBtn');
+            if (startBtn) {
+                startBtn.onclick = startGame;
+                console.log('Start game button connected');
+            } else {
+                console.error('Start game button not found');
+            }
+        });
     </script>
 </body>
 </html>
