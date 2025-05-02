@@ -617,7 +617,6 @@ async function updateGameState(gameId: number, gameState: GameState): Promise<vo
   }
 }
 
-// Helper functions for WebSocket handlers
 async function handleJoinGame(data: any, userId: number, ws: WebSocket) {
   const { gameId } = data;
   
@@ -630,14 +629,26 @@ async function handleJoinGame(data: any, userId: number, ws: WebSocket) {
   }
   
   try {
+    console.log(`User ${userId} joining game ${gameId}`);
+    
     // Add user to game
     await addUserToGame(userId, gameId);
     
-    // Update connection's gameId
+    // Find this connection in the connections array
     const connIndex = connections.findIndex(c => c.userId === userId);
+    
     if (connIndex !== -1) {
-      connections[connIndex].gameId = gameId;
+      console.log(`Updating connection for user ${userId}: setting gameId to ${gameId}`);
+      connections[connIndex].gameId = Number(gameId);
+    } else {
+      console.warn(`Connection not found for user ${userId} when joining game ${gameId}`);
     }
+    
+    // Log connections after update
+    console.log(`Current connections after join:`);
+    connections.forEach(conn => {
+      console.log(`- User: ${conn.username}, ID: ${conn.userId}, Game: ${conn.gameId}`);
+    });
     
     // Send success response
     ws.send(JSON.stringify({
@@ -828,15 +839,22 @@ async function sendConnectedUsers(gameId: number) {
 
 // Function to notify all users in a game
 function notifyGameUsers(gameId: number, message: any) {
+  console.log(`Broadcasting message to all users in game ${gameId}:`, message.type);
+  let sentCount = 0;
+  console.log("clients, gameId:", connections, gameId);
   connections.forEach((client) => {
     if (client.gameId === gameId) {
       try {
         client.ws.send(JSON.stringify(message));
+        sentCount++;
+        console.log(`Message sent to user ${client.username} (ID: ${client.userId})`);
       } catch (error) {
-        console.error("Error sending message to client:", error);
+        console.error(`Error sending message to client ${client.username}:`, error);
       }
     }
   });
+  
+  console.log(`Message broadcast complete: sent to ${sentCount} clients out of ${connections.length} total connections`);
 }
 
 // Add an OPTIONS handler for the login route
@@ -1603,6 +1621,12 @@ router.get("/", async (ctx) => {
       
       // 3. Send current game state
       sendGameState(currentGameId, ws);
+
+    const gameConnections = connections.filter(conn => conn.gameId === currentGameId);
+    console.log(`Current connections in game ${currentGameId}: ${gameConnections.length}`);
+    gameConnections.forEach(conn => {
+      console.log(`- User: ${conn.username}, ID: ${conn.userId}`);
+  });
     }
 
     // WebSocket message handler
