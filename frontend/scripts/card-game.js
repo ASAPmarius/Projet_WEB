@@ -734,28 +734,43 @@ startWebSocketStatusChecks() {
     return String(this.gameState.currentTurn) === String(this.currentPlayerId);
   }
   
-  // Play a card from hand
-  playCard(cardId) {
-    // Check if it's the player's turn
-    if (!this.isMyTurn()) {
-      this.showNotification("It's not your turn to play");
-      return;
-    }
-    
-    // Send play card action
-    this.sendWebSocketMessage({
-      type: 'player_action',
-      action: {
-        type: 'play_card',
-        cardId
-      },
-      gameId: this.currentGameId,
-      auth_token: localStorage.getItem('auth_token')
-    });
-    
-    // Handle card play locally
-    this.handlePlayCardAction(this.currentPlayerId, this.currentUsername, cardId);
+// Find the playCard function (around line 920-940) and modify it like this:
+playCard(cardId) {
+  // Check if it's the player's turn
+  if (!this.isMyTurn()) {
+    this.showNotification("It's not your turn to play");
+    return;
   }
+  
+  // Add a flag to prevent double-handling
+  if (this._isProcessingCardId === cardId) {
+    console.log(`Already processing card ${cardId}, ignoring duplicate action`);
+    return;
+  }
+  
+  // Set the flag
+  this._isProcessingCardId = cardId;
+  
+  // ONLY send the WebSocket message, don't handle locally
+  console.log(`Sending play card action for card ${cardId}`);
+  this.sendWebSocketMessage({
+    type: 'player_action',
+    action: {
+      type: 'play_card',
+      cardId
+    },
+    gameId: this.currentGameId,
+    auth_token: localStorage.getItem('auth_token')
+  });
+  
+  // Clear the flag after a short delay
+  setTimeout(() => {
+    this._isProcessingCardId = null;
+  }, 500);
+  
+  // REMOVE any local handling here - let the WebSocket handler do it
+  // this.handlePlayCardAction(this.currentPlayerId, this.currentUsername, cardId);
+}
   
   // Handle draw card action
   handleDrawCardAction(playerId, username) {
