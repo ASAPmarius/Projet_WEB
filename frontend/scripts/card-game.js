@@ -557,6 +557,13 @@ startWebSocketStatusChecks() {
     
     const { playerId, username, action } = data;
     
+    // Skip processing for your own actions that you already processed locally
+    // This is the key fix - only process actions from other players when they come from the server
+    if (String(playerId) === String(this.currentPlayerId) && action.type === 'play_card') {
+      console.log(`Ignoring my own play_card action broadcast from server`);
+      return;
+    }
+    
     // Process the action based on its type
     switch (action.type) {
       case 'draw_card':
