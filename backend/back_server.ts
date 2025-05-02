@@ -696,7 +696,7 @@ async function handlePlayerAction(data: any, userId: number, username: string, w
       }
     }
     
-    // Broadcast action to all players in game
+    // THIS IS THE CRITICAL PART - make sure this is broadcasting to everyone
     notifyGameUsers(gameId, {
       type: "player_action",
       playerId: userId,
@@ -707,30 +707,6 @@ async function handlePlayerAction(data: any, userId: number, username: string, w
     // Update last action time in game state
     if (gameState) {
       gameState.lastActionTime = new Date();
-      
-      // Additionally, add handling for turn change
-      if (action.type === 'play_card' || action.type === 'play_war_cards') {
-        // Get all players in the game to determine next player
-        const usersInGame = await getUsersInGame(gameId);
-        if (usersInGame.length >= 2) {
-          // Find current player index
-          const currentIndex = usersInGame.findIndex(p => p.idUser === userId);
-          
-          // Calculate next player index
-          const nextIndex = (currentIndex + 1) % usersInGame.length;
-          
-          // Set next player's turn in game state
-          gameState.currentTurn = usersInGame[nextIndex].idUser;
-          
-          // Notify all clients about the turn change
-          notifyGameUsers(gameId, {
-            type: "turn_change",
-            playerId: gameState.currentTurn,
-            username: usersInGame[nextIndex].Username
-          });
-        }
-      }
-      
       await updateGameState(gameId, gameState);
     }
   } catch (error) {

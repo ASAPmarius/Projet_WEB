@@ -553,16 +553,9 @@ startWebSocketStatusChecks() {
   }
   
   handlePlayerAction(data) {
-    console.log('Processing player action');
+    console.log('Processing player action', data);
     
     const { playerId, username, action } = data;
-    
-    // Skip processing for your own actions that you already processed locally
-    // This is the key fix - only process actions from other players when they come from the server
-    if (String(playerId) === String(this.currentPlayerId) && action.type === 'play_card') {
-      console.log(`Ignoring my own play_card action broadcast from server`);
-      return;
-    }
     
     // Process the action based on its type
     switch (action.type) {
@@ -571,6 +564,8 @@ startWebSocketStatusChecks() {
         break;
         
       case 'play_card':
+        // This is the key fix - handle card actions from other players
+        // Make sure this executes for BOTH your own actions and others' actions
         this.handlePlayCardAction(playerId, username, action.cardId);
         break;
         
@@ -812,57 +807,47 @@ startWebSocketStatusChecks() {
     this.showNotification(`${username} drew a card`);
   }
   
-  // Handle play card action
   handlePlayCardAction(playerId, username, cardId) {
     console.log(`Player ${username} played card ${cardId}`);
     
-    // Only process card removal if it's the current player's action
+    // Find the card data - we'll need this for animation regardless of which player
+    const cardData = this.cardsById[cardId];
+    
+    // For the player who made the move
     if (String(playerId) === String(this.currentPlayerId)) {
       // Find the card in the player's hand
       const playerHand = this.hands[playerId];
-      if (!playerHand) {
-        console.warn(`No hand found for player ${playerId}`);
-        return;
-      }
-      console.log(`Player ${username}'s hand:`, playerHand);
-      
-      // Find the card index in the player's hand
-      const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
-      if (cardIndex === -1) {
-        console.warn(`Card ${cardId} not found in player ${playerId}'s hand. Available cards:`, 
-          playerHand.map(c => c.id));
-        return;
-      }
-      
-      // Remove the card from hand
-      const card = playerHand.splice(cardIndex, 1)[0];
-      
-      // Add to discard pile
-      this.discardPile.push(card);
-      
-      // Animate the card being played
-      this.animateCardPlay(card);
-      
-      // Update hand display
-      setTimeout(() => {
-        this.updateHandDisplay();
-      }, 500);
-    } else {
-      // For other players, just show the animation
-      // Find the card in the global cards collection
-      const cardData = this.cardsById[cardId];
-      if (cardData) {
-        this.animateCardPlay(cardData);
+      if (playerHand) {
+        // Find the card index
+        const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
+        if (cardIndex !== -1) {
+          // Remove the card from hand
+          const card = playerHand.splice(cardIndex, 1)[0];
+          
+          // Add to discard pile
+          this.discardPile.push(card);
+          
+          // Update hand display
+          setTimeout(() => {
+            this.updateHandDisplay();
+          }, 500);
+        }
       }
     }
     
-    // Show notification
+    // For ALL players (including the one who played), animate the card
+    if (cardData) {
+      this.animateCardPlay(cardData);
+    } else {
+      console.warn(`Card data not found for ID ${cardId}`);
+    }
+    
+    // Show notification for all players
     this.showNotification(`${username} played a card`);
     
     // Check for game end conditions
     this.checkGameEndConditions();
   }
-  
   // Handle play war cards action
   handlePlayWarCardsAction(playerId, username, count) {
     console.log(`Player ${username} played ${count} war cards`);
