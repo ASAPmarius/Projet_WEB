@@ -806,44 +806,48 @@ playCard(cardId) {
   handlePlayCardAction(playerId, username, cardId) {
     console.log(`Player ${username} played card ${cardId}`);
     
-    // Find the card in the player's hand
-    const playerHand = this.hands[playerId];
-    if (!playerHand) {
-      console.warn(`No hand found for player ${playerId}`);
-      return;
-    }
-    console.log(`Player ${username}'s hand:`, playerHand);
-    
-    // Find handlePlayCardAction and update the card finding logic:
-    const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
-    if (cardIndex === -1) {
-      console.warn(`Card ${cardId} not found in player ${playerId}'s hand. Available cards:`, 
-        playerHand.map(c => c.id));
-      return;
-    }
-    
-    // Remove the card from hand
-    const card = playerHand.splice(cardIndex, 1)[0];
-    
-    // Add to discard pile
-    this.discardPile.push(card);
-    
-    // Update UI
-    if (playerId === this.currentPlayerId) {
-      // First animate the card being played
+    // Only process card removal if it's the current player's action
+    if (String(playerId) === String(this.currentPlayerId)) {
+      // Find the card in the player's hand
+      const playerHand = this.hands[playerId];
+      if (!playerHand) {
+        console.warn(`No hand found for player ${playerId}`);
+        return;
+      }
+      console.log(`Player ${username}'s hand:`, playerHand);
+      
+      // Find the card index in the player's hand
+      const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
+      if (cardIndex === -1) {
+        console.warn(`Card ${cardId} not found in player ${playerId}'s hand. Available cards:`, 
+          playerHand.map(c => c.id));
+        return;
+      }
+      
+      // Remove the card from hand
+      const card = playerHand.splice(cardIndex, 1)[0];
+      
+      // Add to discard pile
+      this.discardPile.push(card);
+      
+      // Animate the card being played
       this.animateCardPlay(card);
       
-      // Then update hand display
+      // Update hand display
       setTimeout(() => {
         this.updateHandDisplay();
       }, 500);
     } else {
-      // For opponent card, just animate
-      this.animateCardPlay(card);
+      // For other players, just show the animation
+      // Find the card in the global cards collection
+      const cardData = this.cardsById[cardId];
+      if (cardData) {
+        this.animateCardPlay(cardData);
+      }
     }
     
     // Show notification
-    this.showNotification(`${username} played ${card.rank} of ${card.suit}`);
+    this.showNotification(`${username} played a card`);
     
     // Check for game end conditions
     this.checkGameEndConditions();
