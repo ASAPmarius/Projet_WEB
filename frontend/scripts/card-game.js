@@ -698,7 +698,10 @@ startWebSocketStatusChecks() {
       // Add click handler if it's the player's turn
       if (this.isMyTurn()) {
         cardElement.classList.add('playable');
-        cardElement.addEventListener('click', () => this.playCard(card.id));
+        cardElement.addEventListener('click', () => {
+          console.log(`Playing card ${card.id} (${card.rank} of ${card.suit})`);
+          this.playCard(card.id);
+        });
       }
       
       // Add to hand container
@@ -794,10 +797,13 @@ startWebSocketStatusChecks() {
       console.warn(`No hand found for player ${playerId}`);
       return;
     }
+    console.log(`Player ${username}'s hand:`, playerHand);
     
-    const cardIndex = playerHand.findIndex(card => card.id === cardId);
+    // Find handlePlayCardAction and update the card finding logic:
+    const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
     if (cardIndex === -1) {
-      console.warn(`Card ${cardId} not found in player ${playerId}'s hand`);
+      console.warn(`Card ${cardId} not found in player ${playerId}'s hand. Available cards:`, 
+        playerHand.map(c => c.id));
       return;
     }
     
