@@ -10,8 +10,8 @@
 
 function handleAuthBeforeUnload(event) {
   // Check if this is intentional navigation within our app
-  if (localStorage.getItem('intentionalNavigation') === 'true' || 
-      localStorage.getItem('wsWasOpen') === 'true') {
+  if (sessionStorage.getItem('intentionalNavigation') === 'true' || 
+      sessionStorage.getItem('wsWasOpen') === 'true') {
     console.log('Intentional navigation detected, skipping disconnect');
     return;
   }
@@ -54,10 +54,10 @@ function checkAuthAndRedirect() {
 // Replace the verifyTokenWithServer function in auth-check.js
 function verifyTokenWithServer(token) {
   // Add a check to see if we're navigating internally
-  if (localStorage.getItem('intentionalNavigation') === 'true') {
+  if (sessionStorage.getItem('intentionalNavigation') === 'true') {
     console.log('Internal navigation detected, skipping token verification');
     // Clear the flag after we've acknowledged it
-    localStorage.removeItem('intentionalNavigation');
+    sessionStorage.removeItem('intentionalNavigation');
     return; // Skip verification during internal navigation
   }
 
@@ -90,7 +90,9 @@ function verifyTokenWithServer(token) {
     if (data && data.token_data && data.token_data.userName) {
       console.log('Auth token verified for:', data.token_data.userName);
       // Store username if not already stored
-      if (!localStorage.getItem('currentUsername')) {
+      if (!sessionStorage.getItem('currentUsername')) {
+        sessionStorage.setItem('currentUsername', data.token_data.userName);
+        // Keep a copy in localStorage as a fallback
         localStorage.setItem('currentUsername', data.token_data.userName);
       }
       
@@ -124,14 +126,14 @@ function checkActiveGame() {
   // If we have a gameId in the URL, use that and skip the active-game check
   if (gameIdParam) {
     console.log(`Game ID found in URL: ${gameIdParam}, storing and bypassing active-game check`);
-    localStorage.setItem('currentGameId', gameIdParam);
+    sessionStorage.setItem('currentGameId', gameIdParam);
     return;
   }
   
-  // If we already have a gameId in localStorage, use that
-  const storedGameId = localStorage.getItem('currentGameId');
+  // If we already have a gameId in sessionStorage, use that
+  const storedGameId = sessionStorage.getItem('currentGameId');
   if (storedGameId) {
-    console.log(`Game ID found in localStorage: ${storedGameId}, using stored value`);
+    console.log(`Game ID found in sessionStorage: ${storedGameId}, using stored value`);
     return;
   }
   
@@ -178,7 +180,7 @@ function checkActiveGame() {
   })
   .then(data => {
     if (data && data.game && data.game.idGame) {
-      localStorage.setItem('currentGameId', data.game.idGame);
+      sessionStorage.setItem('currentGameId', data.game.idGame);
       console.log('Active game found and stored:', data.game.idGame);
     }
   })

@@ -77,6 +77,7 @@ class WarGame extends CardGameFramework {
     actionButton.className = 'war-action-button';
     actionButton.id = 'warActionButton';
     actionButton.textContent = 'Play Cards';
+    actionButton.addEventListener('click', () => this.playTopCard());
     
     // Create result indicator
     const resultIndicator = document.createElement('div');
@@ -695,14 +696,22 @@ class WarGame extends CardGameFramework {
 
 // Initialize the War game when the window is loaded
 globalThis.addEventListener('load', function() {
-  // Create the game instance
-  globalThis.warGame = new WarGame();
-  globalThis.cardGame = globalThis.warGame; // Also set as the main card game
+  console.log('War Game script loaded, initializing game...');
   
-  // Expose functions for HTML onclick handlers
-  globalThis.playWarCards = function() {
-    if (globalThis.warGame) {
-      globalThis.warGame.playTopCard();
-    }
-  };
+  // Create the game instance
+  try {
+    globalThis.warGame = new WarGame();
+    globalThis.cardGame = globalThis.warGame; // Also set as the main card game
+    
+    // Expose functions for HTML onclick handlers
+    globalThis.playWarCards = function() {
+      if (globalThis.warGame) {
+        globalThis.warGame.playTopCard();
+      }
+    };
+    
+    console.log('War Game initialized successfully');
+  } catch (error) {
+    console.error('Error initializing War Game:', error);
+  }
 });

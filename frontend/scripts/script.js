@@ -48,7 +48,8 @@ function login() {
     .then(data => {
       console.log('Login successful, redirecting...');
       localStorage.setItem('auth_token', data.auth_token);
-      localStorage.setItem('currentUsername', username); // Store username for later use
+      sessionStorage.setItem('currentUsername', username); // Store username in sessionStorage
+      localStorage.setItem('currentUsername', username); // Also store in localStorage as fallback
       globalThis.location.href = 'games.html'; // Redirect to games page instead of index.html
     })
     .catch(error => {

@@ -49,11 +49,11 @@
     </div>
     
     <!-- Return to Games Lobby button -->
-    <button id="backToLobbyBtn" class="back-to-lobby-btn" onclick="returnToLobby()">Back to Games Lobby</button>
+    <button id="backToLobbyBtn" class="back-to-lobby-btn">Back to Games Lobby</button>
 
     <div id="gameActions" class="game-actions">
         <!-- Explicit onclick handler for the start game button -->
-        <button id="startGameBtn" class="game-control-btn start-game" onclick="startGame()">Start Game</button>
+        <button id="startGameBtn" class="game-control-btn start-game">Start Game</button>
     </div>
     
     <!-- Link to profile page -->
@@ -63,10 +63,10 @@
         // Function to return to the games lobby
         function returnToLobby() {
             // Set a navigation flag that will be checked by other scripts
-            localStorage.setItem('intentionalNavigation', 'true');
-            localStorage.setItem('wsWasOpen', 'true');
+            sessionStorage.setItem('intentionalNavigation', 'true');
+            sessionStorage.setItem('wsWasOpen', 'true');
             
-            // Small delay to ensure localStorage is updated before navigation
+            // Small delay to ensure sessionStorage is updated before navigation
             setTimeout(() => {
                 // Navigate to games page
                 globalThis.location.href = 'games.html';
@@ -75,32 +75,50 @@
         
         // Function to navigate to profile page
         function goToProfilePage() {
-            localStorage.setItem('intentionalNavigation', 'true');
-            localStorage.setItem('wsWasOpen', 'true');
+            sessionStorage.setItem('intentionalNavigation', 'true');
+            sessionStorage.setItem('wsWasOpen', 'true');
             
             setTimeout(() => {
                 globalThis.location.href = 'profile.html';
             }, 10);
         }
         
-        // Initialize the War game when the window is fully loaded
-        globalThis.addEventListener('load', function() {
-            // Create the game instance
-            globalThis.warGame = new WarGame();
+        // Ensure chat toggle works properly
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize chat toggle button
+            const chatToggle = document.getElementById('chatToggle');
+            const chatContainer = document.querySelector('.container');
             
-            // Expose functions for HTML onclick handlers
-            globalThis.playWarCards = function() {
-                if (globalThis.warGame) {
-                    globalThis.warGame.playTopCard();
+            if (chatToggle && chatContainer) {
+                chatToggle.addEventListener('click', function() {
+                    chatContainer.classList.toggle('chat-hidden');
+                    chatToggle.classList.toggle('chat-hidden');
+                    
+                    // Store state in sessionStorage
+                    const isHidden = chatContainer.classList.contains('chat-hidden');
+                    sessionStorage.setItem('chatHidden', isHidden.toString());
+                });
+                
+                // Initialize from saved state
+                const chatHidden = sessionStorage.getItem('chatHidden') === 'true';
+                if (chatHidden) {
+                    chatContainer.classList.add('chat-hidden');
+                    chatToggle.classList.add('chat-hidden');
                 }
-            };
+            }
+            
+            // Connect lobby button
+            const lobbyButton = document.getElementById('backToLobbyBtn');
+            if (lobbyButton) {
+                lobbyButton.addEventListener('click', returnToLobby);
+            }
         });
 
         function startGame() {
             console.log('Start game button clicked');
             
-            // Get the game ID from localStorage
-            const gameId = localStorage.getItem('currentGameId');
+            // Get the game ID from sessionStorage
+            const gameId = sessionStorage.getItem('currentGameId');
             if (!gameId) {
                 alert('No active game found');
                 return;
@@ -157,8 +175,8 @@
                 } else {
                     // If WebSocket isn't available, set intentional navigation flag and reload
                     console.log('WebSocket not available, using page reload');
-                    localStorage.setItem('intentionalNavigation', 'true');
-                    localStorage.setItem('wsWasOpen', 'true');
+                    sessionStorage.setItem('intentionalNavigation', 'true');
+                    sessionStorage.setItem('wsWasOpen', 'true');
                     
                     // Reload after a small delay
                     setTimeout(() => {
@@ -187,7 +205,23 @@
             } else {
                 console.error('Start game button not found');
             }
+            
+            // Initialize chat send behavior
+            globalThis.sendJson = function() {
+                if (globalThis.cardGame) {
+                    globalThis.cardGame.sendChatMessage();
+                }
+            };
         });
+
+                // Add this debug code to index.html
+        console.log("--------- DEBUGGING INFO ---------");
+        console.log("Auth token exists:", !!localStorage.getItem('auth_token'));
+        console.log("Username in localStorage:", localStorage.getItem('currentUsername'));
+        console.log("Username in sessionStorage:", sessionStorage.getItem('currentUsername'));
+        console.log("Game ID in sessionStorage:", sessionStorage.getItem('currentGameId'));
+        console.log("Chat hidden:", sessionStorage.getItem('chatHidden'));
+        console.log("---------------------------------");
     </script>
 </body>
 </html>

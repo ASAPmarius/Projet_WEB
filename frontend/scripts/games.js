@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
-    localStorage.removeItem('intentionalNavigation');
-    localStorage.removeItem('wsWasOpen');
+    sessionStorage.removeItem('intentionalNavigation');
+    sessionStorage.removeItem('wsWasOpen');
     // Verify authentication status
     const authToken = localStorage.getItem('auth_token');
     if (!authToken) {
@@ -38,13 +38,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to check if user is in a game
     async function checkUserGameStatus() {
         try {
-            // Clear any stale game ID from localStorage to prevent confusion
-            localStorage.removeItem('currentGameId');
+            // Clear any stale game ID from sessionStorage to prevent confusion
+            sessionStorage.removeItem('currentGameId');
             
             // Update user status while checking
             userStatus.textContent = 'Checking your game status...';
             
-            // Instead of relying just on localStorage, check with the server
+            // Instead of relying just on sessionStorage, check with the server
             const response = await fetch('http://localhost:3000/active-game', {
                 method: 'GET',
                 headers: {
@@ -62,8 +62,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentUser.inGame = true;
                     currentUser.currentGameId = data.game.idGame;
                     
-                    // Update localStorage with the current active game ID
-                    localStorage.setItem('currentGameId', data.game.idGame);
+                    // Update sessionStorage with the current active game ID
+                    sessionStorage.setItem('currentGameId', data.game.idGame);
                     
                     userStatus.innerHTML = `You are currently in Game #${data.game.idGame}. <a href="#" onclick="returnToGame()">Return to your game</a> or join another.`;
                     returnBtn.style.display = 'block';
@@ -98,8 +98,8 @@ document.addEventListener('DOMContentLoaded', function() {
         currentUser.inGame = false;
         currentUser.currentGameId = null;
         
-        // Clear any stale gameId from localStorage
-        localStorage.removeItem('currentGameId');
+        // Clear any stale gameId from sessionStorage
+        sessionStorage.removeItem('currentGameId');
         
         userStatus.textContent = 'You are not currently in any game. Join one below or create a new game.';
         
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Check if current user is in this game
             const userInGame = game.players && game.players.some(player => 
-                localStorage.getItem('currentUsername') === player.username
+                sessionStorage.getItem('currentUsername') === player.username
             );
             
             let playersList = '';
@@ -214,12 +214,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            // Store the game ID in local storage
+            // Store the game ID in sessionStorage
             if (data && data.game && data.game.idGame) {
-                localStorage.setItem('currentGameId', data.game.idGame);
+                sessionStorage.setItem('currentGameId', data.game.idGame);
                 
                 // Set the WebSocket flag to prevent disconnection on navigation
-                localStorage.setItem('wsWasOpen', 'true');
+                sessionStorage.setItem('wsWasOpen', 'true');
                 
                 // Redirect to the game page
                 globalThis.location.href = 'index.html';
@@ -231,6 +231,19 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Failed to create game. Please try again.');
         }
     }
+
+    function storeGameData(gameId, username) {
+        // Store game ID in sessionStorage only
+        sessionStorage.setItem('currentGameId', gameId);
+        
+        // Store username in both for compatibility
+        sessionStorage.setItem('currentUsername', username);
+        if (!localStorage.getItem('currentUsername')) {
+          localStorage.setItem('currentUsername', username);
+        }
+        
+        console.log(`Game data stored: Game ID ${gameId} for user ${username}`);
+      }
     
     async function joinGame(gameId) {
         try {
@@ -278,11 +291,11 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log('Join game successful:', responseData);
             
-            // Store the game ID in local storage
-            localStorage.setItem('currentGameId', gameId);
+            // Store the game ID in sessionStorage
+            sessionStorage.setItem('currentGameId', gameId);
             
             // Set the WebSocket flag to prevent disconnection on navigation
-            localStorage.setItem('wsWasOpen', 'true');
+            sessionStorage.setItem('wsWasOpen', 'true');
             
             // Show progress in the button
             if (joinButton) {
@@ -333,8 +346,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (data.game && data.game.idGame) {
                     // Game is active, redirect to it
-                    localStorage.setItem('currentGameId', data.game.idGame);
-                    localStorage.setItem('wsWasOpen', 'true');
+                    sessionStorage.setItem('currentGameId', data.game.idGame);
+                    sessionStorage.setItem('wsWasOpen', 'true');
                     globalThis.location.href = 'index.html';
                 } else {
                     // No active game found even though server returned OK
@@ -368,8 +381,9 @@ document.addEventListener('DOMContentLoaded', function() {
 // Logout function
 function logout() {
     localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('currentUsername');
     localStorage.removeItem('currentUsername');
-    localStorage.removeItem('currentGameId');
-    localStorage.removeItem('wsWasOpen');
+    sessionStorage.removeItem('currentGameId');
+    sessionStorage.removeItem('wsWasOpen');
     globalThis.location.href = 'login.html';
 }

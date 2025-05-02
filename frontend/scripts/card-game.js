@@ -62,13 +62,13 @@ class CardGameFramework {
   // ====================== INITIALIZATION ======================
   async init() {
     try {
-      // Get game ID from URL parameters or localStorage
+      // Get game ID from URL parameters or sessionStorage
       const urlParams = new URLSearchParams(globalThis.location.search);
       const gameIdParam = urlParams.get('gameId');
-      this.currentGameId = gameIdParam || localStorage.getItem('currentGameId');
+      this.currentGameId = gameIdParam || sessionStorage.getItem('currentGameId');
       
-      // Get username from localStorage
-      this.currentUsername = localStorage.getItem('currentUsername');
+      // Get username from sessionStorage
+      this.currentUsername = sessionStorage.getItem('currentUsername') || localStorage.getItem('currentUsername');
       
       // If we don't have a game ID, check for active game
       if (!this.currentGameId) {
@@ -76,7 +76,7 @@ class CardGameFramework {
       }
       
       if (!this.currentGameId) {
-        console.log('No active game found, redirecting to games page');
+        console.error('No active game found, redirecting to games page');
         globalThis.location.href = 'games.html';
         return;
       }
@@ -104,8 +104,8 @@ class CardGameFramework {
       }, 500);
       
       // Clear navigation flags
-      localStorage.removeItem('intentionalNavigation');
-      localStorage.removeItem('wsWasOpen');
+      sessionStorage.removeItem('intentionalNavigation');
+      sessionStorage.removeItem('wsWasOpen');
     } catch (error) {
       console.error('Error during game initialization:', error);
       globalThis.location.href = 'games.html';
@@ -183,7 +183,7 @@ class CardGameFramework {
       if (gameData && gameData.game && gameData.game.idGame) {
         console.log('Active game found:', gameData.game.idGame);
         this.currentGameId = gameData.game.idGame;
-        localStorage.setItem('currentGameId', this.currentGameId);
+        sessionStorage.setItem('currentGameId', this.currentGameId);
         return true;
       }
       
@@ -201,7 +201,7 @@ class CardGameFramework {
     this.uiElements.messageInput = document.getElementById('messageInput');
     this.uiElements.handContainer = document.getElementById('handContainer');
     
-    console.log('UI elements initialized');
+    console.log('UI elements initialized', this.uiElements);
   }
   
   // Initialize game components
@@ -223,23 +223,28 @@ class CardGameFramework {
   
   // ====================== WEBSOCKET HANDLING ======================
   connectWebSocket() {
-    this.websocket = new WebSocket('ws://localhost:3000');
-    
-    this.websocket.onopen = this.handleWebSocketOpen;
-    this.websocket.onmessage = this.handleWebSocketMessage;
-    this.websocket.onerror = this.handleWebSocketError;
-    this.websocket.onclose = this.handleWebSocketClose;
-    
-    console.log('WebSocket connection initialized');
+    try {
+      console.log('Attempting to connect WebSocket...');
+      this.websocket = new WebSocket('ws://localhost:3000');
+      
+      this.websocket.onopen = this.handleWebSocketOpen;
+      this.websocket.onmessage = this.handleWebSocketMessage;
+      this.websocket.onerror = this.handleWebSocketError;
+      this.websocket.onclose = this.handleWebSocketClose;
+      
+      console.log('WebSocket connection initialized');
+    } catch (error) {
+      console.error('Error initializing WebSocket:', error);
+    }
   }
   
-  handleWebSocketOpen() {
+  handleWebSocketOpen(event) {
     console.log('WebSocket connection established');
     
-    // Make sure we load the currentGameId from localStorage if not set
+    // Make sure we load the currentGameId from sessionStorage if not set
     if (!this.currentGameId) {
-      this.currentGameId = localStorage.getItem('currentGameId');
-      console.log(`Retrieved game ID from localStorage: ${this.currentGameId}`);
+      this.currentGameId = sessionStorage.getItem('currentGameId');
+      console.log(`Retrieved game ID from sessionStorage: ${this.currentGameId}`);
     }
     
     // Only request data if UI components and cards are ready
@@ -326,7 +331,7 @@ class CardGameFramework {
     console.error('WebSocket error:', error);
     
     // Only redirect to login if not navigating to games page
-    if (localStorage.getItem('wsWasOpen') !== 'true') {
+    if (sessionStorage.getItem('wsWasOpen') !== 'true') {
       this.goToLogin();
     }
   }
@@ -335,15 +340,15 @@ class CardGameFramework {
     console.log('WebSocket connection closed:', event);
     
     // Only redirect to login if we're not navigating to another page
-    if (localStorage.getItem('wsWasOpen') !== 'true') {
+    if (sessionStorage.getItem('wsWasOpen') !== 'true') {
       this.goToLogin();
     }
   }
   
   handlePageUnload(event) {
     // Check if this is intentional navigation between our pages
-    if (localStorage.getItem('intentionalNavigation') === 'true' || 
-        localStorage.getItem('wsWasOpen') === 'true') {
+    if (sessionStorage.getItem('intentionalNavigation') === 'true' || 
+        sessionStorage.getItem('wsWasOpen') === 'true') {
       console.log('Intentional navigation detected, skipping disconnect');
       return;
     }
@@ -449,7 +454,7 @@ class CardGameFramework {
   }
   
   handleGameState(data) {
-    console.log('Processing game state update');
+    console.log('Processing game state update', data);
     
     // Update the local game state
     this.gameState = data.gameState;
@@ -941,25 +946,46 @@ class CardGameFramework {
   
   initChatToggle() {
     // Create chat toggle button if it doesn't exist
-    if (!document.getElementById('chatToggle')) {
-      const chatToggle = document.createElement('div');
+    const chatToggle = document.getElementById('chatToggle') || document.createElement('div');
+    
+    // If we created a new element, set its properties
+    if (!chatToggle.id) {
       chatToggle.className = 'chat-toggle';
       chatToggle.id = 'chatToggle';
       document.body.appendChild(chatToggle);
-      
-      // Store reference
-      this.uiElements.chatToggle = chatToggle;
-      
-      // Initialize chat state from localStorage (default to visible)
-      const chatHidden = localStorage.getItem('chatHidden') === 'true';
-      if (chatHidden && this.uiElements.chatContainer) {
-        this.uiElements.chatContainer.classList.add('chat-hidden');
-        chatToggle.classList.add('chat-hidden');
-      }
-      
-      // Toggle chat visibility when button is clicked
-      chatToggle.addEventListener('click', () => this.toggleChat());
     }
+    
+    // Store reference
+    this.uiElements.chatToggle = chatToggle;
+    
+    // Check if chat container exists
+    if (!this.uiElements.chatContainer) {
+      this.uiElements.chatContainer = document.querySelector('.container');
+      console.log("Chat container initialized:", this.uiElements.chatContainer);
+    }
+    
+    // Initialize chat state from sessionStorage (default to visible)
+    const chatHidden = sessionStorage.getItem('chatHidden') === 'true';
+    if (chatHidden && this.uiElements.chatContainer) {
+      this.uiElements.chatContainer.classList.add('chat-hidden');
+      chatToggle.classList.add('chat-hidden');
+    }
+    
+    // Add event listener with better error handling
+    chatToggle.addEventListener('click', () => {
+      console.log("Chat toggle clicked");
+      if (this.uiElements.chatContainer) {
+        this.uiElements.chatContainer.classList.toggle('chat-hidden');
+        chatToggle.classList.toggle('chat-hidden');
+        
+        // Save state to sessionStorage
+        const isHidden = this.uiElements.chatContainer.classList.contains('chat-hidden');
+        sessionStorage.setItem('chatHidden', isHidden.toString());
+        console.log("Chat visibility toggled:", isHidden ? "hidden" : "visible");
+      } else {
+        console.error("Chat container not found");
+      }
+    });
   }
   
   toggleChat() {
@@ -969,9 +995,9 @@ class CardGameFramework {
     this.uiElements.chatContainer.classList.toggle('chat-hidden');
     this.uiElements.chatToggle.classList.toggle('chat-hidden');
     
-    // Save state to localStorage
+    // Save state to sessionStorage
     const isHidden = this.uiElements.chatContainer.classList.contains('chat-hidden');
-    localStorage.setItem('chatHidden', isHidden.toString());
+    sessionStorage.setItem('chatHidden', isHidden.toString());
   }
   
   initChatInput() {
@@ -1092,7 +1118,7 @@ class CardGameFramework {
     returnButton.textContent = 'Return to Lobby';
     returnButton.className = 'return-button';
     returnButton.addEventListener('click', () => {
-      localStorage.setItem('intentionalNavigation', 'true');
+      sessionStorage.setItem('intentionalNavigation', 'true');
       globalThis.location.href = 'games.html';
     });
     
@@ -1161,10 +1187,10 @@ class CardGameFramework {
   
   returnToLobby() {
     // Set a navigation flag that will be checked by other scripts
-    localStorage.setItem('intentionalNavigation', 'true');
-    localStorage.setItem('wsWasOpen', 'true');
+    sessionStorage.setItem('intentionalNavigation', 'true');
+    sessionStorage.setItem('wsWasOpen', 'true');
     
-    // Small delay to ensure localStorage is updated before navigation
+    // Small delay to ensure sessionStorage is updated before navigation
     setTimeout(() => {
       // Navigate to games page
       globalThis.location.href = 'games.html';
@@ -1175,6 +1201,30 @@ class CardGameFramework {
   goToLogin() {
     localStorage.removeItem('auth_token');
     globalThis.location.href = 'login.html';
+  }
+
+  logDebug(message, ...args) {
+    console.log(`[CardGame] ${message}`, ...args);
+  }
+  
+  logError(message, error) {
+    console.error(`[CardGame] ${message}`, error);
+    // Show error notification to user
+    this.showErrorNotification(`Error: ${message}. See console for details.`);
+  }
+  
+  // Add a public method to check status
+  getStatus() {
+    return {
+      initialized: this.componentsInitialized,
+      cardsLoaded: this.cardsLoaded,
+      websocketConnected: this.websocket && this.websocket.readyState === WebSocket.OPEN,
+      gameId: this.currentGameId,
+      playerId: this.currentPlayerId,
+      username: this.currentUsername,
+      playerCount: this.players.length,
+      gamePhase: this.gameState.phase
+    };
   }
 }
 

@@ -1520,123 +1520,169 @@ router.get("/api/cards", async (ctx) => {
   }
 });
 
+interface TokenPayload {
+  userName: string;
+  userId: number;
+  [key: string]: unknown;
+}
 
-router.get("/", authorizationMiddleware, async (ctx) => {
+router.get("/", async (ctx) => {
   if (!ctx.isUpgradable) {
     ctx.throw(501);
   }
 
-  const username = ctx.state.tokenData.userName;
-  const userId = ctx.state.tokenData.userId || 0;
-
-  // Check if the user is already connected
-  const isConnected = connections.some((conn) => conn.username === username);
-  if (isConnected) {
-    ctx.throw(403, "User is already connected");
-    return;
-  }
-
-  // Check if user has an active game before establishing WebSocket
-  const activeGame = await getActiveGameForUser(userId);
-  if (!activeGame) {
-    ctx.response.status = 404;
-    ctx.response.body = { error: "No active game found" };
-    return;
-  }
-
-  const ws = ctx.upgrade();
-  const gameId = activeGame.idGame;
-  
-  // Add connection to the list
-  connections.push({ ws, username, gameId, userId });
-  console.log(`+ WebSocket connected: ${username} to game ${gameId} (total: ${connections.length})`);
-
-  // On WebSocket open, send initial data
-  // 1. Send card back image
-  const cardBackImage = await cardService.getCardBackImage();
-  ws.send(JSON.stringify({
-    type: "card_back",
-    image: cardBackImage
-  }));
-  
-  // 2. Send connected users
-  sendConnectedUsers(gameId);
-  
-  // 3. Send current game state
-  sendGameState(gameId, ws);
-
-  // WebSocket message handler
-  ws.onmessage = async (event) => {
-    try {
-      const data = JSON.parse(event.data) as WebSocketMessage;
-      
-      // Verify auth token
-      const authToken = data.auth_token;
-      if (!is_authorized(authToken)) {
-        console.log("Unauthorized WebSocket message");
-        return;
-      }
-      
-      // Handle messages
-      switch (data.type) {
-        case "join_game":
-          handleJoinGame(data, userId, ws);
-          break;
-        
-        case "player_action":
-          handlePlayerAction(data, userId, username, ws);
-          break;
-        
-        case "chat_message":
-          handleChatMessage(data, userId, username);
-          break;
-        
-        case "sync_request":
-          handleSyncRequest(data, ws);
-          break;
-        
-        case "connected_users":
-          sendConnectedUsers(data.gameId);
-          break;
-        
-        case "game_state_request":
-          sendGameState(data.gameId, ws);
-          break;
-          
-        // More handlers...
-      }
-    } catch (error) {
-      console.error("Error handling WebSocket message:", error);
-      ws.send(JSON.stringify({
-        type: "error",
-        message: "Failed to process message"
-      }));
-    }
-  };
-
-  // WebSocket close handler
-  ws.onclose = async () => {
-    // Remove connection
-    const index = connections.findIndex((conn) => conn.ws === ws);
-    if (index !== -1) {
-      const disconnectedUser = connections[index];
-      connections.splice(index, 1);
-      
-      // Update connected users for this game
-      if (disconnectedUser.gameId) {
-        sendConnectedUsers(disconnectedUser.gameId);
-      }
+  try {
+    // Extract auth token from request
+    const cookie = ctx.request.headers.get('cookie');
+    const authToken = cookie?.split('; ').find((row) => row.startsWith('auth_token='))?.split('=')[1];
+    const headerToken = ctx.request.headers.get('Authorization')?.replace('Bearer ', '');
+    const tokenToUse = authToken || headerToken;
+    
+    if (!tokenToUse) {
+      ctx.throw(401, "Unauthorized: Missing authentication token");
+      return;
     }
     
-    console.log(`- WebSocket disconnected (${connections.length} remaining)`);
-  };
+    // Verify token with proper type assertion
+    const tokenData = await verify(tokenToUse, secretKey) as TokenPayload;
+    const username = tokenData.userName;
+    const userId = tokenData.userId;
+    
+    if (!username || userId === undefined) {
+      ctx.throw(401, "Invalid token format: missing username or userId");
+      return;
+    }
 
-  // WebSocket error handler
-  ws.onerror = (error) => {
-    console.error("WebSocket error:", error);
-  };
+    console.log(`WebSocket connection attempt by user: ${username} (ID: ${userId})`);
+    
+    // Check if the user is already connected
+    const isConnected = connections.some((conn) => conn.username === username);
+    if (isConnected) {
+      ctx.throw(403, "User is already connected");
+      return;
+    }
+
+    // Upgrade to WebSocket
+    const ws = ctx.upgrade();
+    
+    // Initialize gameId variable explicitly
+    let currentGameId: number | null = null;
+    
+    // Check if user has an active game
+    try {
+      const activeGame = await getActiveGameForUser(userId);
+      if (activeGame) {
+        currentGameId = activeGame.idGame;
+        console.log(`User ${username} has active game: ${currentGameId}`);
+      }
+    } catch (error) {
+      console.error(`Error getting active game for user ${userId}:`, error);
+    }
+    
+    // Add connection to the list with correct types
+    connections.push({ 
+      ws, 
+      username: username, 
+      gameId: currentGameId, 
+      userId: userId 
+    });
+    
+    console.log(`+ WebSocket connected: ${username} to game ${currentGameId || 'none'} (total: ${connections.length})`);
+    
+    // On WebSocket open, send initial data
+    // 1. Send card back image
+    const cardBackImage = await cardService.getCardBackImage();
+    ws.send(JSON.stringify({
+      type: "card_back",
+      image: cardBackImage
+    }));
+    
+    // 2. Send connected users
+    if (currentGameId) {
+      sendConnectedUsers(currentGameId);
+      
+      // 3. Send current game state
+      sendGameState(currentGameId, ws);
+    }
+
+    // WebSocket message handler
+    ws.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data) as WebSocketMessage;
+        
+        // Verify auth token
+        const authToken = data.auth_token;
+        if (!is_authorized(authToken)) {
+          console.log("Unauthorized WebSocket message");
+          return;
+        }
+        
+        // Handle messages
+        switch (data.type) {
+          case "join_game":
+            handleJoinGame(data, userId, ws);
+            break;
+          
+          case "player_action":
+            handlePlayerAction(data, userId, username, ws);
+            break;
+          
+          case "chat_message":
+            handleChatMessage(data, userId, username);
+            break;
+          
+          case "sync_request":
+            handleSyncRequest(data, ws);
+            break;
+          
+          case "connected_users":
+            sendConnectedUsers(data.gameId);
+            break;
+          
+          case "game_state_request":
+            sendGameState(data.gameId, ws);
+            break;
+            
+          // More handlers...
+        }
+      } catch (error) {
+        console.error("Error handling WebSocket message:", error);
+        ws.send(JSON.stringify({
+          type: "error",
+          message: "Failed to process message"
+        }));
+      }
+    };
+
+    // WebSocket close handler
+    ws.onclose = async () => {
+      // Remove connection
+      const index = connections.findIndex((conn) => conn.ws === ws);
+      if (index !== -1) {
+        const disconnectedUser = connections[index];
+        connections.splice(index, 1);
+        
+        // Update connected users for this game
+        if (disconnectedUser.gameId) {
+          sendConnectedUsers(disconnectedUser.gameId);
+        }
+      }
+      
+      console.log(`- WebSocket disconnected (${connections.length} remaining)`);
+    };
+
+    // WebSocket error handler
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+  } catch (error) {
+    // Add error handling here
+    console.error("Error in WebSocket connection:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "WebSocket connection error" };
+  }
 });
-
 // the cookie is tested in the middleware (the cookie is provided by the browser in a header)
 router.get('/test_cookie', authorizationMiddleware, (ctx) => {
   // Manual CORS headers
