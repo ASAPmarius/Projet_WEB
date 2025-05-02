@@ -307,7 +307,7 @@ createBattleArea() {
     }, 2000);
   }
   
-  // Update card slot with the played card
+  // In war-game.js, ensure this method looks like this
   updateCardSlot(playerId, card) {
     // Find the correct slot based on player position
     let slot;
@@ -321,7 +321,10 @@ createBattleArea() {
       slot = document.getElementById('player2Slot');
     }
     
-    if (!slot) return;
+    if (!slot) {
+      console.warn(`Card slot not found for player ${playerId}`);
+      return;
+    }
     
     // Clear slot
     slot.innerHTML = '';
@@ -334,6 +337,7 @@ createBattleArea() {
     
     // Add to slot
     slot.appendChild(cardImage);
+    console.log(`Updated card slot for player ${playerId} with card ${card.id}`);
   }
   
   // Clear card slots
@@ -480,6 +484,44 @@ createBattleArea() {
         });
       }, 2000);
     }
+  }
+
+  // In war-game.js, add or update this method
+  handlePlayCardAction(playerId, username, cardId) {
+    console.log(`Player ${username} played card ${cardId}`);
+    
+    // Get the card data from the global collection
+    const cardData = this.cardsById[cardId];
+    if (!cardData) {
+      console.warn(`Card data not found for ID ${cardId}`);
+      return;
+    }
+    
+    // Store the played card in our playedCards object
+    // This is the critical change - track played cards for ALL players
+    this.playedCards[playerId] = cardData;
+    
+    // Update the card slot with the played card
+    // This ensures the card stays visible in the slot
+    this.updateCardSlot(playerId, cardData);
+    
+    // For the player who played the card, remove it from their hand
+    if (String(playerId) === String(this.currentPlayerId)) {
+      const playerHand = this.hands[playerId];
+      if (playerHand) {
+        const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
+        if (cardIndex !== -1) {
+          playerHand.splice(cardIndex, 1);
+          this.updateHandDisplay();
+        }
+      }
+    }
+    
+    // Show animation for all players
+    this.animateCardPlay(cardData);
+    
+    // Show notification
+    this.showNotification(`${username} played a card`);
   }
   
   // Override the parent's player highlighting
