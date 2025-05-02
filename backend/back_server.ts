@@ -13,6 +13,8 @@ import * as bcrypt from 'bcrypt';
 import { create, verify } from 'djwt';
 import { Client } from 'postgres';
 import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
+import { CardService } from "./card_service.ts";
+import { GameState, User, Connection, WebSocketMessage, ChatMessage, Card, Game } from "./models.ts";
 
 // Global error handler
 addEventListener("error", (event) => {
@@ -48,6 +50,10 @@ try {
 } catch (error) {
   console.error('Failed to connect to database:', error);
 }
+
+// Initialize card service
+const cardService = new CardService(client);
+
 
 let defaultProfilePictureCache: Uint8Array | null = null;
 
@@ -109,59 +115,6 @@ try {
 } catch (error) {
   console.error('Failed to import JWT secret key:', error);
   throw new Error('Server configuration error: JWT_SECRET missing or invalid');
-}
-
-// Define interfaces for your database models
-interface User {
-  idUser: number;
-  Username: string;
-  Password: string;
-  Profile_picture: Uint8Array | null;
-  isAdmin: boolean;
-  Bio?: string;         // New optional field
-  Favorite_song?: string; // New optional field
-}
-
-interface Card {
-  idCardType: number;
-  Picture: Uint8Array; // BYTEA data stored as binary
-}
-
-interface ActiveCard {
-  idCard: number;
-  idGame: number;
-  idUserHoldingIt: number | null;
-  CardState: string;
-  cardType: number;
-}
-
-interface ChatMessage {
-  idMessages: number;
-  idGame: number;
-  idUser: number;       // New field matching the updated database
-  TextContent: string;
-  Timestamp: Date;
-}
-
-interface Game {
-  idGame: number;
-  DateCreated: Date;
-  GameType: string;
-  GameStatus?: string; // New field: 'active', 'finished', etc.
-}
-
-interface GameState {
-  phase: 'waiting' | 'setup' | 'playing' | 'finished';
-  currentTurn: number | null;
-  turnDirection: number; // 1 for clockwise, -1 for counter-clockwise
-  round: number;
-  startTime?: Date;
-  lastActionTime?: Date;
-}
-
-// Enhanced Game interface to include game state
-interface EnhancedGame extends Game {
-  gameState?: GameState;
 }
 
 // Helper function for safely converting binary data to base64
@@ -270,15 +223,17 @@ async function get_hash(password: string): Promise<string> {
   return await bcrypt.hash(password);
 }
 
-// Connection related variables
+async function getUserById(userId: number): Promise<User | null> {
+  const result = await client.queryObject<User>(
+    'SELECT * FROM "User" WHERE "idUser" = $1',
+    [userId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+// Connection tracking
+const connections: Connection[] = [];
 const tokens: { [key: string]: string } = {};
-const connections: { 
-  ws: WebSocket; 
-  username: string; 
-  gameId: number | null;  // Add gameId to track which game the user is connected to
-  hand: number[]; 
-  handCards?: { idCard: number; picture: string; cardType: number }[] 
-}[] = [];
 
 function removeTokenByUser(user: string) {
   for (const token in tokens) {
@@ -287,50 +242,6 @@ function removeTokenByUser(user: string) {
       break;
     }
   }
-}
-
-// deno-lint-ignore no-explicit-any
-function notifyGameUsers(gameId: number, json: any) {
-  connections.forEach((client) => {
-    // Only send to clients in the same game
-    if (client.gameId === gameId) {
-      client.ws.send(JSON.stringify(json));
-    }
-  });
-}
-
-// Use this function when you explicitly want to create a new game
-async function createNewGame(gameType: string = 'classic'): Promise<number> {
-  // Create a new game with 'active' status
-  const result = await client.queryObject<{ idGame: number }>(
-    'INSERT INTO "Game" ("GameType", "GameStatus") VALUES ($1, $2) RETURNING "idGame"',
-    [gameType, 'active']
-  );
-  
-  const gameId = result.rows[0].idGame;
-  
-  // Get all card types (excluding the card back which is id 54)
-  const cardTypesResult = await client.queryObject<{ idCardType: number }>(
-    'SELECT "idCardType" FROM "Cards" WHERE "idCardType" < 53 ORDER BY "idCardType"'
-  );
-  
-  const cardTypeIds = cardTypesResult.rows.map(row => row.idCardType);
-  
-  // Shuffle the card types using Fisher-Yates algorithm
-  for (let i = cardTypeIds.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [cardTypeIds[i], cardTypeIds[j]] = [cardTypeIds[j], cardTypeIds[i]];
-  }
-  
-  // Create active cards for this game
-  for (const cardTypeId of cardTypeIds) {
-    await createActiveCard(gameId, cardTypeId, 'in_deck');
-  }
-
-  const initialState = await initializeGameState(gameId);
-  await updateGameState(gameId, initialState);
-  
-  return gameId;
 }
 
 async function getAllActiveGames(): Promise<Game[]> {
@@ -499,85 +410,6 @@ async function addUserToGame(userId: number, gameId: number): Promise<void> {
   );
 }
 
-async function getAllCardTypes(): Promise<Card[]> {
-  const result = await client.queryObject<Card>('SELECT * FROM "Cards"');
-  return result.rows;
-}
-
-// Helper function to initialize a game deck
-async function initializeGameDeck(gameId: number): Promise<void> {
-  try {
-    // Get all card types (excluding the card back which is id 54)
-    const cardTypesResult = await client.queryObject<{ idCardType: number }>(
-      'SELECT "idCardType" FROM "Cards" WHERE "idCardType" < 53 ORDER BY "idCardType"'
-    );
-    
-    const cardTypeIds = cardTypesResult.rows.map(row => row.idCardType);
-    
-    // Shuffle the card types using Fisher-Yates algorithm
-    for (let i = cardTypeIds.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cardTypeIds[i], cardTypeIds[j]] = [cardTypeIds[j], cardTypeIds[i]];
-    }
-    
-    // Create active cards for this game
-    for (const cardTypeId of cardTypeIds) {
-      await createActiveCard(gameId, cardTypeId, 'in_deck');
-    }
-    
-    console.log(`Initialized deck for game ${gameId} with ${cardTypeIds.length} cards`);
-  } catch (error) {
-    console.error(`Error initializing game deck for game ${gameId}:`, error);
-    throw error;
-  }
-}
-
-async function createActiveCard(gameId: number, cardTypeId: number, state: string): Promise<ActiveCard> {
-  // Check if the card type exists
-  const cardTypeCheck = await client.queryObject<{ count: number }>(
-    'SELECT COUNT(*) as count FROM "Cards" WHERE "idCardType" = $1',
-    [cardTypeId]
-  );
-  
-  if (cardTypeCheck.rows[0].count === 0) {
-    throw new Error(`Card type ${cardTypeId} does not exist`);
-  }
-  
-  const result = await client.queryObject<ActiveCard>(
-    'INSERT INTO "ActiveCards" ("idGame", "CardState", "cardType") VALUES ($1, $2, $3) RETURNING *',
-    [gameId, state, cardTypeId]
-  );
-  
-  return result.rows[0];
-}
-
-async function updateActiveCardState(cardId: number, state: string, userId: number | null): Promise<void> {
-  await client.queryObject(
-    'UPDATE "ActiveCards" SET "CardState" = $1, "idUserHoldingIt" = $2 WHERE "idCard" = $3',
-    [state, userId, cardId]
-  );
-}
-
-async function getActiveCardsInDeck(gameId: number): Promise<(ActiveCard & { picture_data: Uint8Array })[]> {
-  const result = await client.queryObject<ActiveCard & { picture_data: Uint8Array }>(
-    'SELECT ac.*, c."Picture" as picture_data FROM "ActiveCards" ac ' +
-    'JOIN "Cards" c ON ac."cardType" = c."idCardType" ' +
-    'WHERE ac."idGame" = $1 AND ac."CardState" = \'in_deck\'',
-    [gameId]
-  );
-  return result.rows;
-}
-
-async function getActiveCardsInHand(gameId: number, userId: number): Promise<(ActiveCard & { picture_data: Uint8Array })[]> {
-  const result = await client.queryObject<ActiveCard & { picture_data: Uint8Array }>(
-    'SELECT ac.*, c."Picture" as picture_data FROM "ActiveCards" ac ' +
-    'JOIN "Cards" c ON ac."cardType" = c."idCardType" ' +
-    'WHERE ac."idGame" = $1 AND ac."idUserHoldingIt" = $2 AND ac."CardState" = \'in_hand\'',
-    [gameId, userId]
-  );
-  return result.rows;
-}
-
 async function recordChatMessage(gameId: number, userId: number, textContent: string): Promise<ChatMessage> {
   const result = await client.queryObject<ChatMessage>(
     'INSERT INTO "ChatMessages" ("idGame", "idUser", "TextContent") VALUES ($1, $2, $3) RETURNING *',
@@ -666,7 +498,6 @@ async function initializeGameState(gameId: number): Promise<GameState> {
   const initialState: GameState = {
     phase: players.length >= 2 ? 'playing' : 'waiting', // Start in playing phase if enough players
     currentTurn: players.length > 0 ? players[0].idUser : null, // Set first player's turn
-    turnDirection: 1, // Default to clockwise
     round: 1,
     startTime: new Date(),
     lastActionTime: new Date()
@@ -718,52 +549,6 @@ async function startGame(gameId: number): Promise<void> {
     console.error(`Error starting game ${gameId}:`, error);
     throw error;
   }
-}
-
-
-async function advanceTurn(gameId: number): Promise<void> {
-  // Get current game state
-  const gameState = await getGameState(gameId);
-  if (!gameState || gameState.phase !== 'playing') {
-    throw new Error('Game is not in playing phase');
-  }
-  
-  // Get the players in the game
-  const players = await getUsersInGame(gameId);
-  if (players.length < 2) {
-    throw new Error('Need at least 2 players to advance turn');
-  }
-  
-  // Find the current player's index
-  const currentPlayerIndex = players.findIndex(p => p.idUser === gameState.currentTurn);
-  if (currentPlayerIndex === -1) {
-    // If current player not found, start with the first player
-    gameState.currentTurn = players[0].idUser;
-  } else {
-    // Calculate the next player index based on turn direction
-    let nextPlayerIndex = (currentPlayerIndex + gameState.turnDirection) % players.length;
-    // Handle negative index if going counter-clockwise
-    if (nextPlayerIndex < 0) nextPlayerIndex = players.length - 1;
-    
-    // Set the next player's turn
-    gameState.currentTurn = players[nextPlayerIndex].idUser;
-  }
-  
-  // Update last action time
-  gameState.lastActionTime = new Date();
-  
-  // Update the game state in the database
-  await updateGameState(gameId, gameState);
-  
-  // Find the username of the next player
-  const nextPlayer = players.find(p => p.idUser === gameState.currentTurn);
-  
-  // Notify all players about the turn change
-  notifyGameUsers(gameId, {
-    type: 'turn_change',
-    playerId: gameState.currentTurn,
-    username: nextPlayer ? nextPlayer.Username : 'Unknown'
-  });
 }
 
 async function getGameState(gameId: number): Promise<GameState | null> {
@@ -832,137 +617,226 @@ async function updateGameState(gameId: number, gameState: GameState): Promise<vo
   }
 }
 
-async function playCard(gameId: number, userId: number, cardId: number): Promise<void> {
+// Helper functions for WebSocket handlers
+async function handleJoinGame(data: any, userId: number, ws: WebSocket) {
+  const { gameId } = data;
+  
+  if (!gameId) {
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Missing game ID"
+    }));
+    return;
+  }
+  
   try {
-    // Get the game state
+    // Add user to game
+    await addUserToGame(userId, gameId);
+    
+    // Update connection's gameId
+    const connIndex = connections.findIndex(c => c.userId === userId);
+    if (connIndex !== -1) {
+      connections[connIndex].gameId = gameId;
+    }
+    
+    // Send success response
+    ws.send(JSON.stringify({
+      type: "join_game_success",
+      gameId
+    }));
+    
+    // Update connected users
+    sendConnectedUsers(gameId);
+    
+    // Send game state
+    sendGameState(gameId, ws);
+  } catch (error) {
+    console.error("Error joining game:", error);
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Failed to join game"
+    }));
+  }
+}
+
+async function handlePlayerAction(data: any, userId: number, username: string, ws: WebSocket) {
+  const { gameId, action } = data;
+  
+  if (!gameId || !action) {
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Missing game ID or action"
+    }));
+    return;
+  }
+  
+  try {
+    // Get current game state
     const gameState = await getGameState(gameId);
-    if (!gameState || gameState.phase !== 'playing') {
-      throw new Error('Game is not in playing phase');
+    
+    // Validate action (e.g., check if it's player's turn)
+    if (gameState && gameState.phase === "playing" && gameState.currentTurn !== null) {
+      if (gameState.currentTurn !== userId) {
+        ws.send(JSON.stringify({
+          type: "error",
+          message: "Not your turn"
+        }));
+        return;
+      }
     }
     
-    // Check if it's the player's turn
-    if (gameState.currentTurn !== userId) {
-      throw new Error('Not your turn to play a card');
-    }
-    
-    // Get the card from the player's hand
-    const cardResult = await client.queryObject<ActiveCard & { picture_data: Uint8Array }>(
-      'SELECT ac.*, c."Picture" as picture_data FROM "ActiveCards" ac ' +
-      'JOIN "Cards" c ON ac."cardType" = c."idCardType" ' +
-      'WHERE ac."idCard" = $1 AND ac."idUserHoldingIt" = $2 AND ac."CardState" = \'in_hand\'',
-      [cardId, userId]
-    );
-    
-    if (cardResult.rows.length === 0) {
-      throw new Error('Card not found in player\'s hand');
-    }
-    
-    const card = cardResult.rows[0];
-    
-    // Update the card state to 'played'
-    await updateActiveCardState(cardId, 'played', null);
-    
-    // Get user information
-    const userResult = await client.queryObject<User>(
-      'SELECT * FROM "User" WHERE "idUser" = $1',
-      [userId]
-    );
-    
-    if (userResult.rows.length === 0) {
-      throw new Error('User not found');
-    }
-    
-    const user = userResult.rows[0];
-    
-    // Convert the card image to base64
-    const base64String = safelyConvertToBase64(card.picture_data);
-    const cardPicture = base64String ? `data:image/png;base64,${base64String}` : '';
-    
-    // Notify all players about the played card
+    // Broadcast action to all players in game
     notifyGameUsers(gameId, {
-      type: 'card_played',
-      username: user.Username,
+      type: "player_action",
       playerId: userId,
-      card: {
-        idCard: card.idCard,
-        picture: cardPicture,
-        cardType: card.cardType
-      },
-      toDiscard: true
+      username,
+      action
     });
     
-    // Advance to the next player's turn
-    await advanceTurn(gameId);
-    
-    // Check for game end conditions (e.g., player has no cards left)
-    const playerHandCount = await getPlayerHandCount(gameId, userId);
-    if (playerHandCount === 0) {
-      // Player has no cards left, they win!
-      await endGame(gameId, userId);
+    // Update last action time in game state
+    if (gameState) {
+      gameState.lastActionTime = new Date();
+      await updateGameState(gameId, gameState);
     }
   } catch (error) {
-    console.error(`Error playing card in game ${gameId}:`, error);
-    throw error;
+    console.error("Error handling player action:", error);
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Failed to process action"
+    }));
   }
 }
 
-async function getPlayerHandCount(gameId: number, userId: number): Promise<number> {
-  const result = await client.queryObject<{ count: number }>(
-    'SELECT COUNT(*) as count FROM "ActiveCards" ' +
-    'WHERE "idGame" = $1 AND "idUserHoldingIt" = $2 AND "CardState" = \'in_hand\'',
-    [gameId, userId]
-  );
+async function handleChatMessage(data: any, userId: number, username: string) {
+  const { gameId, message } = data;
   
-  return result.rows[0].count;
+  if (!gameId || !message) {
+    return;
+  }
+  
+  try {
+    // Record chat message in database
+    await recordChatMessage(gameId, userId, message);
+    
+    // Get user profile picture
+    const user = await getUserById(userId);
+    let profilePicture = "";
+    
+    if (user && user.Profile_picture) {
+      profilePicture = bytesToDataURL(user.Profile_picture, "image/png");
+    }
+    
+    // Broadcast message to all users in game
+    notifyGameUsers(gameId, {
+      type: "message",
+      message,
+      owner: username,
+      user_pp_path: profilePicture,
+      userId
+    });
+  } catch (error) {
+    console.error("Error handling chat message:", error);
+  }
 }
 
-async function endGame(gameId: number, winnerId?: number): Promise<void> {
-  try {
-    // Get the game state
-    const gameState = await getGameState(gameId);
-    if (!gameState) {
-      throw new Error('Game state not found');
-    }
-    
-    // Update the game state to finished
-    gameState.phase = 'finished';
-    await updateGameState(gameId, gameState);
-    
-    // If a winner is specified, record the win
-    if (winnerId) {
-      // Get winner's username
-      const userResult = await client.queryObject<User>(
-        'SELECT * FROM "User" WHERE "idUser" = $1',
-        [winnerId]
-      );
-      
-      if (userResult.rows.length > 0) {
-        const winner = userResult.rows[0];
-        
-        // Notify all players about the game end with winner
-        notifyGameUsers(gameId, {
-          type: 'game_end',
-          gameState: gameState,
-          winner: {
-            id: winnerId,
-            username: winner.Username
-          }
-        });
-      }
-    } else {
-      // Notify all players about the game end without a specific winner
-      notifyGameUsers(gameId, {
-        type: 'game_end',
-        gameState: gameState
-      });
-    }
-    
-    // Mark the game as finished in the database
-    await markGameAsFinished(gameId);
-  } catch (error) {
-    console.error(`Error ending game ${gameId}:`, error);
-    throw error;
+async function handleSyncRequest(data: any, ws: WebSocket) {
+  const { gameId } = data;
+  
+  if (!gameId) {
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Missing game ID"
+    }));
+    return;
   }
+  
+  try {
+    // Send game state
+    sendGameState(gameId, ws);
+    
+    // Send connected users
+    const usersInGame = await getUsersInGame(gameId);
+    
+    const connectedUsersData = await Promise.all(usersInGame.map(async (user) => {
+      let ppPath = "";
+      if (user.Profile_picture) {
+        ppPath = bytesToDataURL(user.Profile_picture, "image/png");
+      }
+      
+      return {
+        id: user.idUser,
+        username: user.Username,
+        pp_path: ppPath,
+        connected: connections.some(conn => conn.userId === user.idUser)
+      };
+    }));
+    
+    ws.send(JSON.stringify({
+      type: "connected_users",
+      users: connectedUsersData
+    }));
+  } catch (error) {
+    console.error("Error handling sync request:", error);
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Failed to sync game data"
+    }));
+  }
+}
+
+// Helper function to send game state
+async function sendGameState(gameId: number, ws: WebSocket) {
+  try {
+    const gameState = await getGameState(gameId);
+    
+    ws.send(JSON.stringify({
+      type: "game_state",
+      gameState
+    }));
+  } catch (error) {
+    console.error("Error sending game state:", error);
+  }
+}
+
+// Helper function to send connected users
+async function sendConnectedUsers(gameId: number) {
+  try {
+    const usersInGame = await getUsersInGame(gameId);
+    
+    const connectedUsersData = await Promise.all(usersInGame.map(async (user) => {
+      let ppPath = "";
+      if (user.Profile_picture) {
+        ppPath = bytesToDataURL(user.Profile_picture, "image/png");
+      }
+      
+      return {
+        id: user.idUser,
+        username: user.Username,
+        pp_path: ppPath,
+        connected: connections.some(conn => conn.userId === user.idUser)
+      };
+    }));
+    
+    notifyGameUsers(gameId, {
+      type: "connected_users",
+      users: connectedUsersData
+    });
+  } catch (error) {
+    console.error("Error sending connected users:", error);
+  }
+}
+
+// Function to notify all users in a game
+function notifyGameUsers(gameId: number, message: any) {
+  connections.forEach((client) => {
+    if (client.gameId === gameId) {
+      try {
+        client.ws.send(JSON.stringify(message));
+      } catch (error) {
+        console.error("Error sending message to client:", error);
+      }
+    }
+  });
 }
 
 // Add an OPTIONS handler for the login route
@@ -1088,8 +962,7 @@ router.post('/create_account', async (ctx) => {
   }
 });
 
-router.post('/create-game', authorizationMiddleware, async (ctx) => {
-  // Manual CORS headers
+router.post("/create-game", authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
@@ -1097,7 +970,7 @@ router.post('/create-game', authorizationMiddleware, async (ctx) => {
   
   if (!userId) {
     ctx.response.status = 400;
-    ctx.response.body = { error: 'Missing user ID' };
+    ctx.response.body = { error: "Missing user ID" };
     return;
   }
   
@@ -1111,30 +984,28 @@ router.post('/create-game', authorizationMiddleware, async (ctx) => {
       return;
     }
     
-    // Create a new game without initializing state yet
-    // Modify createNewGame to not call initializeGameState, or create a simpler version here:
+    // Create a new game with minimal state
     const result = await client.queryObject<{ idGame: number }>(
-      'INSERT INTO "Game" ("GameType", "GameStatus") VALUES ($1, $2) RETURNING "idGame"',
-      ['classic', 'active']
+      'INSERT INTO "Game" ("GameType", "GameStatus", "GameState") VALUES ($1, $2, $3) RETURNING "idGame"',
+      [
+        "war", 
+        "active", 
+        JSON.stringify({
+          phase: "waiting",
+          currentTurn: null,
+          round: 1,
+          startTime: new Date()
+        })
+      ]
     );
     
     const gameId = result.rows[0].idGame;
     
-    // Add user to the game BEFORE initializing state
+    // Add user to the game
     await addUserToGame(userId, gameId);
     
-    // Now initialize the deck
-    await initializeGameDeck(gameId);
-    
-    // Now initialize the game state (after user is added)
-    const initialState = await initializeGameState(gameId);
-    await updateGameState(gameId, initialState);
-    
-    // Set current game ID
-    currentGameId = gameId;
-    
     // Get the game to return it
-    const game = await client.queryObject<Game>(
+    const game = await client.queryObject<any>(
       'SELECT * FROM "Game" WHERE "idGame" = $1',
       [gameId]
     );
@@ -1142,9 +1013,9 @@ router.post('/create-game', authorizationMiddleware, async (ctx) => {
     ctx.response.status = 201;
     ctx.response.body = { game: game.rows[0] };
   } catch (error) {
-    console.error('Error creating game:', error);
+    console.error("Error creating game:", error);
     ctx.response.status = 500;
-    ctx.response.body = { error: 'Failed to create game' };
+    ctx.response.body = { error: "Failed to create game" };
   }
 });
 
@@ -1326,29 +1197,12 @@ router.get('/active-game', async (ctx) => {
     
     // Get players in this game
     const players = await getUsersInActiveGame(activeGame.idGame);
-    
-    // Get card counts for each player
-    const playersWithCardCounts = await Promise.all(players.map(async (player) => {
-      // Get cards for this player
-      const playerCards = await getActiveCardsInHand(activeGame.idGame, player.idUser);
-      
-      return { 
-        id: player.idUser,
-        username: player.Username,
-        cardCount: playerCards.length
-      };
-    }));
-    
-    // Get number of cards left in deck
-    const cardsInDeck = await getActiveCardsInDeck(activeGame.idGame);
     const gameState = await getGameState(activeGame.idGame);
 
     ctx.response.status = 200;
     ctx.response.body = { 
       game: {
         ...activeGame,
-        players: playersWithCardCounts,
-        cardsInDeck: cardsInDeck.length,
         gameState: gameState
       }
     };
@@ -1651,7 +1505,23 @@ router.post('/disconnect-from-game', async (ctx) => {
   }
 });
 
-router.get('/', authorizationMiddleware, async (ctx) => {
+// New endpoint to get all card resources
+router.get("/api/cards", async (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  try {
+    const cards = await cardService.getAllCardsWithMetadata();
+    ctx.response.body = { cards };
+  } catch (error) {
+    console.error("Error loading card resources:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to load card resources" };
+  }
+});
+
+
+router.get("/", authorizationMiddleware, async (ctx) => {
   if (!ctx.isUpgradable) {
     ctx.throw(501);
   }
@@ -1662,7 +1532,7 @@ router.get('/', authorizationMiddleware, async (ctx) => {
   // Check if the user is already connected
   const isConnected = connections.some((conn) => conn.username === username);
   if (isConnected) {
-    ctx.throw(403, 'User is already connected');
+    ctx.throw(403, "User is already connected");
     return;
   }
 
@@ -1670,623 +1540,101 @@ router.get('/', authorizationMiddleware, async (ctx) => {
   const activeGame = await getActiveGameForUser(userId);
   if (!activeGame) {
     ctx.response.status = 404;
-    ctx.response.body = { error: 'No active game found' };
+    ctx.response.body = { error: "No active game found" };
     return;
   }
 
   const ws = ctx.upgrade();
-
-  // Use the active game ID instead of creating a new one
   const gameId = activeGame.idGame;
   
-  // Get user's hand from the database
-  const userCards = await getActiveCardsInHand(gameId, userId);
-  const hand = userCards.map(card => card.idCard);
-
   // Add connection to the list
-  connections.push({ ws, username, gameId, hand });
-  console.log(`+ websocket connected: ${username} to game ${gameId} (total: ${connections.length})`);  console.log(`+ websocket connected (${connections.length})`);
+  connections.push({ ws, username, gameId, userId });
+  console.log(`+ WebSocket connected: ${username} to game ${gameId} (total: ${connections.length})`);
 
-  // Send initial card back when user connects
-  const cardsInDeck = await getActiveCardsInDeck(gameId);
-  if (cardsInDeck.length > 0) {
-    const cardBackImage = await getCardBackImage();
+  // On WebSocket open, send initial data
+  // 1. Send card back image
+  const cardBackImage = await cardService.getCardBackImage();
+  ws.send(JSON.stringify({
+    type: "card_back",
+    image: cardBackImage
+  }));
+  
+  // 2. Send connected users
+  sendConnectedUsers(gameId);
+  
+  // 3. Send current game state
+  sendGameState(gameId, ws);
+
+  // WebSocket message handler
+  ws.onmessage = async (event) => {
     try {
-      const base64String = safelyConvertToBase64(cardBackImage);
-      ws.send(JSON.stringify({ 
-        type: 'card_change', 
-        card: {
-          idCard: cardsInDeck[0].idCard,
-          picture: base64String ? `data:image/png;base64,${base64String}` : '',
-          cardType: 54
-        },
-        pileCount: cardsInDeck.length
-      }));
+      const data = JSON.parse(event.data) as WebSocketMessage;
+      
+      // Verify auth token
+      const authToken = data.auth_token;
+      if (!is_authorized(authToken)) {
+        console.log("Unauthorized WebSocket message");
+        return;
+      }
+      
+      // Handle messages
+      switch (data.type) {
+        case "join_game":
+          handleJoinGame(data, userId, ws);
+          break;
+        
+        case "player_action":
+          handlePlayerAction(data, userId, username, ws);
+          break;
+        
+        case "chat_message":
+          handleChatMessage(data, userId, username);
+          break;
+        
+        case "sync_request":
+          handleSyncRequest(data, ws);
+          break;
+        
+        case "connected_users":
+          sendConnectedUsers(data.gameId);
+          break;
+        
+        case "game_state_request":
+          sendGameState(data.gameId, ws);
+          break;
+          
+        // More handlers...
+      }
     } catch (error) {
-      console.error('Error sending initial card back:', error);
+      console.error("Error handling WebSocket message:", error);
+      ws.send(JSON.stringify({
+        type: "error",
+        message: "Failed to process message"
+      }));
     }
-  }
-
-  // Send connected users list to the new connection
-  const usersInGame = await getUsersInGame(gameId);
-  const connectedUsers = usersInGame.map(user => {
-    let ppPath = '';
-    if (user.Profile_picture) {
-      const base64String = safelyConvertToBase64(user.Profile_picture);
-      ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
-    }
-    
-    return {
-      id: user.idUser,  // Add this line to include the user ID
-      username: user.Username,
-      pp_path: ppPath
-    };
-  });
-  
-  // Send to the new user
-  ws.send(JSON.stringify({ type: 'connected_users', users: connectedUsers }));
-  
-  // Notify all other users about the new connection
-  notifyGameUsers(gameId, { type: 'connected_users', users: connectedUsers });
-
-  ws.onerror = (_error) => {
-    const index = connections.findIndex((conn) => conn.ws === ws);
-    if (index !== -1) {
-      connections.splice(index, 1);
-    }
-    console.log(`- websocket error`);
   };
 
-// In the ws.onmessage handler, we need to modify several places to use game ID from the connection
-// Here's a partial example showing key changes needed:
-
-ws.onmessage = async (event) => {
-  const message = event.data;
-  const data = JSON.parse(message);
-
-  // Get user information
-  const owner = tokens[data.auth_token];
-  if (!owner) {
-    console.log('Invalid auth token');
-    return;
-  }
-  
-  const user = await getUserByUsername(owner);
-  if (!user) {
-    console.log('User not found');
-    return;
-  }
-  
-  const userId = user.idUser;
-  const userConnection = connections.find(conn => conn.username === owner);
-  const gameId = data.gameId || (userConnection ? userConnection.gameId : null);
-
-  if (!gameId) {
-    console.log('No game ID found for request');
-    ws.send(JSON.stringify({
-      type: 'error',
-      message: 'No active game found. Please join or create a game first.'
-    }));
-    return;
-  }
-
-  // Get the user's current active game
-  const activeGame = await getActiveGameForUser(userId);
-  if (!activeGame) {
-    console.log('No active game found for user');
-    ws.send(JSON.stringify({
-      type: 'error',
-      message: 'No active game found. Please join or create a game first.'
-    }));
-    return;
-  }
-  
-  // Handle player_hand_update
-  if (data.type === 'player_hand_update' && owner === data.username) {
-    // Broadcast the card count update to all connected users
-    notifyGameUsers(gameId, {
-      type: 'player_hand_update',
-      username: data.username,
-      cardCount: data.cardCount
-    });
-    return;
-  }
-
-  // Handle add_card_to_hand - add counting deck cards
-  if (data.type === 'add_card_to_hand' && userId) {
-    // Find a card in the deck - use the specific game ID, not a global one
-    const cardsInDeck = await getActiveCardsInDeck(gameId);
-    
-    if (cardsInDeck.length > 0) {
-      const card = cardsInDeck[0];
+  // WebSocket close handler
+  ws.onclose = async () => {
+    // Remove connection
+    const index = connections.findIndex((conn) => conn.ws === ws);
+    if (index !== -1) {
+      const disconnectedUser = connections[index];
+      connections.splice(index, 1);
       
-      // Update the card state
-      await updateActiveCardState(card.idCard, 'in_hand', userId);
-      
-      // Update the player's hand in memory
-      const connectionIndex = connections.findIndex(conn => conn.username === owner);
-      if (connectionIndex !== -1) {
-        connections[connectionIndex].hand.push(card.idCard);
+      // Update connected users for this game
+      if (disconnectedUser.gameId) {
+        sendConnectedUsers(disconnectedUser.gameId);
       }
-      
-      // Send the updated hand back to the client
-      const updatedCards = await getActiveCardsInHand(gameId, userId);
-      
-      // Convert binary data to base64 strings for JSON safely
-      try {
-        const handCards = updatedCards.map(card => {
-          // Safely convert binary data to base64
-          const picture_data = card.picture_data;
-          let base64String = '';
-          
-          if (picture_data) {
-            base64String = safelyConvertToBase64(picture_data);
-          }
-          
-          return {
-            idCard: card.idCard,
-            picture: base64String ? `data:image/png;base64,${base64String}` : '',
-            cardType: card.cardType
-          };
-        });
-        
-        // Update the connection's handCards
-        if (connectionIndex !== -1) {
-          connections[connectionIndex].handCards = handCards;
-        }
-        
-        ws.send(JSON.stringify({ 
-          type: 'player_hand', 
-          hand: handCards
-        }));
-        
-        // Broadcast the card count update to all connected users
-        notifyGameUsers(gameId, {
-          type: 'player_hand_update',
-          username: owner,
-          cardCount: updatedCards.length
-        });
-      } catch (error) {
-        console.error('Error converting hand images to base64:', error);
-      }
-      
-      // Notify all users about the card change (show card back)
-      const remainingCardsInDeck = await getActiveCardsInDeck(gameId);
-      if (remainingCardsInDeck.length > 0) {
-        // Get the card back image instead of the actual card
-        const cardBackImage = await getCardBackImage();
-        
-        try {
-          // Convert card back image to base64
-          const base64String = safelyConvertToBase64(cardBackImage);
-          
-          notifyGameUsers(gameId, { 
-            type: 'card_change', 
-            card: {
-              idCard: remainingCardsInDeck[0].idCard,
-              picture: base64String ? `data:image/png;base64,${base64String}` : '',
-              cardType: 54 // Indicate it's a card back
-            },
-            pileCount: remainingCardsInDeck.length // Add the deck count
-          });
-        } catch (error) {
-          console.error('Error converting card back image to base64:', error);
-        }
-      } else {
-        // Notify that the deck is empty
-        notifyGameUsers(gameId, { 
-          type: 'card_change', 
-          card: {
-            idCard: null,
-            picture: '',
-            cardType: null
-          },
-          pileCount: 0
-        });
-      }
-    } else {
-      console.log('No cards left in the pile');
-    }
-    return;
-  }
-
-  // Update the connected_users handler to include card counts
-  if (data.type === 'connected_users') {
-    const usersInGame = await getUsersInGame(gameId);
-    
-    const connectedUsers = await Promise.all(usersInGame.map(async (user) => {
-      // Get profile picture
-      let ppPath = '';
-      if (user.Profile_picture) {
-        const base64String = safelyConvertToBase64(user.Profile_picture);
-        ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
-      }
-      
-      // Get card count for this user from active connection or database
-      const connection = connections.find(conn => conn.username === user.Username);
-      let cardCount = 0;
-      
-      if (connection) {
-        // If user is connected, use hand length from connection
-        cardCount = connection.hand.length;
-      } else {
-        // Otherwise, query database for cards in hand
-        const userCards = await getActiveCardsInHand(gameId, user.idUser);
-        cardCount = userCards.length;
-      }
-      
-      return {
-        id: user.idUser,  // Add the user ID here
-        username: user.Username,
-        pp_path: ppPath,
-        cardCount: cardCount
-      };
-    }));
-    
-    // Add current user information to the response
-    const response = { 
-      type: 'connected_users', 
-      users: connectedUsers,
-      username: owner // Add current username for client identification
-    };
-    
-    notifyGameUsers(gameId, response);
-    return;
-  }
-
-  // Updated chat message handling
-  if ('message' in data) {
-    const msg = data.message;
-    if (msg.length == 0) {
-      return;
     }
     
-    // Check that we have a valid userId
-    if (!userId) {
-      console.error('Cannot send message: Missing userId for user', owner);
-      return;
-    }
-    
-    try {
-      // Record the chat message in the database with the user ID
-      const chatMessage = await recordChatMessage(gameId, userId, msg);
-      console.log(`Chat message recorded with ID: ${chatMessage.idMessages}, userId: ${chatMessage.idUser}`);
-      
-      // Handle profile picture - either from DB or path
-      let userProfilePicture = '';
-      if (user.Profile_picture) {
-        const base64String = safelyConvertToBase64(user.Profile_picture);
-        userProfilePicture = base64String ? `data:image/png;base64,${base64String}` : '';
-      }
-      
-      // Send the message to all connected users in the same game
-      connections.forEach((client) => {
-        client.ws.send(
-          JSON.stringify({
-            type: 'message',
-            message: msg,
-            owner: owner,
-            user_pp_path: userProfilePicture,
-            username: client.username,
-            userId: userId,
-            gameId: gameId
-          }),
-        );
-      });
-    } catch (error) {
-      console.error('Error recording chat message:', error);
-    }
-    
-    return;
-  }
+    console.log(`- WebSocket disconnected (${connections.length} remaining)`);
+  };
 
-  if (data.type === 'add_card_to_hand' && userId) {
-    // Check game phase first
-    const gameState = await getGameState(gameId);
-    if (!gameState) {
-      // If no game state, initialize one and set to playing
-      const newState = await initializeGameState(gameId);
-      newState.phase = 'playing'; // Force to playing phase
-      await updateGameState(gameId, newState);
-      console.log(`Created new game state for game ${gameId} and set to playing phase`);
-    } else if (gameState.phase !== 'playing') {
-      // If game exists but not in playing phase, change it
-      gameState.phase = 'playing';
-      await updateGameState(gameId, gameState);
-      console.log(`Updated game ${gameId} to playing phase`);
-      
-      // Notify all players about the game state change
-      notifyGameUsers(gameId, {
-        type: 'game_state',
-        gameState: gameState
-      });
-    }
-    
-    // Find a card in the deck - use the specific game ID, not a global one
-    const cardsInDeck = await getActiveCardsInDeck(gameId);
-    
-    if (cardsInDeck.length > 0) {
-      const card = cardsInDeck[0];
-      
-      // Update the card state
-      await updateActiveCardState(card.idCard, 'in_hand', userId);
-      
-      // Update the player's hand in memory
-      const connectionIndex = connections.findIndex(conn => conn.username === owner);
-      if (connectionIndex !== -1) {
-        connections[connectionIndex].hand.push(card.idCard);
-      }
-      
-      // Send the updated hand back to the client
-      const updatedCards = await getActiveCardsInHand(gameId, userId);
-      
-      // Convert binary data to base64 strings for JSON safely
-      try {
-        const handCards = updatedCards.map(card => {
-          // Safely convert binary data to base64
-          const picture_data = card.picture_data;
-          let base64String = '';
-          
-          if (picture_data) {
-            base64String = safelyConvertToBase64(picture_data);
-          }
-          
-          return {
-            idCard: card.idCard,
-            picture: base64String ? `data:image/png;base64,${base64String}` : '',
-            cardType: card.cardType
-          };
-        });
-        
-        // Update the connection's handCards
-        if (connectionIndex !== -1) {
-          connections[connectionIndex].handCards = handCards;
-        }
-        
-        ws.send(JSON.stringify({ 
-          type: 'player_hand', 
-          hand: handCards
-        }));
-        
-        // Broadcast the card count update to all connected users
-        notifyGameUsers(gameId, {
-          type: 'player_hand_update',
-          username: owner,
-          cardCount: updatedCards.length
-        });
-      } catch (error) {
-        console.error('Error converting hand images to base64:', error);
-      }
-      
-      // Notify all users about the card change (show card back)
-      const remainingCardsInDeck = await getActiveCardsInDeck(gameId);
-      if (remainingCardsInDeck.length > 0) {
-        // Get the card back image instead of the actual card
-        const cardBackImage = await getCardBackImage();
-        
-        try {
-          // Convert card back image to base64
-          const base64String = safelyConvertToBase64(cardBackImage);
-          
-          // Update deck count for all users
-          notifyGameUsers(gameId, {
-            type: 'deck_update',
-            pileCount: remainingCardsInDeck.length
-          });
-          
-          notifyGameUsers(gameId, { 
-            type: 'card_change', 
-            card: {
-              idCard: remainingCardsInDeck[0].idCard,
-              picture: base64String ? `data:image/png;base64,${base64String}` : '',
-              cardType: 54 // Indicate it's a card back
-            },
-            pileCount: remainingCardsInDeck.length // Add the deck count
-          });
-        } catch (error) {
-          console.error('Error converting card back image to base64:', error);
-        }
-      } else {
-        // Notify that the deck is empty
-        notifyGameUsers(gameId, { 
-          type: 'card_change', 
-          card: {
-            idCard: null,
-            picture: '',
-            cardType: null
-          },
-          pileCount: 0
-        });
-      }
-    } else {
-      console.log('No cards left in the pile');
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: 'No cards left in the deck'
-      }));
-    }
-    return;
-  }
-
-  // Hand request handler
-  if (data.type === 'hand_request' && userId) {
-    // Get the user's hand from the database
-    const userCards = await getActiveCardsInHand(gameId, userId);
-    
-    // Convert binary data to base64 strings for JSON safely
-    try {
-      ws.send(JSON.stringify({ 
-        type: 'player_hand', 
-        hand: userCards.map(card => {
-          // Safely convert binary data to base64
-          const picture_data = card.picture_data;
-          let base64String = '';
-          
-          if (picture_data) {
-            base64String = safelyConvertToBase64(picture_data);
-          }
-          
-          return {
-            idCard: card.idCard,
-            picture: base64String ? `data:image/png;base64,${base64String}` : '',
-            cardType: card.cardType
-          };
-        })
-      }));
-    } catch (error) {
-      console.error('Error converting hand images to base64:', error);
-    }
-    return;
-  }
-
-  // Handle game_state_request
-  if (data.type === 'game_state_request') {
-    const gameState = await getGameState(gameId);
-    
-    if (gameState) {
-      ws.send(JSON.stringify({
-        type: 'game_state',
-        gameState: gameState
-      }));
-    } else {
-      // If no game state exists, initialize one
-      const initialState = await initializeGameState(gameId);
-      await updateGameState(gameId, initialState);
-      
-      ws.send(JSON.stringify({
-        type: 'game_state',
-        gameState: initialState
-      }));
-    }
-    return;
-  }
-  
-  // Handle turn_change request
-  if (data.type === 'turn_change' && userId) {
-    try {
-      // Only admin or current turn player can change turns
-      const gameState = await getGameState(gameId);
-      
-      if (!gameState) {
-        ws.send(JSON.stringify({
-          type: 'error',
-          message: 'Game state not found'
-        }));
-        return;
-      }
-      
-      if (user.isAdmin || gameState.currentTurn === userId) {
-        await advanceTurn(gameId);
-      } else {
-        ws.send(JSON.stringify({
-          type: 'error',
-          message: 'Not authorized to change turns'
-        }));
-      }
-    } catch (error) {
-      console.error('Error changing turn:', error);
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: 'Failed to change turn'
-      }));
-    }
-    return;
-  }
-  
-  // Handle play_card request
-  if (data.type === 'play_card' && userId) {
-    try {
-      const cardId = data.cardId;
-      
-      if (!cardId) {
-        ws.send(JSON.stringify({
-          type: 'error',
-          message: 'Missing card ID'
-        }));
-        return;
-      }
-      
-      await playCard(gameId, userId, cardId);
-    } catch (error) {
-      console.error('Error playing card:', error);
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to play card'
-      }));
-    }
-    return;
-  }
-};
-
-ws.onclose = async () => {
-  // Find the index of the closed connection
-  const index = connections.findIndex((conn) => conn.ws === ws);
-  
-  // Get the username of the disconnected user before removing the connection
-  const disconnectedUsername = index !== -1 ? connections[index].username : null;
-  
-  // Remove the connection from the list
-  if (index !== -1) {
-    connections.splice(index, 1);
-  }
-  
-  // If we have the username of the disconnected user
-  if (disconnectedUsername) {
-    try {
-      // Get the user's ID from their username
-      const disconnectedUser = await getUserByUsername(disconnectedUsername);
-      
-      if (disconnectedUser) {
-        // Get the active game for this user
-        const userActiveGame = await getActiveGameForUser(disconnectedUser.idUser);
-        
-        if (userActiveGame) {
-          const gameId = userActiveGame.idGame;
-          
-          // Get all users in this game
-          const usersInGame = await getUsersInGame(gameId);
-          
-          // Check if any user from this game is still connected
-          const anyUserStillConnected = usersInGame.some(user => 
-            connections.some(conn => conn.username === user.Username)
-          );
-          
-          // If no users from this game are still connected, mark the game as finished
-          if (!anyUserStillConnected) {
-            console.log(`No players connected to game ${gameId}, marking as finished`);
-            await markGameAsFinished(gameId);
-            
-            // If this was the current game, reset currentGameId
-            if (currentGameId === gameId) {
-              currentGameId = null;
-            }
-          } else {
-            // Update the connected users list for this game
-            const connectedUsers = usersInGame
-              .filter(user => connections.some(conn => conn.username === user.Username))
-              .map(user => {
-                let ppPath = '';
-                if (user.Profile_picture) {
-                  const base64String = safelyConvertToBase64(user.Profile_picture);
-                  ppPath = base64String ? `data:image/png;base64,${base64String}` : '';
-                }
-                
-                return {
-                  username: user.Username,
-                  pp_path: ppPath
-                };
-              });
-              notifyGameUsers(gameId, { type: 'connected_users', users: connectedUsers });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error updating user list after disconnect:', error);
-    }
-  }
-  
-  console.log(`- websocket disconnected (${connections.length} remaining)`);
-};
+  // WebSocket error handler
+  ws.onerror = (error) => {
+    console.error("WebSocket error:", error);
+  };
 });
 
 // the cookie is tested in the middleware (the cookie is provided by the browser in a header)
