@@ -837,13 +837,18 @@ async function sendConnectedUsers(gameId: number) {
   }
 }
 
-// Function to notify all users in a game
 function notifyGameUsers(gameId: number, message: any) {
   console.log(`Broadcasting message to all users in game ${gameId}:`, message.type);
   let sentCount = 0;
-  console.log("clients, gameId:", connections, gameId);
+  
+  // Debug client game IDs with their types
+  console.log("Client game IDs:", connections.map(c => 
+    `${c.username}: ${c.gameId} (${typeof c.gameId})`
+  ));
+  
   connections.forEach((client) => {
-    if (client.gameId === gameId) {
+    // Convert both to the same type for comparison
+    if (Number(client.gameId) === Number(gameId)) {
       try {
         client.ws.send(JSON.stringify(message));
         sentCount++;
@@ -851,6 +856,8 @@ function notifyGameUsers(gameId: number, message: any) {
       } catch (error) {
         console.error(`Error sending message to client ${client.username}:`, error);
       }
+    } else {
+      console.log(`Skipping client ${client.username} - gameId doesn't match: ${client.gameId} !== ${gameId}`);
     }
   });
   
