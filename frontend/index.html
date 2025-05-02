@@ -84,30 +84,7 @@
         }
         
         // Ensure chat toggle works properly
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize chat toggle button
-            const chatToggle = document.getElementById('chatToggle');
-            const chatContainer = document.querySelector('.container');
-            
-            if (chatToggle && chatContainer) {
-                chatToggle.addEventListener('click', function() {
-                    chatContainer.classList.toggle('chat-hidden');
-                    chatToggle.classList.toggle('chat-hidden');
-                    
-                    // Store state in sessionStorage
-                    const isHidden = chatContainer.classList.contains('chat-hidden');
-                    sessionStorage.setItem('chatHidden', isHidden.toString());
-                });
-                
-                // Initialize from saved state
-                const chatHidden = sessionStorage.getItem('chatHidden') === 'true';
-                if (chatHidden) {
-                    chatContainer.classList.add('chat-hidden');
-                    chatToggle.classList.add('chat-hidden');
-                }
-            }
-            
-            // Connect lobby button
+        document.addEventListener('DOMContentLoaded', function() {  
             const lobbyButton = document.getElementById('backToLobbyBtn');
             if (lobbyButton) {
                 lobbyButton.addEventListener('click', returnToLobby);
@@ -195,25 +172,6 @@
                 }
             });
         }
-    
-        // Connect the button to the start function
-        document.addEventListener('DOMContentLoaded', function() {
-            const startBtn = document.getElementById('startGameBtn');
-            if (startBtn) {
-                startBtn.onclick = startGame;
-                console.log('Start game button connected');
-            } else {
-                console.error('Start game button not found');
-            }
-            
-            // Initialize chat send behavior
-            globalThis.sendJson = function() {
-                if (globalThis.cardGame) {
-                    globalThis.cardGame.sendChatMessage();
-                }
-            };
-        });
-
                 // Add this debug code to index.html
         console.log("--------- DEBUGGING INFO ---------");
         console.log("Auth token exists:", !!localStorage.getItem('auth_token'));

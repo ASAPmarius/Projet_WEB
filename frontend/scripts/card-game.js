@@ -54,9 +54,32 @@ class CardGameFramework {
     this.handlePageUnload = this.handlePageUnload.bind(this);
     this.loadCardResources = this.loadCardResources.bind(this);
     
-    // Initialize game when DOM is loaded
-    document.addEventListener('DOMContentLoaded', this.init);
-    globalThis.addEventListener('beforeunload', this.handlePageUnload);
+    // Fix initialization with proper binding
+    if (document.readyState === 'loading') {
+      // Document still loading, add event listener
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOMContentLoaded event fired, initializing game');
+        this.init();
+      });
+    } else {
+      // DOMContentLoaded has already fired, call init directly
+      console.log('Document already loaded, initializing game immediately');
+      setTimeout(() => this.init(), 0);
+    }
+
+    // Use arrow function to properly bind this context
+    globalThis.addEventListener('beforeunload', (event) => this.handlePageUnload(event));
+
+    // Also add direct initialization on window load for redundancy
+    globalThis.addEventListener('load', () => {
+      console.log('Window load event fired');
+      if (!this.componentsInitialized) {
+        console.log('Components not initialized yet, calling init()');
+        this.init();
+      }
+    });
+
+    console.log('CardGameFramework constructor completed');
   }
   
   // ====================== INITIALIZATION ======================
@@ -70,8 +93,14 @@ class CardGameFramework {
       // Get username from sessionStorage
       this.currentUsername = sessionStorage.getItem('currentUsername') || localStorage.getItem('currentUsername');
       
+      console.log('Game initialization starting with:', {
+        gameId: this.currentGameId,
+        username: this.currentUsername
+      });
+      
       // If we don't have a game ID, check for active game
       if (!this.currentGameId) {
+        console.log('No game ID found, checking for active game');
         await this.checkActiveGame();
       }
       
@@ -89,26 +118,22 @@ class CardGameFramework {
       // Load card resources
       await this.loadCardResources();
       
-      // Setup game components with a delay to ensure DOM is ready
-      setTimeout(() => {
-        try {
-          this.initGameComponents();
-          this.componentsInitialized = true;
-          console.log('Game components initialized');
-          
-          // Connect to WebSocket after components are initialized
-          this.connectWebSocket();
-        } catch (error) {
-          console.error('Error initializing game components:', error);
-        }
-      }, 500);
+      // Initialize game components immediately without timeout
+      this.initGameComponents();
+      this.componentsInitialized = true;
+      console.log('Game components initialized');
+      
+      // Connect to WebSocket immediately after initialization
+      console.log('Connecting to WebSocket now...');
+      this.connectWebSocket();
       
       // Clear navigation flags
       sessionStorage.removeItem('intentionalNavigation');
       sessionStorage.removeItem('wsWasOpen');
     } catch (error) {
       console.error('Error during game initialization:', error);
-      globalThis.location.href = 'games.html';
+      // Don't redirect immediately, let the user see the error
+      alert('Error initializing game: ' + error.message);
     }
   }
   
@@ -225,17 +250,65 @@ class CardGameFramework {
   connectWebSocket() {
     try {
       console.log('Attempting to connect WebSocket...');
-      this.websocket = new WebSocket('ws://localhost:3000');
+      // Add the auth token to the URL for authentication
+      const authToken = localStorage.getItem('auth_token');
+      // Use explicit protocol and full URL with token as query parameter
+      this.websocket = new WebSocket(`ws://localhost:3000/?token=${encodeURIComponent(authToken)}`);
       
-      this.websocket.onopen = this.handleWebSocketOpen;
-      this.websocket.onmessage = this.handleWebSocketMessage;
-      this.websocket.onerror = this.handleWebSocketError;
-      this.websocket.onclose = this.handleWebSocketClose;
+      // Add unbound functions with proper error handling
+      this.websocket.onopen = (event) => {
+        console.log('WebSocket OPEN event triggered:', event);
+        this.handleWebSocketOpen(event);
+      };
+      
+      this.websocket.onmessage = (event) => {
+        console.log('WebSocket MESSAGE received');
+        this.handleWebSocketMessage(event);
+      };
+      
+      this.websocket.onerror = (event) => {
+        console.error('WebSocket ERROR:', event);
+        this.handleWebSocketError(event);
+      };
+      
+      this.websocket.onclose = (event) => {
+        console.log('WebSocket CLOSED:', event.code, event.reason);
+        this.handleWebSocketClose(event);
+      };
       
       console.log('WebSocket connection initialized');
     } catch (error) {
       console.error('Error initializing WebSocket:', error);
     }
+
+    this.startWebSocketStatusChecks();
+  }
+
+  // Add after connectWebSocket() method
+startWebSocketStatusChecks() {
+    // Check WebSocket status every 5 seconds
+    this.wsCheckInterval = setInterval(() => {
+      if (!this.websocket) {
+        console.log('WebSocket not initialized yet');
+        return;
+      }
+      
+      const stateNames = {
+        0: 'CONNECTING',
+        1: 'OPEN',
+        2: 'CLOSING',
+        3: 'CLOSED'
+      };
+      
+      console.log(`WebSocket status: ${stateNames[this.websocket.readyState]} (${this.websocket.readyState})`);
+      
+      // If closed or closing, try to reconnect unless navigating away
+      if (this.websocket.readyState >= 2 && 
+          sessionStorage.getItem('intentionalNavigation') !== 'true') {
+        console.log('WebSocket disconnected, attempting to reconnect...');
+        this.connectWebSocket();
+      }
+    }, 5000);
   }
   
   handleWebSocketOpen(event) {
