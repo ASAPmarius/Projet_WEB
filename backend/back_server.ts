@@ -1717,6 +1717,7 @@ router.get('/', authorizationMiddleware, async (ctx) => {
     }
     
     return {
+      id: user.idUser,  // Add this line to include the user ID
       username: user.Username,
       pp_path: ppPath
     };
@@ -1915,6 +1916,7 @@ ws.onmessage = async (event) => {
       }
       
       return {
+        id: user.idUser,  // Add the user ID here
         username: user.Username,
         pp_path: ppPath,
         cardCount: cardCount

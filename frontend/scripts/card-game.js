@@ -199,13 +199,22 @@ class CardGameFramework {
   handleWebSocketOpen() {
     console.log('WebSocket connection established');
     
+    // Make sure we load the currentGameId from localStorage if not set
+    if (!this.currentGameId) {
+      this.currentGameId = localStorage.getItem('currentGameId');
+      console.log(`Retrieved game ID from localStorage: ${this.currentGameId}`);
+    }
+    
     // Only request data if UI components are ready
     if (this.componentsInitialized) {
       console.log('UI components are ready, requesting initial data');
       this.requestUsersProfile();
-      this.requestGameState();
-      this.requestCard();
-      this.requestHand();
+      setTimeout(() => {
+        // Slight delay to ensure user profiles loaded first
+        this.requestGameState();
+        this.requestCard();
+        this.requestHand();
+      }, 500);
     } else {
       // If components aren't ready yet, wait and then request data
       console.log('UI components not fully initialized, waiting before requesting data...');
@@ -214,9 +223,11 @@ class CardGameFramework {
           clearInterval(checkInterval);
           console.log('UI components now initialized, requesting data...');
           this.requestUsersProfile();
-          this.requestGameState();
-          this.requestCard();
-          this.requestHand();
+          setTimeout(() => {
+            this.requestGameState();
+            this.requestCard();
+            this.requestHand();
+          }, 500);
         }
       }, 200);
     }
@@ -410,14 +421,14 @@ class CardGameFramework {
     // Store the players
     this.players = users;
     
-    // Update the user profiles sidebar
-    this.updateProfilesSidebar(users);
-    
-    // Get current username
+    // Get current username and set currentPlayerId
     this.currentUsername = data.username || this.currentUsername || localStorage.getItem('currentUsername');
-    if (!this.currentUsername && data.owner) {
-      this.currentUsername = data.owner;
-      localStorage.setItem('currentUsername', this.currentUsername);
+    
+    // Find this player in the players array and set currentPlayerId
+    const currentPlayer = this.players.find(p => p.username === this.currentUsername);
+    if (currentPlayer && currentPlayer.id) {
+      this.currentPlayerId = currentPlayer.id;
+      console.log(`Set current player ID to: ${this.currentPlayerId}`);
     }
     
     // Update the poker table players
@@ -551,11 +562,16 @@ class CardGameFramework {
   handleGameState(data) {
     console.log('Processing game state update');
     
+    // Log detailed information for debugging
+    console.log('Game state data:', data);
+    console.log('Current players:', this.players);
+    
     // Update the local game state
     this.gameState = data.gameState;
     
     // Update the current turn indicator
     if (this.gameState.currentTurn) {
+      console.log(`Current turn player ID: ${this.gameState.currentTurn}`);
       this.highlightCurrentPlayer(this.gameState.currentTurn);
     }
     
@@ -569,7 +585,7 @@ class CardGameFramework {
   }
   
   handleTurnChange(data) {
-    console.log('Processing turn change');
+    console.log('Processing turn change:', data);
     
     // Update the current turn in our game state
     this.gameState.currentTurn = data.playerId;
@@ -578,7 +594,8 @@ class CardGameFramework {
     this.highlightCurrentPlayer(data.playerId);
     
     // If it's my turn, enable appropriate actions
-    const isMyTurn = data.playerId === this.currentPlayerId;
+    const isMyTurn = String(data.playerId) === String(this.currentPlayerId);
+    console.log(`Is my turn check: ${data.playerId} vs ${this.currentPlayerId} = ${isMyTurn}`);
     this.setMyTurnState(isMyTurn);
     
     // Show a notification about whose turn it is
@@ -818,25 +835,90 @@ class CardGameFramework {
       this.uiElements.pokerTable.appendChild(seat);
     });
   }
+
+  // Add this new method to the WarGame class
+findPlayerById(playerId) {
+  if (!this.players || !this.players.length) {
+    console.warn('No players array available when trying to find player');
+    return null;
+  }
   
-  highlightCurrentPlayer(playerId) {
-    // Remove active-player class from all seats
-    const allSeats = document.querySelectorAll('.player-seat');
-    allSeats.forEach(seat => seat.classList.remove('active-player'));
-    
-    // Find the player by ID
-    const player = this.players.find(p => p.id === playerId);
-    if (!player) {
-      console.warn(`Player with ID ${playerId} not found`);
-      return;
+  // Try to find the player using various ID formats
+  let player = this.players.find(p => p.id === playerId);
+  
+  // If not found by direct comparison, try numeric comparison
+  if (!player) {
+    player = this.players.find(p => Number(p.id) === Number(playerId));
+  }
+  
+  // If still not found, try string comparison
+  if (!player) {
+    player = this.players.find(p => String(p.id) === String(playerId));
+  }
+  
+  // If still not found, try position-based fallback (WAR specific, assumes 2 players)
+  if (!player && this.players.length === 2) {
+    // In WAR game, if ID is 2, it might be player at index 1
+    if ((playerId === 2 || playerId === '2') && this.players[1]) {
+      console.log('Using position-based player lookup as fallback');
+      return this.players[1];
     }
-    
-    // Add active-player class to the current player's seat
-    const seat = document.getElementById(`player-seat-${player.username}`);
-    if (seat) {
-      seat.classList.add('active-player');
+    // If ID is 1, it might be player at index 0
+    if ((playerId === 1 || playerId === '1') && this.players[0]) {
+      console.log('Using position-based player lookup as fallback');
+      return this.players[0];
     }
   }
+  
+  return player;
+}
+  
+// Override the parent class method
+highlightCurrentPlayer(playerId) {
+  // Remove active-player class from all seats
+  const allSeats = document.querySelectorAll('.player-seat');
+  allSeats.forEach(seat => seat.classList.remove('active-player'));
+  
+  console.log(`Highlighting player with ID ${playerId}, players:`, this.players);
+  
+  // Use our new robust player finding method
+  const player = this.findPlayerById(playerId);
+  
+  if (!player) {
+    console.warn(`Player with ID ${playerId} not found, trying fallback...`);
+    
+    // Fallback: Attempt to use a special case for WAR game
+    // In WAR, player ID 1 is often the first player, ID 2 is the second player
+    if (this.players.length >= 2) {
+      if (playerId == 1 && this.players[0]) { 
+        const seat = document.getElementById(`player-seat-${this.players[0].username}`);
+        if (seat) {
+          seat.classList.add('active-player');
+          console.log(`Highlighted seat for first player as fallback: ${this.players[0].username}`);
+          return;
+        }
+      } else if (playerId == 2 && this.players[1]) {
+        const seat = document.getElementById(`player-seat-${this.players[1].username}`);
+        if (seat) {
+          seat.classList.add('active-player');
+          console.log(`Highlighted seat for second player as fallback: ${this.players[1].username}`);
+          return;
+        }
+      }
+    }
+    
+    return;
+  }
+  
+  // Add active-player class to the current player's seat
+  const seat = document.getElementById(`player-seat-${player.username}`);
+  if (seat) {
+    seat.classList.add('active-player');
+    console.log(`Highlighted seat for player: ${player.username}`);
+  } else {
+    console.warn(`Could not find seat for player: ${player.username}`);
+  }
+}
   
   // ====================== CARD HANDLING ======================
   updateCardDisplay(picture, idCard) {
@@ -1650,6 +1732,7 @@ class CardGameFramework {
       return;
     }
     
+    console.log(`Requesting users profile for game ${this.currentGameId}`);
     const data = {
       auth_token: localStorage.auth_token, 
       type: 'connected_users', 

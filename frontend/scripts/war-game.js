@@ -26,7 +26,13 @@ class WarGame extends CardGameFramework {
     
     // Extend the init method from the parent class
     async init() {
+      console.log("=== WAR GAME INIT START ===");
+      console.log(`Game ID before super.init(): ${this.currentGameId}`);
+      
       await super.init();
+      
+      console.log(`Game ID after super.init(): ${this.currentGameId}`);
+      console.log(`localStorage currentGameId: ${localStorage.getItem('currentGameId')}`);
       
       // Add war-specific UI elements
       this.createWarTable();
@@ -34,6 +40,12 @@ class WarGame extends CardGameFramework {
       
       // Add event listener for the play button
       this.addPlayButtonListener();
+      
+      // Log game state for debugging
+      console.log("=== WAR GAME DEBUG INFO ===");
+      console.log("Current Game State:", this.gameState);
+      console.log("Game ID:", this.currentGameId);
+      console.log("Players:", this.players);
     }
     
     // Create the war-specific table layout
@@ -120,8 +132,44 @@ class WarGame extends CardGameFramework {
         });
       }
     }
+
+    // Add this new method to the WarGame class
+    findPlayerById(playerId) {
+      if (!this.players || !this.players.length) {
+        console.warn('No players array available when trying to find player');
+        return null;
+      }
+      
+      // Try to find the player using various ID formats
+      let player = this.players.find(p => p.id === playerId);
+      
+      // If not found by direct comparison, try numeric comparison
+      if (!player) {
+        player = this.players.find(p => Number(p.id) === Number(playerId));
+      }
+      
+      // If still not found, try string comparison
+      if (!player) {
+        player = this.players.find(p => String(p.id) === String(playerId));
+      }
+      
+      // If still not found, try position-based fallback (WAR specific, assumes 2 players)
+      if (!player && this.players.length === 2) {
+        // In WAR game, if ID is 2, it might be player at index 1
+        if ((playerId === 2 || playerId === '2') && this.players[1]) {
+          console.log('Using position-based player lookup as fallback');
+          return this.players[1];
+        }
+        // If ID is 1, it might be player at index 0
+        if ((playerId === 1 || playerId === '1') && this.players[0]) {
+          console.log('Using position-based player lookup as fallback');
+          return this.players[0];
+        }
+      }
+      
+      return player;
+    }
     
-    // Check if it's the current player's turn
     isMyTurn() {
       // If game is in war mode, let the player who started the war play
       if (this.warMode) {
@@ -130,7 +178,20 @@ class WarGame extends CardGameFramework {
       
       // Check if turn-based system is being used
       if (this.gameState && this.gameState.currentTurn) {
-        return this.gameState.currentTurn === this.currentPlayerId;
+        const turnId = this.gameState.currentTurn;
+        
+        // If we don't have a currentPlayerId, try to match by username
+        if (!this.currentPlayerId) {
+          // Find player with the current turn ID
+          const turnPlayer = this.findPlayerById(turnId);
+          // Check if this is the current player by username
+          return turnPlayer && turnPlayer.username === this.currentUsername;
+        }
+        
+        // Otherwise do normal ID comparison
+        return turnId === this.currentPlayerId || 
+               Number(turnId) === this.currentPlayerIdAsNumber ||
+               String(turnId) === this.currentPlayerIdAsString;
       }
       
       // If no turn system, always allow playing
@@ -171,6 +232,10 @@ class WarGame extends CardGameFramework {
     
     // Compare two cards to determine the winner
     compareCards(card1, card2) {
+      if (!card1 || !card2 || !card1.cardType || !card2.cardType) {
+        console.error('Invalid cards for comparison:', card1, card2);
+        return 0; // Default to war if we can't compare
+      }
       // Convert card types to ranks (assuming card types 1-13 for each suit)
       const getRank = (cardType) => {
         // Get the card rank (1-13) from the card type
@@ -310,6 +375,10 @@ class WarGame extends CardGameFramework {
     
     // Check if the game has ended
     checkGameEnd() {
+      if (!this.players || this.players.length < 2) {
+        console.warn('Not enough players to check game end');
+        return;
+      }
       // Check if any player has 0 cards
       const player1Cards = this.players[0].cardCount || 0;
       const player2Cards = this.players[1].cardCount || 0;
@@ -359,15 +428,6 @@ class WarGame extends CardGameFramework {
       scoreContainer.appendChild(roundCounter);
     }
     
-    // Override the handleConnectedUsers method to update the scoreboard
-    handleConnectedUsers(data) {
-      // Call the parent method first
-      super.handleConnectedUsers(data);
-      
-      // Then update our scoreboard
-      this.updateScoreboard();
-    }
-    
     // Override the handlePlayerHandUpdate method
     handlePlayerHandUpdate(data) {
       // Call the parent method first
@@ -381,6 +441,7 @@ class WarGame extends CardGameFramework {
     handleWebSocketMessage(event) {
       try {
         const data = JSON.parse(event.data);
+        console.log('War game received message type:', data.type);
         
         // Handle war-specific messages
         if (data.type === 'war_cards_played') {
@@ -388,11 +449,62 @@ class WarGame extends CardGameFramework {
           return;
         }
         
+        // For debugging connected_users and game_state
+        if (data.type === 'connected_users') {
+          console.log('War game received connected_users:', data.users);
+        }
+        
+        if (data.type === 'game_state') {
+          console.log('War game received game_state:', data.gameState);
+        }
+        
         // Call the parent handler for other message types
         super.handleWebSocketMessage(event);
       } catch (error) {
-        console.error('Error handling WebSocket message:', error);
+        console.error('Error handling WebSocket message in WarGame:', error);
       }
+    }
+
+    handleConnectedUsers(data) {
+      // First call the parent implementation
+      super.handleConnectedUsers(data);
+
+      this.updateScoreboard();
+      
+      // Then call our custom implementation
+      this.handleConnectedUsersWar(data);
+    }
+
+    handleConnectedUsersWar(data) {
+      if (data.users && Array.isArray(data.users)) {
+        console.log('Raw user data received:', data.users);
+        
+        // Assign IDs manually if they don't exist from the backend
+        this.players = data.users.map((user, index) => ({
+          id: user.id || (index + 1), // Use ID from server or position-based ID
+          idAsNumber: user.id ? Number(user.id) : (index + 1),
+          idAsString: user.id ? String(user.id) : String(index + 1),
+          username: user.username,
+          pp_path: user.pp_path,
+          cardCount: user.cardCount || 0
+        }));
+        
+        console.log('Updated players array with position-based IDs:', this.players);
+        
+        // Find current player by username and assign IDs
+        const currentPlayer = this.players.find(p => p.username === this.currentUsername);
+        if (currentPlayer) {
+          this.currentPlayerId = currentPlayer.id;
+          this.currentPlayerIdAsNumber = Number(currentPlayer.id);
+          this.currentPlayerIdAsString = String(currentPlayer.id);
+          console.log(`Current player (${this.currentUsername}) has ID: ${this.currentPlayerId}`);
+        } else {
+          console.warn(`Could not find current player in players array: ${this.currentUsername}`);
+        }
+      }
+      
+      // Update the scoreboard with player information
+      this.updateScoreboard();
     }
   }
   
