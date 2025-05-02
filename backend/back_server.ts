@@ -819,6 +819,95 @@ async function handleSyncRequest(data: any, ws: WebSocket) {
   }
 }
 
+async function handleGameStateUpdate(data: any, userId: number, ws: WebSocket) {
+  const { gameId, gameState } = data;
+  
+  if (!gameId || !gameState) {
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Missing game ID or game state data"
+    }));
+    return;
+  }
+  
+  try {
+    // Get current game state from database
+    const currentGameState = await getGameState(gameId);
+    if (!currentGameState) {
+      throw new Error("Game state not found");
+    }
+    
+    // Update only the specified fields
+    const updatedGameState = { ...currentGameState };
+    
+    // Update round if provided
+    if (gameState.round !== undefined) {
+      updatedGameState.round = gameState.round;
+      console.log(`Updating game ${gameId} round to ${gameState.round}`);
+    }
+    
+    // Update other fields as needed
+    if (gameState.phase !== undefined) {
+      updatedGameState.phase = gameState.phase;
+    }
+    
+    // Save updated game state
+    await updateGameState(gameId, updatedGameState);
+    
+    // Broadcast updated game state to all players
+    notifyGameUsers(gameId, {
+      type: "game_state",
+      gameState: updatedGameState
+    });
+  } catch (error) {
+    console.error("Error updating game state:", error);
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Failed to update game state"
+    }));
+  }
+}
+
+async function handleRoundUpdate(data: any, userId: number, ws: WebSocket) {
+  const { gameId, round } = data;
+  
+  if (!gameId || !round) {
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Missing game ID or round number"
+    }));
+    return;
+  }
+  
+  try {
+    console.log(`Updating round for game ${gameId} to ${round}`);
+    
+    // Get current game state
+    const gameState = await getGameState(gameId);
+    if (!gameState) {
+      throw new Error("Game state not found");
+    }
+    
+    // Update round
+    gameState.round = round;
+    
+    // Save updated game state
+    await updateGameState(gameId, gameState);
+    
+    // Notify all clients about the updated game state
+    notifyGameUsers(gameId, {
+      type: "game_state",
+      gameState
+    });
+  } catch (error) {
+    console.error("Error updating round:", error);
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Failed to update round"
+    }));
+  }
+}
+
 // Helper function to send game state
 async function sendGameState(gameId: number, ws: WebSocket) {
   try {
@@ -1697,8 +1786,14 @@ router.get("/", async (ctx) => {
           case "game_state_request":
             sendGameState(data.gameId, ws);
             break;
-            
-          // More handlers...
+
+          case "update_game_state":
+            handleGameStateUpdate(data, userId, ws);
+            break;
+
+          case "update_round":
+          handleRoundUpdate(data, userId, ws);
+          break;
         }
       } catch (error) {
         console.error("Error handling WebSocket message:", error);

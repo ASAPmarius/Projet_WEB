@@ -20,7 +20,8 @@ class WarGame extends CardGameFramework {
     document.addEventListener('DOMContentLoaded', () => {
       const actionButton = document.getElementById('warActionButton');
       if (actionButton) {
-        actionButton.addEventListener('click', () => this.playTopCard());
+        // Hide the button as we won't use it
+        actionButton.style.display = 'none';
       }
     });
   }
@@ -48,56 +49,45 @@ class WarGame extends CardGameFramework {
     }
   }
   
-  // Create war battle area
-  createBattleArea() {
-    if (!this.uiElements.pokerTable) return;
-    
-    // Create battle area container
-    const battleArea = document.createElement('div');
-    battleArea.className = 'war-battle-area';
-    battleArea.id = 'battleArea';
-    
-    // Create player 1 card slot
-    const player1Slot = document.createElement('div');
-    player1Slot.className = 'war-card-slot player1-slot';
-    player1Slot.id = 'player1Slot';
-    
-    // Create VS indicator
-    const vsIndicator = document.createElement('div');
-    vsIndicator.className = 'war-vs-indicator';
-    vsIndicator.textContent = 'VS';
-    
-    // Create player 2 card slot
-    const player2Slot = document.createElement('div');
-    player2Slot.className = 'war-card-slot player2-slot';
-    player2Slot.id = 'player2Slot';
-    
-    // Create action button
-    const actionButton = document.createElement('button');
-    actionButton.className = 'war-action-button';
-    actionButton.id = 'warActionButton';
-    actionButton.textContent = 'Play Cards';
-    actionButton.addEventListener('click', () => this.playTopCard());
-    
-    // Create result indicator
-    const resultIndicator = document.createElement('div');
-    resultIndicator.className = 'war-result-indicator';
-    resultIndicator.id = 'warResult';
-    
-    // Create scoreboard
-    this.createScoreboard();
-    
-    // Assemble battle area
-    battleArea.appendChild(player1Slot);
-    battleArea.appendChild(vsIndicator);
-    battleArea.appendChild(player2Slot);
-    battleArea.appendChild(document.createElement('br'));
-    battleArea.appendChild(actionButton);
-    battleArea.appendChild(resultIndicator);
-    
-    // Add to the table
-    this.uiElements.pokerTable.appendChild(battleArea);
-  }
+// Create war battle area
+createBattleArea() {
+  if (!this.uiElements.pokerTable) return;
+  
+  // Create battle area container
+  const battleArea = document.createElement('div');
+  battleArea.className = 'war-battle-area';
+  battleArea.id = 'battleArea';
+  
+  // Create player 1 card slot
+  const player1Slot = document.createElement('div');
+  player1Slot.className = 'war-card-slot player1-slot';
+  player1Slot.id = 'player1Slot';
+  
+  // Create VS indicator
+  const vsIndicator = document.createElement('div');
+  vsIndicator.className = 'war-vs-indicator';
+  vsIndicator.textContent = 'VS';
+  
+  // Create player 2 card slot
+  const player2Slot = document.createElement('div');
+  player2Slot.className = 'war-card-slot player2-slot';
+  player2Slot.id = 'player2Slot';
+  
+  // Create result indicator
+  const resultIndicator = document.createElement('div');
+  resultIndicator.className = 'war-result-indicator';
+  resultIndicator.id = 'warResult';
+  
+  // Assemble battle area - remove the action button completely
+  battleArea.appendChild(player1Slot);
+  battleArea.appendChild(vsIndicator);
+  battleArea.appendChild(player2Slot);
+  battleArea.appendChild(document.createElement('br'));
+  battleArea.appendChild(resultIndicator);
+  
+  // Add to the table
+  this.uiElements.pokerTable.appendChild(battleArea);
+}
   
   // Create scoreboard for War game
   createScoreboard() {
@@ -168,8 +158,8 @@ class WarGame extends CardGameFramework {
     this.updateTablePlayersWar(players, currentUsername);
   }
   
-  // Play top card from the player's hand
-  playTopCard() {
+  // Add this method (replacing the previous playTopCard and related methods)
+  playCard(cardId) {
     // Check if it's the player's turn
     if (!this.isMyTurn()) {
       this.showNotification("It's not your turn to play");
@@ -183,58 +173,29 @@ class WarGame extends CardGameFramework {
       return;
     }
     
-    // Disable the button while processing
-    const actionButton = document.getElementById('warActionButton');
-    if (actionButton) {
-      actionButton.disabled = true;
-      actionButton.textContent = 'Processing...';
+    // Find the card in the player's hand
+    const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
+    if (cardIndex === -1) {
+      console.warn(`Card ${cardId} not found in player's hand`);
+      return;
     }
     
-    if (this.warMode) {
-      // In war mode, play multiple cards
-      const warCount = Math.min(4, playerHand.length);
-      
-      // Send war play cards action
-      this.sendWebSocketMessage({
-        type: 'player_action',
-        action: {
-          type: 'play_war_cards',
-          count: warCount
-        },
-        gameId: this.currentGameId,
-        auth_token: localStorage.getItem('auth_token')
-      });
-      
-      // Handle locally
-      this.playWarCards(warCount);
-    } else {
-      // Normal play - top card
-      const topCard = playerHand[0];
-      
-      // Send play card action
-      this.sendWebSocketMessage({
-        type: 'player_action',
-        action: {
-          type: 'play_card',
-          cardId: topCard.id
-        },
-        gameId: this.currentGameId,
-        auth_token: localStorage.getItem('auth_token')
-      });
-      
-      // Handle locally
-      this.playTopCardLocal();
-    }
-  }
-  
-  // Play top card locally
-  playTopCardLocal() {
-    // Get player's hand
-    const playerHand = this.hands[this.currentPlayerId];
-    if (!playerHand || playerHand.length === 0) return;
+    // Get the card
+    const card = playerHand[cardIndex];
     
-    // Take the top card
-    const card = playerHand.shift();
+    // Send play card action to server
+    this.sendWebSocketMessage({
+      type: 'player_action',
+      action: {
+        type: 'play_card',
+        cardId: card.id
+      },
+      gameId: this.currentGameId,
+      auth_token: localStorage.getItem('auth_token')
+    });
+    
+    // Remove the card from hand
+    playerHand.splice(cardIndex, 1);
     
     // Add to played cards
     this.playedCards[this.currentPlayerId] = card;
@@ -431,6 +392,8 @@ class WarGame extends CardGameFramework {
   resolveRound() {
     if (Object.keys(this.playedCards).length !== 2) return;
     
+    console.log('Resolving round with played cards:', this.playedCards);
+    
     // Get the two player IDs
     const [player1Id, player2Id] = Object.keys(this.playedCards);
     
@@ -445,54 +408,7 @@ class WarGame extends CardGameFramework {
     const resultIndicator = document.getElementById('warResult');
     
     if (result === 0) {
-      // It's a war!
-      if (resultIndicator) {
-        resultIndicator.textContent = "It's a WAR!";
-        resultIndicator.className = 'war-result-indicator war';
-      }
-      
-      // Add cards to war pile
-      this.warPile.push(card1, card2);
-      
-      // Enter war mode
-      this.warMode = true;
-      
-      // Update button text
-      const actionButton = document.getElementById('warActionButton');
-      if (actionButton) {
-        actionButton.textContent = 'Play War Cards';
-        actionButton.disabled = false;
-      }
-      
-      // Show notification
-      this.showNotification("It's a WAR! Each player plays 4 more cards", "war");
-      
-      // Reset played cards
-      this.playedCards = {};
-      
-      // Make a short pause before starting next round
-      setTimeout(() => {
-        // Clear card slots
-        this.clearCardSlots();
-        
-        // First player's turn
-        this.gameState.currentTurn = this.players[0].id;
-        this.highlightCurrentPlayer(this.gameState.currentTurn);
-        
-        // Enable button for first player
-        if (actionButton) {
-          actionButton.disabled = String(this.gameState.currentTurn) !== String(this.currentPlayerId);
-        }
-        
-        // Send turn change message
-        this.sendWebSocketMessage({
-          type: 'turn_change',
-          playerId: this.gameState.currentTurn,
-          username: this.players[0].username,
-          gameId: this.currentGameId,
-          auth_token: localStorage.getItem('auth_token')
-        });
-      }, 2000);
+      // War code...
     } else {
       // We have a winner
       const winnerId = result === 1 ? player1Id : player2Id;
@@ -526,19 +442,21 @@ class WarGame extends CardGameFramework {
       
       // Increment round counter
       this.gameState.round = (this.gameState.round || 1) + 1;
+      console.log(`Round incremented to ${this.gameState.round}`);
       
       // Update scoreboard
       this.updateScoreboard();
       
-      // Reset button
-      const actionButton = document.getElementById('warActionButton');
-      if (actionButton) {
-        actionButton.textContent = 'Play Cards';
-        actionButton.disabled = false;
-      }
-      
       // Show notification
       this.showNotification(`${winner.username} wins the round and takes ${cardsToAward.length} cards!`, "winner");
+      
+      // Explicitly send round update to server
+      this.sendWebSocketMessage({
+        type: 'update_round',
+        gameId: this.currentGameId,
+        round: this.gameState.round,
+        auth_token: localStorage.getItem('auth_token')
+      });
       
       // Check for game end
       this.checkGameEndConditions();
@@ -551,11 +469,6 @@ class WarGame extends CardGameFramework {
         // First player's turn for next round
         this.gameState.currentTurn = this.players[0].id;
         this.highlightCurrentPlayer(this.gameState.currentTurn);
-        
-        // Enable button for first player
-        if (actionButton) {
-          actionButton.disabled = String(this.gameState.currentTurn) !== String(this.currentPlayerId);
-        }
         
         // Send turn change message for next round
         this.sendWebSocketMessage({
