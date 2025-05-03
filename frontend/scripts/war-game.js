@@ -369,7 +369,7 @@ createBattleArea() {
       type: 'turn_change',
       playerId: nextPlayerId,
       gameId: this.currentGameId,
-      username: this.players[nextIndex].username,
+      username: this.players[nextIndex].username, // Add username explicitly
       auth_token: localStorage.getItem('auth_token')
     });
   }
@@ -384,15 +384,13 @@ createBattleArea() {
     return 0; // War (tie)
   }
   
-  // Resolve the round after both players have played
   resolveRound() {
     console.log("Resolving round with played cards:", this.playedCards);
-  
+    
     if (Object.keys(this.playedCards).length !== 2) {
       console.log("Cannot resolve round - don't have cards from both players");
       return;
     }    
-    console.log('Resolving round with played cards:', this.playedCards);
     
     // Get the two player IDs
     const [player1Id, player2Id] = Object.keys(this.playedCards);
@@ -434,11 +432,12 @@ createBattleArea() {
       // Clear war pile
       this.warPile = [];
       
+      // CRITICAL: Create a new empty object to ensure clean state
+      this.playedCards = {};
+      console.log("RESET: Cleared playedCards object for next round", this.playedCards);
+      
       // Exit war mode
       this.warMode = false;
-      
-      // Reset played cards
-      this.playedCards = {};
       
       // Increment round counter
       this.gameState.round = (this.gameState.round || 1) + 1;
@@ -461,23 +460,25 @@ createBattleArea() {
       // Check for game end
       this.checkGameEndConditions();
       
+      // Clear card slots immediately
+      this.clearCardSlots();
+      
       // Make a short pause before starting next round
       setTimeout(() => {
-        // Clear card slots
-        this.clearCardSlots();
-        
-        // First player's turn for next round
-        this.gameState.currentTurn = this.players[0].id;
+        // Set the winner as the first player for next round
+        this.gameState.currentTurn = winnerId;
         this.highlightCurrentPlayer(this.gameState.currentTurn);
         
         // Send turn change message for next round
         this.sendWebSocketMessage({
           type: 'turn_change',
           playerId: this.gameState.currentTurn,
-          username: this.players[0].username,
+          username: winner.username,
           gameId: this.currentGameId,
           auth_token: localStorage.getItem('auth_token')
         });
+        
+        console.log(`Next round starting with ${winner.username}'s turn (ID: ${winnerId})`);
       }, 2000);
     }
   }
@@ -501,7 +502,6 @@ createBattleArea() {
       this.updateCardSlot(playerId, cardData);
       
       // For the player who played the card, update hand if needed
-      // (This handles the case where server message arrives after we've already updated locally)
       if (String(playerId) === String(this.currentPlayerId)) {
         const playerHand = this.hands[playerId];
         if (playerHand) {
@@ -524,7 +524,13 @@ createBattleArea() {
       if (Object.keys(this.playedCards).length === 2) {
         console.log("Both players have played cards, resolving round");
         // Both players have played, resolve the round
-        setTimeout(() => this.resolveRound(), 1000); // Short delay to show cards
+        if (!this._resolvingRound) {
+          this._resolvingRound = true;
+          setTimeout(() => {
+            this.resolveRound();
+            this._resolvingRound = false;
+          }, 1000); // Short delay to show cards
+        }
       } else {
         console.log(`Only one player has played, advancing turn from ${this.gameState.currentTurn}`);
         // Only one player has played, advance to next player's turn
