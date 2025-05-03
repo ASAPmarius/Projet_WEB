@@ -884,6 +884,48 @@ async function handleRoundUpdate(data: any, userId: number, ws: WebSocket) {
   }
 }
 
+async function handleTurnChange(data: any, userId: number, username: string, ws: WebSocket) {
+  const { gameId, playerId } = data;
+  
+  if (!gameId || !playerId) {
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Missing game ID or player ID"
+    }));
+    return;
+  }
+  
+  try {
+    console.log(`Turn change: Game ${gameId}, Player ${playerId} (${username})`);
+    
+    // Get current game state
+    const gameState = await getGameState(gameId);
+    if (!gameState) {
+      throw new Error("Game state not found");
+    }
+    
+    // Update turn
+    gameState.currentTurn = playerId;
+    gameState.lastActionTime = new Date();
+    
+    // Save updated game state
+    await updateGameState(gameId, gameState);
+    
+    // Notify all clients about the turn change
+    notifyGameUsers(gameId, {
+      type: "turn_change",
+      playerId,
+      username: data.username || username
+    });
+  } catch (error) {
+    console.error("Error handling turn change:", error);
+    ws.send(JSON.stringify({
+      type: "error",
+      message: "Failed to process turn change"
+    }));
+  }
+}
+
 // Helper function to send game state
 async function sendGameState(gameId: number, ws: WebSocket) {
   try {
@@ -1769,6 +1811,10 @@ router.get("/", async (ctx) => {
 
           case "update_round":
           handleRoundUpdate(data, userId, ws);
+          break;
+
+          case "turn_change":
+          handleTurnChange(data, userId, username, ws);
           break;
         }
       } catch (error) {

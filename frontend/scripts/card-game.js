@@ -727,16 +727,20 @@ startWebSocketStatusChecks() {
   isMyTurn() {
     // If game is not in playing phase, return false
     if (this.gameState.phase !== 'playing') {
+      console.log('Not in playing phase');
       return false;
     }
     
-    // If no current turn set, allow playing
+    // If no current turn set, don't allow playing
     if (!this.gameState.currentTurn) {
-      return true;
+      console.log('No current turn set');
+      return false;
     }
     
     // Compare current turn with player ID
-    return String(this.gameState.currentTurn) === String(this.currentPlayerId);
+    const isTurn = Number(this.gameState.currentTurn) === Number(this.currentPlayerId);
+    console.log(`Turn check: currentTurn=${this.gameState.currentTurn}, currentPlayerId=${this.currentPlayerId}, isTurn=${isTurn}`);
+    return isTurn;
   }
   
   playCard(cardId) {

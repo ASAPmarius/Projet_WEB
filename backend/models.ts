@@ -64,7 +64,8 @@ export type WebSocketMessage =
   | { type: 'card_request'; gameId: number; auth_token: string; }
   | { type: 'hand_request'; gameId: number; auth_token: string; }
   | { type: 'update_game_state'; gameId: number; gameState: GameState; auth_token: string;}
-  | { type: 'update_round'; userId: number; auth_token: string; };
+  | { type: 'update_round'; userId: number; auth_token: string; }
+  | { type: 'turn_change'; playerId: number; gameId: number; username?: string; auth_token: string; };
 
 // Player action types
 export interface PlayerAction {
