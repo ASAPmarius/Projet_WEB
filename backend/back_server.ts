@@ -905,7 +905,7 @@ async function handleTurnChange(data: any, userId: number, username: string, ws:
     }
     
     // Update turn
-    gameState.currentTurn = playerId;
+    gameState.currentTurn = Number(playerId);
     gameState.lastActionTime = new Date();
     
     // Save updated game state

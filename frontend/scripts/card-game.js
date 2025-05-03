@@ -740,7 +740,6 @@ startWebSocketStatusChecks() {
     });
   }
   
-  // In card-game.js, improve the isMyTurn method
   isMyTurn() {
     // If game is not in playing phase, return false
     if (this.gameState.phase !== 'playing') {
@@ -754,10 +753,15 @@ startWebSocketStatusChecks() {
       return false;
     }
     
-    // Compare current turn with player ID - ensure both are converted to numbers
-    const isTurn = Number(this.gameState.currentTurn) === Number(this.currentPlayerId);
-    console.log(`Turn check: currentTurn=${this.gameState.currentTurn}, currentPlayerId=${this.currentPlayerId}, isTurn=${isTurn}`);
-    return isTurn;
+    // Add more robust type conversion
+    const currentTurn = Number(this.gameState.currentTurn);
+    const currentPlayerId = Number(this.currentPlayerId);
+    
+    // Log exact values with types for debugging
+    console.log(`Turn check: currentTurn=${currentTurn} (${typeof currentTurn}), currentPlayerId=${currentPlayerId} (${typeof currentPlayerId})`);
+    
+    // Compare as numbers
+    return currentTurn === currentPlayerId;
   }
   
   playCard(cardId) {

@@ -486,7 +486,7 @@ createBattleArea() {
       // Make a short pause before starting next round
       setTimeout(() => {
         // Set the winner as the first player for next round
-        this.gameState.currentTurn = winnerId;
+        this.gameState.currentTurn = Number(winnerId);
         
         // IMPORTANT: Clear the card slots here for all players
         this.clearTable();
@@ -497,7 +497,7 @@ createBattleArea() {
         // Send turn change message for next round
         this.sendWebSocketMessage({
           type: 'turn_change',
-          playerId: winnerId,
+          playerId: Number(winnerId),
           username: winner.username,
           gameId: this.currentGameId,
           auth_token: localStorage.getItem('auth_token')
