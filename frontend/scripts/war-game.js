@@ -510,7 +510,7 @@ createBattleArea() {
   }
 
   handlePlayCardAction(playerId, username, cardId) {
-    console.log(`Player ${username} played card ${cardId}`);
+    console.log(`Player ${username}(${playerId}) played card ${cardId}`);
     
     // Get the card data
     const cardData = this.cardsById[cardId];
@@ -519,51 +519,21 @@ createBattleArea() {
       return;
     }
     
-    // Only add to played cards if not already there
-    if (!this.playedCards[playerId]) {
-      console.log(`Adding card ${cardId} to played cards for player ${playerId}`);
-      this.playedCards[playerId] = cardData;
-      
-      // Update the card slot with the played card
-      this.updateCardSlot(playerId, cardData);
-      
-      // For the player who played the card, update hand if needed
-      if (String(playerId) === String(this.currentPlayerId)) {
-        const playerHand = this.hands[playerId];
-        if (playerHand) {
-          const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
-          if (cardIndex !== -1) {
-            console.log(`Removing card ${cardId} from hand (if not already removed)`);
-            playerHand.splice(cardIndex, 1);
-            this.updateHandDisplay();
-          }
-        }
+    // Update the UI to show the played card
+    this.updateCardSlot(playerId, cardData);
+    
+    // Show animation and notification
+    this.animateCardPlay(cardData);
+    this.showNotification(`${username} played a card`);
+    
+    // If this was our card, update our hand (server already removed it)
+    if (String(playerId) === String(this.currentPlayerId) && this.hands[playerId]) {
+      // Find and remove the card from local hand representation
+      const cardIndex = this.hands[playerId].findIndex(c => Number(c.id) === Number(cardId));
+      if (cardIndex !== -1) {
+        this.hands[playerId].splice(cardIndex, 1);
+        this.updateHandDisplay();
       }
-      
-      // Show animation for all players
-      this.animateCardPlay(cardData);
-      
-      // Show notification
-      this.showNotification(`${username} played a card`);
-      
-      // Check if both players have played cards
-      if (Object.keys(this.playedCards).length === 2) {
-        console.log("Both players have played cards, resolving round");
-        // Both players have played, resolve the round
-        if (!this._resolvingRound) {
-          this._resolvingRound = true;
-          setTimeout(() => {
-            this.resolveRound();
-            this._resolvingRound = false;
-          }, 1000); // Short delay to show cards
-        }
-      } else {
-        console.log(`Only one player has played, advancing turn from ${this.gameState.currentTurn}`);
-        // Only one player has played, advance to next player's turn
-        setTimeout(() => this.advanceTurn(), 500); // Short delay before advancing
-      }
-    } else {
-      console.log(`Card ${cardId} already recorded for player ${playerId}, skipping duplicate handling`);
     }
   }
   

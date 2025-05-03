@@ -35,14 +35,28 @@ export interface ChatMessage {
   Timestamp: Date;
 }
 
-// Game state model (simplified)
+// Add to backend/models.ts if not already there
+export interface CardMetadata {
+  id: number;
+  suit: string;
+  rank: string;
+  value: number;
+  picture: string;
+}
+
+// Update in backend/models.ts
 export interface GameState {
   phase: 'waiting' | 'setup' | 'playing' | 'finished';
   currentTurn: number | null;
   round: number;
   startTime?: Date;
   lastActionTime?: Date;
-  players?: PlayerState[];
+  
+  // Remove the ? to make these required properties
+  playerHands: Record<number, CardMetadata[]>;
+  playedCards: Record<number, CardMetadata | null>;
+  warPile: CardMetadata[];
+  lastWinner: number | null;
 }
 
 // Player state in game

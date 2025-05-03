@@ -526,28 +526,61 @@ startWebSocketStatusChecks() {
     }
   }
   
-  // In card-game.js, modify the handleGameState method
+// Replace in card-game.js
+
   handleGameState(data) {
     console.log('Processing game state update', data);
     
-    // Store previous round to detect round changes
+    // Store previous state info to detect changes
     const previousRound = this.gameState ? this.gameState.round : null;
+    const previousTurn = this.gameState ? this.gameState.currentTurn : null;
     
     // Update the local game state
     this.gameState = data.gameState;
     
-    // If the round has changed, clear the table - THIS IS THE KEY CHANGE
+    // If server is tracking hands, update our local representation
+    if (this.gameState.playerHands) {
+      this.hands = this.gameState.playerHands;
+      this.updateHandDisplay();
+    }
+    
+    // If server is tracking played cards, update locally
+    if (this.gameState.playedCards) {
+      this.playedCards = this.gameState.playedCards;
+      
+      // Update card display for each played card
+      Object.entries(this.playedCards).forEach(([playerId, card]) => {
+        if (card) this.updateCardSlot(playerId, card);
+      });
+    }
+    
+    // If the round has changed, update UI
     if (previousRound && this.gameState.round && previousRound !== this.gameState.round) {
-      console.log(`Round changed from ${previousRound} to ${this.gameState.round} - clearing table`);
-      if (this instanceof WarGame) {
+      console.log(`Round changed from ${previousRound} to ${this.gameState.round}`);
+      
+      // Clear the table UI if method exists
+      if (this.clearTable) {
         this.clearTable();
       }
     }
     
-    // Update the current turn indicator
-    if (this.gameState.currentTurn) {
-      console.log(`Current turn player ID: ${this.gameState.currentTurn}`);
-      this.highlightCurrentPlayer(this.gameState.currentTurn);
+    // If the turn has changed, update the UI
+    if (previousTurn !== this.gameState.currentTurn) {
+      console.log(`Turn changed from ${previousTurn} to ${this.gameState.currentTurn}`);
+      
+      // Highlight the current player
+      if (this.gameState.currentTurn) {
+        this.highlightCurrentPlayer(this.gameState.currentTurn);
+      }
+      
+      // Update my-turn state
+      const isMyTurn = Number(this.gameState.currentTurn) === Number(this.currentPlayerId);
+      this.setMyTurnState(isMyTurn);
+      
+      // Update hand display if it's my turn
+      if (isMyTurn) {
+        this.updateHandDisplay();
+      }
     }
     
     // Update UI elements based on game state
@@ -556,11 +589,6 @@ startWebSocketStatusChecks() {
     // Update round indicator if needed
     if (this.gameState.round) {
       this.updateRoundIndicator(this.gameState.round);
-    }
-    
-    // If game just started, initialize hands
-    if (this.gameState.phase === 'playing' && Object.keys(this.hands).length === 0) {
-      this.initializeHands();
     }
   }
   

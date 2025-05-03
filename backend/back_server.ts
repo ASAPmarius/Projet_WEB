@@ -14,7 +14,7 @@ import { create, verify } from 'djwt';
 import { Client } from 'postgres';
 import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
 import { CardService } from "./card_service.ts";
-import { GameState, User, Connection, WebSocketMessage, ChatMessage, Card, Game } from "./models.ts";
+import { GameState, User, Connection, WebSocketMessage, ChatMessage, Card, Game , CardMetadata} from "./models.ts";
 
 // Global error handler
 addEventListener("error", (event) => {
@@ -482,25 +482,22 @@ await checkAndCleanupFinishedGames();
 // Current game tracking
 let currentGameId: number | null = null;
 
-// Function to get card back image (id 54)
-async function getCardBackImage(): Promise<Uint8Array | null> {
-  const result = await client.queryObject<{ Picture: Uint8Array }>(
-    'SELECT "Picture" FROM "Cards" WHERE "idCardType" = 54'
-  );
-  return result.rows.length > 0 ? result.rows[0].Picture : null;
-}
-
 async function initializeGameState(gameId: number): Promise<GameState> {
   // Get the players in the game
   const players = await getUsersInGame(gameId);
   
   // Initialize with a more complete state
   const initialState: GameState = {
-    phase: players.length >= 2 ? 'playing' : 'waiting', // Start in playing phase if enough players
-    currentTurn: players.length > 0 ? players[0].idUser : null, // Set first player's turn
+    phase: players.length >= 2 ? 'playing' : 'waiting',
+    currentTurn: players.length > 0 ? players[0].idUser : null,
     round: 1,
     startTime: new Date(),
-    lastActionTime: new Date()
+    lastActionTime: new Date(),
+    // Add these required properties
+    playerHands: {},
+    playedCards: {},
+    warPile: [],
+    lastWinner: null
   };
   
   console.log(`Initialized game state for game ${gameId}: ${JSON.stringify(initialState)}`);
@@ -924,6 +921,339 @@ async function handleTurnChange(data: any, userId: number, username: string, ws:
       message: "Failed to process turn change"
     }));
   }
+}
+
+async function loadAllCardsWithMetadata(): Promise<CardMetadata[]> {
+  try {
+    // Load all cards from database
+    const cards = await client.queryObject<Card>(
+      'SELECT * FROM "Cards" ORDER BY "idCardType"'
+    );
+    
+    if (!cards.rows.length) {
+      console.error('No cards found in database');
+      return [];
+    }
+    
+    // Convert DB cards to cards with metadata
+    const cardsWithMetadata: CardMetadata[] = cards.rows.map(card => {
+      // Extract metadata based on card ID
+      const metadata = getCardMetadata(card.idCardType);
+      
+      // Convert binary image to data URL
+      const imageData = bytesToDataURL(card.Picture, 'image/png');
+      
+      // Create the card metadata object
+      return {
+        id: card.idCardType,
+        suit: metadata.suit,
+        rank: metadata.rank,
+        value: metadata.value,
+        picture: imageData
+      };
+    });
+    
+    console.log(`Loaded ${cardsWithMetadata.length} cards with metadata`);
+    return cardsWithMetadata;
+  } catch (error) {
+    console.error('Error loading cards with metadata:', error);
+    return [];
+  }
+}
+
+// Helper function to get card metadata
+function getCardMetadata(cardTypeId: number): { suit: string; rank: string; value: number } {
+  // Card IDs 1-52 are standard playing cards
+  if (cardTypeId < 1 || cardTypeId > 54) {
+    return { suit: 'unknown', rank: 'unknown', value: 0 };
+  }
+  
+  // Card ID 53 is joker, 54 is card back
+  if (cardTypeId === 53) {
+    return { suit: 'special', rank: 'joker', value: 0 };
+  }
+  
+  if (cardTypeId === 54) {
+    return { suit: 'special', rank: 'back', value: 0 };
+  }
+  
+  // For standard cards (1-52)
+  // Suit: 1-13 = hearts, 14-26 = diamonds, 27-39 = clubs, 40-52 = spades
+  // Rank: Each suit starts with 2 and ends with Ace
+  
+  let suitIndex = Math.floor((cardTypeId - 1) / 13);
+  let rankIndex = (cardTypeId - 1) % 13;
+  
+  const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
+  const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
+  const values = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]; // Values for comparison (Ace high)
+  
+  return {
+    suit: suits[suitIndex],
+    rank: ranks[rankIndex],
+    value: values[rankIndex]
+  };
+}
+
+async function advanceTurn(gameId: number): Promise<void> {
+  try {
+    // Get current game state
+    const gameState = await getGameState(gameId);
+    if (!gameState) {
+      console.error(`Game state not found for game ${gameId}`);
+      return;
+    }
+    
+    // Get all players in the game
+    const players = await getUsersInGame(gameId);
+    if (players.length < 2) {
+      console.error(`Not enough players in game ${gameId} to advance turn`);
+      return;
+    }
+    
+    // Find current player index
+    const currentTurn = gameState.currentTurn;
+    const currentPlayerIndex = players.findIndex(p => Number(p.idUser) === Number(currentTurn));
+    
+    if (currentPlayerIndex === -1) {
+      console.error(`Current turn player ${currentTurn} not found in players list`);
+      return;
+    }
+    
+    // Calculate next player index
+    const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
+    const nextPlayerId = players[nextPlayerIndex].idUser;
+    
+    console.log(`Advancing turn from player ${currentTurn} to player ${nextPlayerId}`);
+    
+    // Update game state
+    gameState.currentTurn = nextPlayerId;
+    gameState.lastActionTime = new Date();
+    await updateGameState(gameId, gameState);
+    
+    // Notify all clients about the turn change
+    notifyGameUsers(gameId, {
+      type: "turn_change",
+      playerId: nextPlayerId,
+      gameId: gameId,
+      username: players[nextPlayerIndex].Username
+    });
+    
+    console.log(`Turn advanced for game ${gameId}`);
+  } catch (error) {
+    console.error(`Error advancing turn for game ${gameId}:`, error);
+  }
+}
+
+async function handlePlayCard(gameId: number, playerId: number, cardId: number): Promise<boolean> {
+  // Get current game state
+  const gameState = await getGameState(gameId);
+  if (!gameState) return false;
+  
+  // Ensure we're tracking player hands
+  if (!gameState.playerHands) {
+    gameState.playerHands = {};
+  }
+  
+  // Ensure we're tracking played cards
+  if (!gameState.playedCards) {
+    gameState.playedCards = {};
+  }
+  
+  // Validate it's the player's turn
+  if (gameState.currentTurn !== playerId) {
+    return false;
+  }
+  
+  // Check if player already played a card
+  if (gameState.playedCards[playerId]) {
+    return false;
+  }
+  
+  // Get player's hand
+  const hand = gameState.playerHands[playerId] || [];
+  
+  // Find the card
+  const cardIndex = hand.findIndex(card => card.id === cardId);
+  if (cardIndex === -1) return false;
+  
+  // Get the card
+  const card = hand[cardIndex];
+  
+  // Remove from hand
+  hand.splice(cardIndex, 1);
+  
+  // Add to played cards
+  gameState.playedCards[playerId] = card;
+  
+  // Update game state
+  await updateGameState(gameId, gameState);
+  
+  // Notify all clients
+  notifyGameUsers(gameId, {
+    type: "player_action",
+    playerId,
+    action: {
+      type: "play_card",
+      cardId
+    }
+  });
+  
+  // Check if round should be resolved
+  if (Object.keys(gameState.playedCards).length === 2) {
+    resolveRound(gameId);
+  } else {
+    // Advance to next player's turn
+    advanceTurn(gameId);
+  }
+  
+  return true;
+}
+
+// Add to back_server.ts
+
+async function resolveRound(gameId: number): Promise<void> {
+  // Get current game state
+  const gameState = await getGameState(gameId);
+  if (!gameState) return;
+  
+  // Get the played cards
+  const playedCards = gameState.playedCards || {};
+  if (Object.keys(playedCards).length !== 2) return;
+
+  const playerIds = Object.keys(playedCards).map(Number);
+  const player1Id = playerIds[0];
+  const player2Id = playerIds[1];
+
+  // Add null checks
+  const card1 = playedCards[player1Id];
+  const card2 = playedCards[player2Id];
+
+  if (!card1 || !card2) {
+    console.error('Missing played cards for one or both players');
+    return;
+  }
+
+  // Now TypeScript knows these aren't null
+  let winnerId: number;
+  if (card1.value > card2.value) {
+    winnerId = player1Id;
+  } else if (card1.value < card2.value) {
+    winnerId = player2Id;
+  } else {
+    // Handle war (tie)
+    winnerId = player1Id; // Default winner for ties
+  }
+  
+  // Add cards to winner's hand
+  if (!gameState.playerHands[winnerId]) {
+    gameState.playerHands[winnerId] = [];
+  }
+  
+  // Add played cards to winner's hand
+  const cardsToAdd = Object.values(playedCards)
+  .filter((card): card is CardMetadata => card !== null);
+
+// Now we can safely add to the winner's hand
+  if (!gameState.playerHands[winnerId]) {
+    gameState.playerHands[winnerId] = [];
+  }
+  gameState.playerHands[winnerId].push(...cardsToAdd);
+  
+  // Update round
+  gameState.round = (gameState.round || 1) + 1;
+  gameState.lastWinner = Number(winnerId);
+  
+  // Clear played cards
+  gameState.playedCards = {};
+  
+  // Update game state
+  await updateGameState(gameId, gameState);
+  
+  // Get winner name
+  const users = await getUsersInGame(gameId);
+  const winner = users.find(u => String(u.idUser) === String(winnerId));
+  
+  // Notify all clients
+  notifyGameUsers(gameId, {
+    type: "round_result",
+    winnerId: Number(winnerId),
+    winnerName: winner ? winner.Username : "Unknown",
+    cardCount: cardsToAdd.length,
+    newRound: gameState.round
+  });
+  
+  // Set the winner as the next player
+  if (winner) {
+    gameState.currentTurn = Number(winnerId);
+    await updateGameState(gameId, gameState);
+    
+    notifyGameUsers(gameId, {
+      type: "turn_change",
+      playerId: Number(winnerId),
+      username: winner.Username
+    });
+  }
+}
+
+// Add to back_server.ts
+
+async function initializeGame(gameId: number): Promise<void> {
+  // Get the game
+  const game = await getGameById(gameId);
+  if (!game) return;
+  
+  // Get players
+  const players = await getUsersInGame(gameId);
+  if (players.length < 2) return;
+  
+  // Create game state if it doesn't exist
+  let gameState = await getGameState(gameId);
+  if (!gameState) {
+    gameState = {
+      phase: 'playing',
+      currentTurn: players[0].idUser,
+      round: 1,
+      startTime: new Date(),
+      lastActionTime: new Date(),
+      playerHands: {},
+      playedCards: {},
+      warPile: [],
+      lastWinner: null
+    };
+  }
+  
+  const cards = await loadAllCardsWithMetadata();
+  const deck = cards.filter((card: CardMetadata) => card.id >= 1 && card.id <= 52);
+  
+  // Shuffle the deck
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  
+  // Divide cards between players
+  const halfDeck = Math.floor(deck.length / 2);
+  
+  gameState.playerHands = {};
+  players.forEach((player, index) => {
+    if (index === 0) {
+      gameState.playerHands[player.idUser] = deck.slice(0, halfDeck);
+    } else if (index === 1) {
+      gameState.playerHands[player.idUser] = deck.slice(halfDeck);
+    } else {
+      gameState.playerHands[player.idUser] = [];
+    }
+  });
+  
+  // Update game state
+  await updateGameState(gameId, gameState);
+  
+  // Notify all players
+  notifyGameUsers(gameId, {
+    type: "game_state",
+    gameState
+  });
 }
 
 // Helper function to send game state
