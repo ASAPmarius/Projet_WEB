@@ -526,11 +526,23 @@ startWebSocketStatusChecks() {
     }
   }
   
+  // In card-game.js, modify the handleGameState method
   handleGameState(data) {
     console.log('Processing game state update', data);
     
+    // Store previous round to detect round changes
+    const previousRound = this.gameState ? this.gameState.round : null;
+    
     // Update the local game state
     this.gameState = data.gameState;
+    
+    // If the round has changed, clear the table - THIS IS THE KEY CHANGE
+    if (previousRound && this.gameState.round && previousRound !== this.gameState.round) {
+      console.log(`Round changed from ${previousRound} to ${this.gameState.round} - clearing table`);
+      if (this instanceof WarGame) {
+        this.clearTable();
+      }
+    }
     
     // Update the current turn indicator
     if (this.gameState.currentTurn) {
@@ -578,7 +590,7 @@ startWebSocketStatusChecks() {
     }
   }
   
-  // In card-game.js, modify the handleTurnChange method
+  // Add this to the handleTurnChange method in card-game.js
   handleTurnChange(data) {
     console.log('Processing turn change');
     
@@ -728,7 +740,7 @@ startWebSocketStatusChecks() {
     });
   }
   
-  // Check if it's the current player's turn
+  // In card-game.js, improve the isMyTurn method
   isMyTurn() {
     // If game is not in playing phase, return false
     if (this.gameState.phase !== 'playing') {
@@ -742,7 +754,7 @@ startWebSocketStatusChecks() {
       return false;
     }
     
-    // Compare current turn with player ID
+    // Compare current turn with player ID - ensure both are converted to numbers
     const isTurn = Number(this.gameState.currentTurn) === Number(this.currentPlayerId);
     console.log(`Turn check: currentTurn=${this.gameState.currentTurn}, currentPlayerId=${this.currentPlayerId}, isTurn=${isTurn}`);
     return isTurn;
@@ -816,46 +828,63 @@ startWebSocketStatusChecks() {
     this.showNotification(`${username} drew a card`);
   }
   
+  // In war-game.js, modify handlePlayCardAction method
   handlePlayCardAction(playerId, username, cardId) {
     console.log(`Player ${username} played card ${cardId}`);
     
-    // Find the card data - we'll need this for animation regardless of which player
+    // Get the card data
     const cardData = this.cardsById[cardId];
+    if (!cardData) {
+      console.warn(`Card data not found for ID ${cardId}`);
+      return;
+    }
     
-    // For the player who made the move
-    if (String(playerId) === String(this.currentPlayerId)) {
-      // Find the card in the player's hand
-      const playerHand = this.hands[playerId];
-      if (playerHand) {
-        // Find the card index
-        const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
-        if (cardIndex !== -1) {
-          // Remove the card from hand
-          const card = playerHand.splice(cardIndex, 1)[0];
-          
-          // Add to discard pile
-          this.discardPile.push(card);
-          
-          // Update hand display
-          setTimeout(() => {
+    // Only add to played cards if not already there
+    if (!this.playedCards[playerId]) {
+      console.log(`Adding card ${cardId} to played cards for player ${playerId}`);
+      this.playedCards[playerId] = cardData;
+      
+      // Update the card slot with the played card
+      this.updateCardSlot(playerId, cardData);
+      
+      // For the player who played the card, update hand if needed
+      if (String(playerId) === String(this.currentPlayerId)) {
+        const playerHand = this.hands[playerId];
+        if (playerHand) {
+          const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
+          if (cardIndex !== -1) {
+            console.log(`Removing card ${cardId} from hand (if not already removed)`);
+            playerHand.splice(cardIndex, 1);
             this.updateHandDisplay();
-          }, 500);
+          }
         }
       }
-    }
-    
-    // For ALL players (including the one who played), animate the card
-    if (cardData) {
+      
+      // Show animation for all players
       this.animateCardPlay(cardData);
+      
+      // Show notification
+      this.showNotification(`${username} played a card`);
+      
+      // Check if both players have played cards
+      if (Object.keys(this.playedCards).length === 2) {
+        console.log("Both players have played cards, resolving round");
+        // Both players have played, resolve the round
+        if (!this._resolvingRound) {
+          this._resolvingRound = true;
+          setTimeout(() => {
+            this.resolveRound();
+            this._resolvingRound = false;
+          }, 1000); // Short delay to show cards
+        }
+      } else {
+        console.log(`Only one player has played, advancing turn from ${this.gameState.currentTurn}`);
+        // Only one player has played, advance to next player's turn
+        setTimeout(() => this.advanceTurn(), 500); // Short delay before advancing
+      }
     } else {
-      console.warn(`Card data not found for ID ${cardId}`);
+      console.log(`Card ${cardId} already recorded for player ${playerId}, skipping duplicate handling`);
     }
-    
-    // Show notification for all players
-    this.showNotification(`${username} played a card`);
-    
-    // Check for game end conditions
-    this.checkGameEndConditions();
   }
   // Handle play war cards action
   handlePlayWarCardsAction(playerId, username, count) {

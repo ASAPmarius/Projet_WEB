@@ -158,11 +158,18 @@ createBattleArea() {
     this.updateTablePlayersWar(players, currentUsername);
   }
   
+  // In war-game.js, modify the playCard method
   playCard(cardId) {
     // Check if it's the player's turn
     if (!this.isMyTurn()) {
       this.showNotification("It's not your turn to play");
       console.log("Turn prevented - not this player's turn");
+      return;
+    }
+    
+    // Check if we already have a played card for this player
+    if (this.playedCards[this.currentPlayerId]) {
+      console.log("Card already played for this player in this round");
       return;
     }
     
@@ -196,10 +203,13 @@ createBattleArea() {
       auth_token: localStorage.getItem('auth_token')
     });
     
-    // CRITICAL: Don't advance turn here! Let the server message handler do it
-    // Only update the UI locally for responsiveness
+    // Remove the card from hand
     playerHand.splice(cardIndex, 1);
+    
+    // Record played card
     this.playedCards[this.currentPlayerId] = card;
+    
+    // Update UI
     this.updateCardSlot(this.currentPlayerId, card);
     this.updateHandDisplay();
   }
@@ -241,6 +251,15 @@ createBattleArea() {
       // Otherwise, advance turn
       this.advanceTurn();
     }
+  }
+
+  clearTable() {
+    // Clear card slots
+    this.clearCardSlots();
+    
+    // CRITICAL: Reset played cards object
+    this.playedCards = {};
+    console.log("Explicitly clearing playedCards in clearTable", this.playedCards);
   }
   
   // Display war cards animation
@@ -384,6 +403,7 @@ createBattleArea() {
     return 0; // War (tie)
   }
   
+  // In war-game.js, modify the resolveRound() method
   resolveRound() {
     console.log("Resolving round with played cards:", this.playedCards);
     
@@ -467,12 +487,17 @@ createBattleArea() {
       setTimeout(() => {
         // Set the winner as the first player for next round
         this.gameState.currentTurn = winnerId;
+        
+        // IMPORTANT: Clear the card slots here for all players
+        this.clearTable();
+        
+        // Then update the UI based on the new state
         this.highlightCurrentPlayer(this.gameState.currentTurn);
         
         // Send turn change message for next round
         this.sendWebSocketMessage({
           type: 'turn_change',
-          playerId: this.gameState.currentTurn,
+          playerId: winnerId,
           username: winner.username,
           gameId: this.currentGameId,
           auth_token: localStorage.getItem('auth_token')
@@ -480,6 +505,7 @@ createBattleArea() {
         
         console.log(`Next round starting with ${winner.username}'s turn (ID: ${winnerId})`);
       }, 2000);
+      
     }
   }
 
