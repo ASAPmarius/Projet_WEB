@@ -578,6 +578,7 @@ startWebSocketStatusChecks() {
     }
   }
   
+  // In card-game.js, modify the handleTurnChange method
   handleTurnChange(data) {
     console.log('Processing turn change');
     
@@ -588,11 +589,15 @@ startWebSocketStatusChecks() {
     this.highlightCurrentPlayer(data.playerId);
     
     // Check if it's my turn
-    const isMyTurn = String(data.playerId) === String(this.currentPlayerId);
+    const isMyTurn = Number(data.playerId) === Number(this.currentPlayerId);
     this.setMyTurnState(isMyTurn);
     
     // Show notification about whose turn it is
     this.showTurnNotification(data.username);
+    
+    if (isMyTurn) {
+      this.updateHandDisplay();
+    }
   }
   
   handleError(data) {
