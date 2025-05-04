@@ -930,8 +930,8 @@ handleRoundResult(data) {
     this.showNotification(`${username} played a war card!`, 'war-card');
   }
   
-  // Animate a card being played
-  animateCardPlay(card, isWarCard = false) {
+  // In card-game.js, replace the existing animateCardPlay method with this:
+  animateCardPlay(card, isWarCard = false, isOpponent = false) {
     // Create a temporary element for the animation
     const animatedCard = document.createElement('div');
     animatedCard.className = 'animated-card';
@@ -952,28 +952,40 @@ handleRoundResult(data) {
     
     animatedCard.appendChild(cardImage);
     
-    // Position initially near hand
-    animatedCard.style.bottom = '150px';
+    // Position differently based on player source
+    if (isOpponent) {
+      // For opponent cards - come from top
+      animatedCard.style.top = '50px';
+      animatedCard.style.bottom = 'auto';
+    } else {
+      // For player cards - come from bottom (original behavior)
+      animatedCard.style.bottom = '150px';
+      animatedCard.style.top = 'auto';
+    }
+    
     animatedCard.style.left = '50%';
     animatedCard.style.transform = 'translateX(-50%)';
     
     // Add to document
     document.body.appendChild(animatedCard);
     
-    // Animate to center with more dramatic effect for war cards
+    // Animate to center
     setTimeout(() => {
       if (isWarCard) {
-        animatedCard.style.transform = 'translate(-50%, 50%) scale(1.2)';
+        animatedCard.style.transform = 'translate(-50%, 0) scale(1.2)';
         animatedCard.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
       } else {
-        animatedCard.style.transform = 'translate(-50%, 50%)';
+        animatedCard.style.transform = 'translate(-50%, 0)';
       }
-      animatedCard.style.bottom = '50%';
+      
+      // Move to center position regardless of starting point
+      animatedCard.style.top = isOpponent ? '50%' : 'auto';
+      animatedCard.style.bottom = isOpponent ? 'auto' : '50%';
       
       // Remove after animation
       setTimeout(() => {
         animatedCard.remove();
-      }, isWarCard ? 800 : 500); // Longer display for war cards
+      }, isWarCard ? 800 : 500);
     }, 10);
   }
   

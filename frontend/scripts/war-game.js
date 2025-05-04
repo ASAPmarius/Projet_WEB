@@ -326,8 +326,35 @@ class WarGame extends CardGameFramework {
     // Update scoreboard if it exists
     this.updateScoreboard();
   }
+
+  // In war-game.js, find where handlePlayerAction is used or add this method if not present:
+  handlePlayerAction(data) {
+    // First call the parent handler
+    super.handlePlayerAction(data);
+    
+    const { playerId, action } = data;
+    
+    // Determine if the action is from an opponent
+    const isOpponent = String(playerId) !== String(this.currentPlayerId);
+    
+    // For specific card plays in War game
+    if (action.type === 'play_card' || action.type === 'play_war_card') {
+      // If we have the card data
+      const cardId = action.cardId;
+      const card = this.cardsById[cardId];
+      
+      if (card) {
+        // Animate with proper source player
+        this.animateCardPlay(card, action.type === 'play_war_card', isOpponent);
+        
+        // Clear any face down card previously in this slot if needed
+        if (this.faceDownCardSlots && this.faceDownCardSlots[playerId]) {
+          delete this.faceDownCardSlots[playerId];
+        }
+      }
+    }
+  }
   
-  // Add this new method to animate face-down cards
   animateFaceDownCards() {
     // Get all players for reference
     if (!this.players || this.players.length < 2) return;
@@ -337,6 +364,9 @@ class WarGame extends CardGameFramework {
     
     // Animate for each player (one at a time with delay)
     this.players.slice(0, 2).forEach((player, index) => {
+      // Determine if it's the current player or opponent
+      const isOpponent = String(player.id) !== String(this.currentPlayerId);
+      
       // Add short delay for second player for better visual effect
       setTimeout(() => {
         // Create a face down card element
@@ -346,14 +376,35 @@ class WarGame extends CardGameFramework {
           suit: 'hidden'
         };
         
-        // Animate the card being played
-        this.animateCardPlay(faceDownCard);
+        // Animate the card being played with the isOpponent flag
+        this.animateCardPlay(faceDownCard, false, isOpponent);
         
-        // Don't update the card slot yet - that will happen when war cards are played
+        // Update the card slot with the face down card
+        // Determine which slot to update
+        const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
+        const slot = document.getElementById(slotId);
+        
+        if (slot) {
+          // First, store the current content in a temporary element
+          const tempContent = slot.innerHTML;
+          
+          // Clear and update with face down card
+          slot.innerHTML = '';
+          const cardImg = document.createElement('img');
+          cardImg.src = cardBackImage;
+          cardImg.alt = 'Card face down';
+          cardImg.className = 'war-card-image face-down';
+          slot.appendChild(cardImg);
+          
+          // Schedule removal of face down card when the face up card will be displayed
+          // Usually in the next round of play
+          this.faceDownCardSlots = this.faceDownCardSlots || {};
+          this.faceDownCardSlots[player.id] = true;
+        }
       }, index * 800); // Slight delay between players
     });
   }
-}
+  }
 
 // Initialize the War game when the window is loaded
 globalThis.addEventListener('load', function() {
