@@ -525,6 +525,9 @@ async function startGame(gameId: number): Promise<void> {
       // Update the game state
       await updateGameState(gameId, gameState);
       
+      // ADD THIS LINE: Initialize the game with cards for each player
+      await initializeGame(gameId);
+      
       // Notify all players that the game has started
       notifyGameUsers(gameId, {
         type: 'game_state',
