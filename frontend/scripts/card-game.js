@@ -644,31 +644,43 @@ startWebSocketStatusChecks() {
     }
   }
 
-  handleRoundResult(data) {
-    console.log(`Round result received: ${data.winnerName} won ${data.cardCount} cards`);
-    
-    // Get result indicator
-    const resultIndicator = document.getElementById('warResult');
-    if (resultIndicator) {
-      resultIndicator.textContent = `${data.winnerName} wins the round!`;
-      resultIndicator.className = 'war-result-indicator winner';
-    }
-    
-    // Update game state from server data
-    this.gameState.round = data.newRound;
-    
-    // Clear played cards (UI only)
-    this.playedCards = {};
-    
-    // Clear card slots
-    this.clearCardSlots();
-    
-    // Show notification
-    this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
-    
-    // Update scoreboard after a short delay (to receive updated hand sizes)
-    setTimeout(() => this.updateScoreboard(), 500);
+// In card-game.js, update the handleRoundResult method
+
+handleRoundResult(data) {
+  console.log(`Round result received: ${data.winnerName} won ${data.cardCount} cards`);
+  
+  // Get result indicator
+  const resultIndicator = document.getElementById('warResult');
+  if (resultIndicator) {
+    resultIndicator.textContent = `${data.winnerName} wins the round!`;
+    resultIndicator.className = 'war-result-indicator winner';
   }
+  
+  // Update game state from server data
+  this.gameState.round = data.newRound;
+  
+  // Clear played cards (UI only)
+  this.playedCards = {};
+  
+  // Clear card slots
+  this.clearCardSlots();
+  
+  // Show notification
+  this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
+  
+  // Update scoreboard after a short delay (to receive updated hand sizes)
+  setTimeout(() => this.updateScoreboard(), 500);
+  
+  // Add this line to request fresh game state from server
+  setTimeout(() => {
+    this.sendWebSocketMessage({
+      type: 'game_state_request',
+      gameId: this.currentGameId,
+      auth_token: localStorage.getItem('auth_token')
+    });
+    console.log('Requesting updated game state after round result');
+  }, 700); // Wait a bit longer than the scoreboard update
+}
   
   handleError(data) {
     console.error('Game error:', data.message);

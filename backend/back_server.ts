@@ -611,8 +611,12 @@ async function updateGameState(gameId: number, gameState: GameState): Promise<vo
       'UPDATE "Game" SET "GameState" = $1 WHERE "idGame" = $2',
       [gameStateJSON, gameId]
     );
-    
-    console.log(`Updated game state for game ${gameId}: ${gameStateJSON}`);
+    const gameStateWithoutPlayerHands = {
+      ...gameState,
+      playerHands: undefined
+    };
+
+    console.log(`Updated game state for game ${gameId}:`, JSON.stringify(gameStateWithoutPlayerHands, null, 2));
   } catch (error) {
     console.error(`Error updating game state for game ${gameId}:`, error);
     throw error;
@@ -1295,6 +1299,14 @@ async function handleWarEnd(gameId: number, gameState: GameState, winnerId: numb
   // Award all cards in war pile to winner
   const cardsWon = [...gameState.warPile];
   gameState.playerHands[winnerId].push(...cardsWon);
+
+  // Log both players' hands without the 'picture' property
+  const playerHandsWithoutPictures = Object.entries(gameState.playerHands).map(([playerId, hand]) => ({
+    playerId,
+    hand: hand.map(({ id, suit, rank, value }) => ({ id, suit, rank, value }))
+  }));
+
+  console.log("Player hands without pictures:", playerHandsWithoutPictures);
   
   // Clear war state
   gameState.inWar = false;
