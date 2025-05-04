@@ -695,6 +695,10 @@ async function handlePlayerAction(data: any, userId: number, username: string, w
         return;
       }
     }
+
+    if (action.type === 'play_card' && action.cardId) {
+      await handlePlayCard(gameId, userId, action.cardId);
+    }
     
     // THIS IS THE CRITICAL PART - make sure this is broadcasting to everyone
     notifyGameUsers(gameId, {
@@ -1113,8 +1117,6 @@ async function handlePlayCard(gameId: number, playerId: number, cardId: number):
   return true;
 }
 
-// Add to back_server.ts
-
 async function resolveRound(gameId: number): Promise<void> {
   // Get current game state
   const gameState = await getGameState(gameId);
@@ -1137,7 +1139,7 @@ async function resolveRound(gameId: number): Promise<void> {
     return;
   }
 
-  // Now TypeScript knows these aren't null
+  // Compare cards to determine winner
   let winnerId: number;
   if (card1.value > card2.value) {
     winnerId = player1Id;
@@ -1145,27 +1147,30 @@ async function resolveRound(gameId: number): Promise<void> {
     winnerId = player2Id;
   } else {
     // Handle war (tie)
-    winnerId = player1Id; // Default winner for ties
+    // For simplicity, default winner for ties
+    winnerId = player1Id;
   }
   
-  // Add cards to winner's hand
+  // Update hands - add both cards to winner's hand
   if (!gameState.playerHands[winnerId]) {
     gameState.playerHands[winnerId] = [];
   }
   
-  // Add played cards to winner's hand
+  // Add played cards to winner's hand (filter out nulls for safety)
   const cardsToAdd = Object.values(playedCards)
-  .filter((card): card is CardMetadata => card !== null);
+    .filter((card): card is CardMetadata => card !== null);
 
-// Now we can safely add to the winner's hand
-  if (!gameState.playerHands[winnerId]) {
-    gameState.playerHands[winnerId] = [];
-  }
   gameState.playerHands[winnerId].push(...cardsToAdd);
+  
+  // Add any war pile cards if they exist
+  if (gameState.warPile && gameState.warPile.length > 0) {
+    gameState.playerHands[winnerId].push(...gameState.warPile);
+    gameState.warPile = []; // Clear war pile
+  }
   
   // Update round
   gameState.round = (gameState.round || 1) + 1;
-  gameState.lastWinner = Number(winnerId);
+  gameState.lastWinner = winnerId;
   
   // Clear played cards
   gameState.playedCards = {};
@@ -1175,31 +1180,30 @@ async function resolveRound(gameId: number): Promise<void> {
   
   // Get winner name
   const users = await getUsersInGame(gameId);
-  const winner = users.find(u => String(u.idUser) === String(winnerId));
+  const winner = users.find(u => Number(u.idUser) === Number(winnerId));
   
-  // Notify all clients
+  // Notify all clients about the round result
   notifyGameUsers(gameId, {
     type: "round_result",
-    winnerId: Number(winnerId),
+    winnerId: winnerId,
     winnerName: winner ? winner.Username : "Unknown",
     cardCount: cardsToAdd.length,
     newRound: gameState.round
   });
   
   // Set the winner as the next player
+  gameState.currentTurn = winnerId;
+  await updateGameState(gameId, gameState);
+  
+  // Notify about turn change
   if (winner) {
-    gameState.currentTurn = Number(winnerId);
-    await updateGameState(gameId, gameState);
-    
     notifyGameUsers(gameId, {
       type: "turn_change",
-      playerId: Number(winnerId),
+      playerId: winnerId,
       username: winner.Username
     });
   }
 }
-
-// Add to back_server.ts
 
 async function initializeGame(gameId: number): Promise<void> {
   // Get the game

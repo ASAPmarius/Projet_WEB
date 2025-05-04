@@ -391,7 +391,11 @@ startWebSocketStatusChecks() {
         case 'error':
           this.handleError(data);
           break;
-          
+
+        case "round_result":
+          this.handleRoundResult(data);
+          break;
+        
         default:
           console.log('Unknown message type:', data.type);
       }
@@ -638,6 +642,32 @@ startWebSocketStatusChecks() {
     if (isMyTurn) {
       this.updateHandDisplay();
     }
+  }
+
+  handleRoundResult(data) {
+    console.log(`Round result received: ${data.winnerName} won ${data.cardCount} cards`);
+    
+    // Get result indicator
+    const resultIndicator = document.getElementById('warResult');
+    if (resultIndicator) {
+      resultIndicator.textContent = `${data.winnerName} wins the round!`;
+      resultIndicator.className = 'war-result-indicator winner';
+    }
+    
+    // Update game state from server data
+    this.gameState.round = data.newRound;
+    
+    // Clear played cards (UI only)
+    this.playedCards = {};
+    
+    // Clear card slots
+    this.clearCardSlots();
+    
+    // Show notification
+    this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
+    
+    // Update scoreboard after a short delay (to receive updated hand sizes)
+    setTimeout(() => this.updateScoreboard(), 500);
   }
   
   handleError(data) {
