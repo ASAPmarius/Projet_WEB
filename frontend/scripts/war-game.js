@@ -509,8 +509,9 @@ createBattleArea() {
     }
   }
 
+  // In war-game.js, modify the handlePlayCardAction method
   handlePlayCardAction(playerId, username, cardId) {
-    console.log(`Player ${username}(${playerId}) played card ${cardId}`);
+    console.log(`Player ${username} played card ${cardId}`);
     
     // Get the card data
     const cardData = this.cardsById[cardId];
@@ -534,6 +535,30 @@ createBattleArea() {
         this.hands[playerId].splice(cardIndex, 1);
         this.updateHandDisplay();
       }
+    }
+    
+    // CRITICAL FIX: Record played card
+    if (!this.playedCards) {
+      this.playedCards = {};
+    }
+    this.playedCards[playerId] = cardData;
+    console.log("Updated playedCards:", this.playedCards);
+    
+    // Check if both players have played cards
+    if (Object.keys(this.playedCards).length === 2) {
+      console.log("Both players have played cards, resolving round");
+      // Both players have played, resolve the round
+      if (!this._resolvingRound) {
+        this._resolvingRound = true;
+        setTimeout(() => {
+          this.resolveRound();
+          this._resolvingRound = false;
+        }, 1000); // Short delay to show cards
+      }
+    } else {
+      console.log(`Only one player has played, advancing turn from ${this.gameState.currentTurn}`);
+      // Only one player has played, explicitly advance to next player's turn
+      setTimeout(() => this.advanceTurn(), 500); // Short delay before advancing
     }
   }
   
