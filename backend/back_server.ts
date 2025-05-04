@@ -611,12 +611,17 @@ async function updateGameState(gameId: number, gameState: GameState): Promise<vo
       'UPDATE "Game" SET "GameState" = $1 WHERE "idGame" = $2',
       [gameStateJSON, gameId]
     );
-    const gameStateWithoutPlayerHands = {
+    const gameStateWithoutSensitiveData = {
       ...gameState,
-      playerHands: undefined
+      playerHands: undefined,
+      playedCards: Object.fromEntries(
+      Object.entries(gameState.playedCards || {}).map(([playerId, card]) => [
+        playerId, { ...card, picture: undefined }
+      ])
+      )
     };
 
-    console.log(`Updated game state for game ${gameId}:`, JSON.stringify(gameStateWithoutPlayerHands, null, 2));
+    console.log(`Updated game state for game ${gameId}:`, JSON.stringify(gameStateWithoutSensitiveData, null, 2));
   } catch (error) {
     console.error(`Error updating game state for game ${gameId}:`, error);
     throw error;
@@ -1101,11 +1106,15 @@ async function handlePlayCard(gameId: number, playerId: number, cardId: number):
   
   // Update game state
   await updateGameState(gameId, gameState);
+
+  const user = await getUserById(playerId);
+  const username = user ? user.Username : "Unknown";
   
   // Notify all clients
   notifyGameUsers(gameId, {
     type: "player_action",
     playerId,
+    username,
     action: {
       type: "play_card",
       cardId
