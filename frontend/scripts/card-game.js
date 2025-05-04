@@ -39,6 +39,7 @@ class CardGameFramework {
       winCondition: options.winCondition || 'empty-hand', // empty-hand, points, etc.
       allowedActions: options.allowedActions || ['draw', 'play', 'discard']
     };
+    this.warMode = false;
     
     // Flag to track initialization status
     this.componentsInitialized = false;
@@ -898,13 +899,17 @@ handleRoundResult(data) {
         }
       }
       
-      // Show animation for all players
-      this.animateCardPlay(cardData);
+      // IMPORTANT: Check if we're in a WarGame subclass
+      // If we are, don't animate here - it's handled in WarGame's implementation
+      if (!this.warMode) {
+        // Only animate in base class if not in War game
+        // Determine if it's an opponent card based on player ID
+        const isOpponent = String(playerId) !== String(this.currentPlayerId);
+        this.animateCardPlay(cardData, false, isOpponent);
+      }
       
       // Show notification
       this.showNotification(`${username} played a card`);
-      
-      // REMOVED: Logic that called this.advanceTurn() or this.resolveRound()
     } else {
       console.log(`Card ${cardId} already recorded for player ${playerId}, skipping duplicate handling`);
     }
