@@ -1147,6 +1147,12 @@ handleRoundResult(data) {
     // Add the current phase class
     document.body.classList.add(`phase-${phase}`);
     
+    // Hide start game button when game is playing
+    const startGameBtn = document.getElementById('startGameBtn');
+    if (startGameBtn) {
+      startGameBtn.style.display = phase === 'playing' ? 'none' : 'block';
+    }
+    
     // Show phase notification
     switch (phase) {
       case 'waiting':
@@ -1273,18 +1279,16 @@ handleRoundResult(data) {
   
   // ====================== EVENT LISTENERS ======================
   setupEventListeners() {
-    // Add button for returning to lobby
+    // Attach event listener to Back to Lobby button
     const lobbyButton = document.getElementById('backToLobbyBtn');
     if (lobbyButton) {
       lobbyButton.addEventListener('click', () => this.returnToLobby());
-    } else {
-      // Create one if it doesn't exist
-      const button = document.createElement('button');
-      button.id = 'backToLobbyBtn';
-      button.className = 'back-to-lobby-btn';
-      button.textContent = 'Back to Games Lobby';
-      button.addEventListener('click', () => this.returnToLobby());
-      document.body.appendChild(button);
+    }
+    
+    // Attach event listener to Start Game button 
+    const startGameBtn = document.getElementById('startGameBtn');
+    if (startGameBtn) {
+      startGameBtn.addEventListener('click', () => this.startGame());
     }
   }
   
@@ -1298,6 +1302,87 @@ handleRoundResult(data) {
       // Navigate to games page
       globalThis.location.href = 'games.html';
     }, 10);
+  }
+
+  startGame() {
+    console.log('Start game button clicked');
+    
+    // Get the game ID from sessionStorage
+    const gameId = this.currentGameId || sessionStorage.getItem('currentGameId');
+    if (!gameId) {
+      this.showErrorNotification('No active game found');
+      return;
+    }
+    
+    // Show loading state
+    const startBtn = document.getElementById('startGameBtn');
+    if (startBtn) {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Starting...';
+    }
+    
+    // Call the backend API directly
+    fetch('http://localhost:3000/start-game', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      },
+      body: JSON.stringify({ gameId: parseInt(gameId, 10) }),
+      credentials: 'include'
+    })
+    .then(response => {
+      console.log('Start game response status:', response.status);
+      
+      if (!response.ok) {
+        return response.json().then(err => {
+          throw new Error(err.error || 'Failed to start game');
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log('Game started successfully:', data);
+      
+      // Instead of reloading the page, we'll request game state update via WebSocket
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        
+        // Request updated game state
+        this.sendWebSocketMessage({
+          type: 'game_state_request',
+          gameId: gameId,
+          auth_token: localStorage.getItem('auth_token')
+        });
+        
+        // Hide the start button
+        if (startBtn) {
+          startBtn.style.display = 'none';
+        }
+        
+        // Show success message
+        this.showNotification('Game started! Waiting for server update...', 'success');
+      } else {
+        // If WebSocket isn't available, set intentional navigation flag and reload
+        console.log('WebSocket not available, using page reload');
+        sessionStorage.setItem('intentionalNavigation', 'true');
+        sessionStorage.setItem('wsWasOpen', 'true');
+        
+        // Reload after a small delay
+        setTimeout(() => {
+          globalThis.location.reload();
+        }, 100);
+      }
+    })
+    .catch(error => {
+      console.error('Error starting game:', error);
+      this.showErrorNotification('Error starting game: ' + error.message);
+      
+      // Reset button state
+      if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start Game';
+      }
+    });
   }
   
   // ====================== UTILITY FUNCTIONS ======================

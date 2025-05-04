@@ -1,0 +1,11 @@
+profile button:
+        
+        // Function to navigate to profile page
+        function goToProfilePage() {
+            sessionStorage.setItem('intentionalNavigation', 'true');
+            sessionStorage.setItem('wsWasOpen', 'true');
+            
+            setTimeout(() => {
+                globalThis.location.href = 'profile.html';
+            }, 10);
+        }
