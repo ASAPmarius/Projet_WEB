@@ -295,7 +295,6 @@ class WarGame extends CardGameFramework {
     }
   }
   
-  // In war-game.js, enhance the handleWarStart function:
   handleWarStart(data) {
     console.log(`War started! Round ${data.warRound}`);
     
@@ -312,18 +311,47 @@ class WarGame extends CardGameFramework {
       resultIndicator.textContent = 'WAR!';
       resultIndicator.className = 'war-result-indicator war';
     }
-    
-    // Clear card slots to prepare for new cards
-    this.clearCardSlots();
   }
 
-  // Add or update the handleWarProgress method:
   handleWarProgress(data) {
     // Show notification about war progress
     this.showNotification(data.message, 'war-progress');
     
+    // If this is about face-down cards being placed, animate them
+    if (data.message.includes("face down")) {
+      // Animate face-down cards for both players
+      this.animateFaceDownCards();
+    }
+    
     // Update scoreboard if it exists
     this.updateScoreboard();
+  }
+  
+  // Add this new method to animate face-down cards
+  animateFaceDownCards() {
+    // Get all players for reference
+    if (!this.players || this.players.length < 2) return;
+    
+    // Get card back image URL
+    const cardBackImage = this.cardsById[54]?.picture || 'card_back.png';
+    
+    // Animate for each player (one at a time with delay)
+    this.players.slice(0, 2).forEach((player, index) => {
+      // Add short delay for second player for better visual effect
+      setTimeout(() => {
+        // Create a face down card element
+        const faceDownCard = {
+          picture: cardBackImage,
+          rank: 'hidden',
+          suit: 'hidden'
+        };
+        
+        // Animate the card being played
+        this.animateCardPlay(faceDownCard);
+        
+        // Don't update the card slot yet - that will happen when war cards are played
+      }, index * 800); // Slight delay between players
+    });
   }
 }
 

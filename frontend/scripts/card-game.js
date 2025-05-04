@@ -608,9 +608,14 @@ startWebSocketStatusChecks() {
         break;
         
       case 'play_card':
-        // This is the key fix - handle card actions from other players
-        // Make sure this executes for BOTH your own actions and others' actions
-        this.handlePlayCardAction(playerId, username, action.cardId);
+        // Handle standard card play
+        if (action.warMode) {
+          // This is a war card - handle differently
+          this.handleWarCardAction(playerId, username, action.cardId);
+        } else {
+          // Regular card play
+          this.handlePlayCardAction(playerId, username, action.cardId);
+        }
         break;
         
       case 'play_war_card':
@@ -918,18 +923,20 @@ handleRoundResult(data) {
     // Update the card slot
     this.updateCardSlot(playerId, card);
     
-    // Animate the card play
-    this.animateCardPlay(card);
+    // Animate the card play with more dramatic effect for war
+    this.animateCardPlay(card, true); // Pass true to indicate war card
     
     // Show notification
-    this.showNotification(`${username} played a war card`);
+    this.showNotification(`${username} played a war card!`, 'war-card');
   }
   
   // Animate a card being played
-  animateCardPlay(card) {
+  animateCardPlay(card, isWarCard = false) {
     // Create a temporary element for the animation
     const animatedCard = document.createElement('div');
     animatedCard.className = 'animated-card';
+    if (isWarCard) animatedCard.classList.add('war-card');
+    
     animatedCard.style.position = 'absolute';
     animatedCard.style.width = '120px';
     animatedCard.style.height = '180px';
@@ -953,15 +960,20 @@ handleRoundResult(data) {
     // Add to document
     document.body.appendChild(animatedCard);
     
-    // Animate to center
+    // Animate to center with more dramatic effect for war cards
     setTimeout(() => {
+      if (isWarCard) {
+        animatedCard.style.transform = 'translate(-50%, 50%) scale(1.2)';
+        animatedCard.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
+      } else {
+        animatedCard.style.transform = 'translate(-50%, 50%)';
+      }
       animatedCard.style.bottom = '50%';
-      animatedCard.style.transform = 'translate(-50%, 50%)';
       
       // Remove after animation
       setTimeout(() => {
         animatedCard.remove();
-      }, 500);
+      }, isWarCard ? 800 : 500); // Longer display for war cards
     }, 10);
   }
   
