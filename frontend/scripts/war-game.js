@@ -295,7 +295,7 @@ class WarGame extends CardGameFramework {
     }
   }
   
-  // Handle war start notification
+  // In war-game.js, enhance the handleWarStart function:
   handleWarStart(data) {
     console.log(`War started! Round ${data.warRound}`);
     
@@ -304,7 +304,7 @@ class WarGame extends CardGameFramework {
     document.body.classList.add('war-mode');
     
     // Show war notification
-    this.showNotification(`WAR! Cards have equal value. Each player plays another card!`, 'war');
+    this.showNotification(`WAR! Cards have equal value. Each player puts one card face down and one face up!`, 'war');
     
     // Update result indicator
     const resultIndicator = document.getElementById('warResult');
@@ -312,9 +312,12 @@ class WarGame extends CardGameFramework {
       resultIndicator.textContent = 'WAR!';
       resultIndicator.className = 'war-result-indicator war';
     }
+    
+    // Clear card slots to prepare for new cards
+    this.clearCardSlots();
   }
-  
-  // Handle war progress updates
+
+  // Add or update the handleWarProgress method:
   handleWarProgress(data) {
     // Show notification about war progress
     this.showNotification(data.message, 'war-progress');

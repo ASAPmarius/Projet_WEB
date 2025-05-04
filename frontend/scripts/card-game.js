@@ -613,8 +613,8 @@ startWebSocketStatusChecks() {
         this.handlePlayCardAction(playerId, username, action.cardId);
         break;
         
-      case 'play_war_cards':
-        this.handlePlayWarCardsAction(playerId, username, action.count);
+      case 'play_war_card':
+        this.handleWarCardAction(playerId, username, action.cardId);
         break;
         
       default:
@@ -905,61 +905,24 @@ handleRoundResult(data) {
     }
   }
 
-  handlePlayWarCardsAction(playerId, username, count) {
-    console.log(`Player ${username} played ${count} war cards`);
+  handleWarCardAction(playerId, username, cardId) {
+    console.log(`Player ${username} played war card ${cardId}`);
     
-    // REMOVED: Logic for removing cards from player hand
-    // Now we only handle displaying the animation
-    
-    // Create container for war cards animation
-    const warContainer = document.createElement('div');
-    warContainer.className = 'war-cards-container';
-    warContainer.style.position = 'absolute';
-    warContainer.style.zIndex = '100';
-    
-    // Position based on player
-    if (playerId === this.currentPlayerId) {
-      warContainer.style.bottom = '200px';
-    } else {
-      warContainer.style.top = '200px';
+    // Get the card data
+    const card = this.cardsById[cardId];
+    if (!card) {
+      console.warn(`Card data not found for ID ${cardId}`);
+      return;
     }
     
-    warContainer.style.left = '50%';
-    warContainer.style.transform = 'translateX(-50%)';
+    // Update the card slot
+    this.updateCardSlot(playerId, card);
     
-    // For animation purposes only
-    const faceDownCards = Array(count).fill(null);
-    
-    // Add each card with a slight offset
-    faceDownCards.forEach((_, index) => {
-      const cardElement = document.createElement('div');
-      cardElement.className = 'war-card';
-      cardElement.style.position = 'absolute';
-      cardElement.style.left = `${index * 20}px`;
-      cardElement.style.zIndex = index;
-      
-      // Show card back for all but last card
-      const cardImage = document.createElement('img');
-      cardImage.src = this.cardsById[54].picture; // Card back
-      cardImage.alt = 'Card back';
-      cardImage.className = 'card-image';
-      
-      cardElement.appendChild(cardImage);
-      warContainer.appendChild(cardElement);
-    });
-    
-    // Add to document
-    document.body.appendChild(warContainer);
-    
-    // Remove after animation
-    setTimeout(() => {
-      warContainer.remove();
-    }, 2000);
+    // Animate the card play
+    this.animateCardPlay(card);
     
     // Show notification
-    this.showNotification(`${username} played ${count} cards for war`);
-    
-    // Actual hand updates will come from server game state
+    this.showNotification(`${username} played a war card`);
   }
   
   // Animate a card being played

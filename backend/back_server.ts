@@ -1285,10 +1285,7 @@ async function resolveRound(gameId: number): Promise<void> {
       warPileSize: gameState.warPile.length
     });
     
-    // Request war cards from both players
-    setTimeout(() => {
-      requestWarCards(gameId, player1Id, player2Id);
-    }, 1000);
+    await processWarAutomatically(gameId, player1Id, player2Id);
     
     return;
   }
@@ -1296,6 +1293,123 @@ async function resolveRound(gameId: number): Promise<void> {
   // Normal round win - no war
   const winnerId = result === 1 ? player1Id : player2Id;
   handleWarEnd(gameId, gameState, winnerId, "normal win");
+}
+
+// Add this function near the other war-related functions
+async function processWarAutomatically(gameId: number, player1Id: number, player2Id: number): Promise<void> {
+  // Get game state
+  const gameState = await getGameState(gameId);
+  if (!gameState) return;
+  
+  const player1Hand = gameState.playerHands[player1Id];
+  const player2Hand = gameState.playerHands[player2Id];
+  
+  // Double-check that both players have enough cards
+  if (player1Hand.length < 2 || player2Hand.length < 2) {
+    // Not enough cards, end the war with whoever has more cards winning
+    const winnerId = player1Hand.length > player2Hand.length ? player1Id : player2Id;
+    await handleWarEnd(gameId, gameState, winnerId, "not enough cards for war");
+    return;
+  }
+  
+  // Get user information for notifications
+  const users = await getUsersInGame(gameId);
+  const player1 = users.find(u => Number(u.idUser) === Number(player1Id));
+  const player2 = users.find(u => Number(u.idUser) === Number(player2Id));
+  
+  // STEP 1: Take face down cards from both players
+  const player1FaceDown = player1Hand.shift();
+  const player2FaceDown = player2Hand.shift();
+  
+  if (!player1FaceDown || !player2FaceDown) {
+    console.error("Missing face down cards in war");
+    return;
+  }
+  
+  // Add to war pile
+  gameState.warPile.push(player1FaceDown, player2FaceDown);
+  
+  // Notify clients about face-down cards
+  notifyGameUsers(gameId, {
+    type: "war_progress",
+    message: "Both players placed a card face down",
+    player1: player1?.Username || "Player 1",
+    player2: player2?.Username || "Player 2",
+    warPileSize: gameState.warPile.length
+  });
+  
+  // Update game state
+  await updateGameState(gameId, gameState);
+  
+  // Short delay for UI
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  // STEP 2: Take face up cards from both players and compare
+  const player1FaceUp = player1Hand.shift();
+  const player2FaceUp = player2Hand.shift();
+  
+  if (!player1FaceUp || !player2FaceUp) {
+    console.error("Missing face up cards in war");
+    return;
+  }
+  
+  // Add to war pile
+  gameState.warPile.push(player1FaceUp, player2FaceUp);
+  
+  // Notify clients about the face-up cards
+  notifyGameUsers(gameId, {
+    type: "player_action",
+    playerId: player1Id,
+    username: player1?.Username || "Player 1",
+    action: {
+      type: "play_war_card",
+      cardId: player1FaceUp.id
+    }
+  });
+  
+  notifyGameUsers(gameId, {
+    type: "player_action",
+    playerId: player2Id,
+    username: player2?.Username || "Player 2",
+    action: {
+      type: "play_war_card",
+      cardId: player2FaceUp.id
+    }
+  });
+  
+  // Update game state with the face-up cards
+  await updateGameState(gameId, gameState);
+  
+  // Short delay for UI
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  // Compare face-up cards to determine winner or another war
+  if (player1FaceUp.value > player2FaceUp.value) {
+    // Player 1 wins
+    await handleWarEnd(gameId, gameState, player1Id, "won war with higher card");
+  } else if (player1FaceUp.value < player2FaceUp.value) {
+    // Player 2 wins
+    await handleWarEnd(gameId, gameState, player2Id, "won war with higher card");
+  } else {
+    // Another tie - recursive war (but check if enough cards first)
+    if (player1Hand.length < 2 || player2Hand.length < 2) {
+      const winnerId = player1Hand.length > player2Hand.length ? player1Id : player2Id;
+      await handleWarEnd(gameId, gameState, winnerId, "won war due to opponent running out of cards");
+    } else {
+      // Notify about another war
+      gameState.warRound += 1;
+      await updateGameState(gameId, gameState);
+      
+      notifyGameUsers(gameId, {
+        type: "war_start",
+        warRound: gameState.warRound,
+        message: "War again! Both players tied"
+      });
+      
+      // Recursive call for another war
+      await processWarAutomatically(gameId, player1Id, player2Id);
+    }
+  }
 }
 
 // Handle the end of a war (or regular round)
