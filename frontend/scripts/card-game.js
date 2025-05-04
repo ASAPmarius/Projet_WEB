@@ -925,6 +925,18 @@ handleRoundResult(data) {
       return;
     }
     
+    // Check if there was a face-down card in this slot
+    if (this.faceDownCardSlots && this.faceDownCardSlots[playerId]) {
+      // Explicitly clear the slot before updating it
+      const slotId = String(playerId) === String(this.currentPlayerId) ? 'player2Slot' : 'player1Slot';
+      const slot = document.getElementById(slotId);
+      if (slot) {
+        slot.innerHTML = '';
+      }
+      // Mark as cleared
+      delete this.faceDownCardSlots[playerId];
+    }
+    
     // Update the card slot
     this.updateCardSlot(playerId, card);
     
