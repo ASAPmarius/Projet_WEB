@@ -686,37 +686,11 @@ startWebSocketStatusChecks() {
     }
   }
   
-  // ====================== GAME LOGIC ======================
-  // Initialize player hands (for War game)
   initializeHands() {
-    if (this.players.length < 2) {
-      console.warn('Not enough players to initialize hands');
-      return;
-    }
+    console.log('Hand initialization is now handled by the server');
     
-    console.log('Initializing player hands');
-    
-    // Split the deck evenly between the players
-    const halfDeck = Math.floor(this.deck.length / 2);
-    
-    this.hands = {};
-    this.players.forEach((player, index) => {
-      if (index === 0) {
-        // First player gets first half
-        this.hands[player.id] = this.deck.slice(0, halfDeck);
-      } else if (index === 1) {
-        // Second player gets second half
-        this.hands[player.id] = this.deck.slice(halfDeck);
-      } else {
-        // Additional players get empty hands
-        this.hands[player.id] = [];
-      }
-    });
-    
-    // Clear deck after dealing
-    this.deck = [];
-    
-    // Update UI
+    // The hands data should be coming from the server
+    // We'll just update the UI based on that data
     this.updateHandDisplay();
   }
   
@@ -799,6 +773,9 @@ startWebSocketStatusChecks() {
   }
   
   isMyTurn() {
+    // This function is purely for UI purposes - determining if the current player can interact
+    // It doesn't modify game state, just reads from the state sent by the server
+    
     // If game is not in playing phase, return false
     if (this.gameState.phase !== 'playing') {
       console.log('Not in playing phase');
@@ -811,12 +788,17 @@ startWebSocketStatusChecks() {
       return false;
     }
     
-    // Add more robust type conversion
+    // Add more robust type conversion to handle string vs number comparison
     const currentTurn = Number(this.gameState.currentTurn);
     const currentPlayerId = Number(this.currentPlayerId);
     
-    // Log exact values with types for debugging
-    console.log(`Turn check: currentTurn=${currentTurn} (${typeof currentTurn}), currentPlayerId=${currentPlayerId} (${typeof currentPlayerId})`);
+    if (isNaN(currentTurn) || isNaN(currentPlayerId)) {
+      console.log('Invalid turn or player ID format');
+      return false;
+    }
+    
+    // For debugging
+    console.log(`Turn check: currentTurn=${currentTurn}, currentPlayerId=${currentPlayerId}`);
     
     // Compare as numbers
     return currentTurn === currentPlayerId;
@@ -838,21 +820,17 @@ startWebSocketStatusChecks() {
     // Set the flag
     this._isProcessingCardId = cardId;
     
-    // If we're using the War game, use its method
-    if (globalThis.warGame) {
-      globalThis.warGame.playCard(cardId);
-    } else {
-      // For other games, use the standard approach
-      this.sendWebSocketMessage({
-        type: 'player_action',
-        action: {
-          type: 'play_card',
-          cardId
-        },
-        gameId: this.currentGameId,
-        auth_token: localStorage.getItem('auth_token')
-      });
-    }
+    // Send the action to the server but don't modify local state
+    // The server will broadcast updates to all clients
+    this.sendWebSocketMessage({
+      type: 'player_action',
+      action: {
+        type: 'play_card',
+        cardId
+      },
+      gameId: this.currentGameId,
+      auth_token: localStorage.getItem('auth_token')
+    });
     
     // Clear the flag after a short delay
     setTimeout(() => {
@@ -860,37 +838,18 @@ startWebSocketStatusChecks() {
     }, 500);
   }
   
-  // Handle draw card action
   handleDrawCardAction(playerId, username) {
     console.log(`Player ${username} drew a card`);
     
-    // Check if there are cards in the deck
-    if (this.deck.length === 0) {
-      console.log('No cards left in the deck');
-      this.showNotification('No cards left in the deck');
-      return;
-    }
+    // REMOVED: Logic for checking deck size and drawing cards
     
-    // Draw the top card
-    const card = this.deck.shift();
-    
-    // Add to player's hand
-    if (!this.hands[playerId]) {
-      this.hands[playerId] = [];
-    }
-    
-    this.hands[playerId].push(card);
-    
-    // Update UI if it's the current player
-    if (playerId === this.currentPlayerId) {
-      this.updateHandDisplay();
-    }
-    
-    // Show notification
+    // Show notification only
     this.showNotification(`${username} drew a card`);
+    
+    // The actual card should arrive in a game state update from the server
+    // We'll update the UI when that happens
   }
   
-  // In war-game.js, modify handlePlayCardAction method
   handlePlayCardAction(playerId, username, cardId) {
     console.log(`Player ${username} played card ${cardId}`);
     
@@ -928,49 +887,19 @@ startWebSocketStatusChecks() {
       // Show notification
       this.showNotification(`${username} played a card`);
       
-      // Check if both players have played cards
-      if (Object.keys(this.playedCards).length === 2) {
-        console.log("Both players have played cards, resolving round");
-        // Both players have played, resolve the round
-        if (!this._resolvingRound) {
-          this._resolvingRound = true;
-          setTimeout(() => {
-            this.resolveRound();
-            this._resolvingRound = false;
-          }, 1000); // Short delay to show cards
-        }
-      } else {
-        console.log(`Only one player has played, advancing turn from ${this.gameState.currentTurn}`);
-        // Only one player has played, advance to next player's turn
-        setTimeout(() => this.advanceTurn(), 500); // Short delay before advancing
-      }
+      // REMOVED: Logic that called this.advanceTurn() or this.resolveRound()
     } else {
       console.log(`Card ${cardId} already recorded for player ${playerId}, skipping duplicate handling`);
     }
   }
-  // Handle play war cards action
+
   handlePlayWarCardsAction(playerId, username, count) {
     console.log(`Player ${username} played ${count} war cards`);
     
-    // Get player hand
-    const playerHand = this.hands[playerId];
-    if (!playerHand) {
-      console.warn(`No hand found for player ${playerId}`);
-      return;
-    }
+    // REMOVED: Logic for removing cards from player hand
+    // Now we only handle displaying the animation
     
-    // Can't play more cards than in hand
-    const cardsToPlay = Math.min(count, playerHand.length);
-    
-    if (cardsToPlay === 0) {
-      console.log(`Player ${username} has no cards to play`);
-      return;
-    }
-    
-    // Take the top cards from hand
-    const playedCards = playerHand.splice(0, cardsToPlay);
-    
-    // Create container for war cards
+    // Create container for war cards animation
     const warContainer = document.createElement('div');
     warContainer.className = 'war-cards-container';
     warContainer.style.position = 'absolute';
@@ -986,19 +915,21 @@ startWebSocketStatusChecks() {
     warContainer.style.left = '50%';
     warContainer.style.transform = 'translateX(-50%)';
     
+    // For animation purposes only
+    const faceDownCards = Array(count).fill(null);
+    
     // Add each card with a slight offset
-    playedCards.forEach((card, index) => {
+    faceDownCards.forEach((_, index) => {
       const cardElement = document.createElement('div');
       cardElement.className = 'war-card';
       cardElement.style.position = 'absolute';
       cardElement.style.left = `${index * 20}px`;
       cardElement.style.zIndex = index;
       
-      // Only show the last card face up
-      const isLastCard = index === playedCards.length - 1;
+      // Show card back for all but last card
       const cardImage = document.createElement('img');
-      cardImage.src = isLastCard ? card.picture : this.cardsById[54].picture; // Card back for face down
-      cardImage.alt = isLastCard ? `${card.rank} of ${card.suit}` : 'Card back';
+      cardImage.src = this.cardsById[54].picture; // Card back
+      cardImage.alt = 'Card back';
       cardImage.className = 'card-image';
       
       cardElement.appendChild(cardImage);
@@ -1013,16 +944,10 @@ startWebSocketStatusChecks() {
       warContainer.remove();
     }, 2000);
     
-    // Add cards to war pile
-    // This would be handled by the war game implementation
-    
-    // Update hand display
-    if (playerId === this.currentPlayerId) {
-      this.updateHandDisplay();
-    }
-    
     // Show notification
-    this.showNotification(`${username} played ${cardsToPlay} cards for war`);
+    this.showNotification(`${username} played ${count} cards for war`);
+    
+    // Actual hand updates will come from server game state
   }
   
   // Animate a card being played
@@ -1065,54 +990,19 @@ startWebSocketStatusChecks() {
     }, 10);
   }
   
-  // Check for game end conditions
-  checkGameEndConditions() {
-    // Check if any player has no cards left
-    for (const playerId in this.hands) {
-      if (this.hands[playerId].length === 0) {
-        // Find the player with cards remaining
-        const winnerIds = Object.keys(this.hands).filter(
-          id => this.hands[id].length > 0
-        );
-        
-        if (winnerIds.length === 1) {
-          const winnerId = winnerIds[0];
-          const winner = this.players.find(p => String(p.id) === String(winnerId));
-          
-          if (winner) {
-            // End the game
-            this.endGame(winnerId, winner.username);
-          }
-        }
-        
-        return true;
-      }
-    }
-    
-    return false;
-  }
-  
-  // End the game
   endGame(winnerId, winnerName) {
     console.log(`Game ended, winner: ${winnerName}`);
     
-    // Update game state
+    // Update UI state only
     this.gameState.phase = 'finished';
     this.updateGamePhaseUI('finished');
     
     // Show game over notification
     this.showNotification(`Game Over! ${winnerName} wins!`, 'gameOver');
     
-    // Send game end message
-    this.sendWebSocketMessage({
-      type: 'game_end',
-      winnerId,
-      winnerName,
-      gameId: this.currentGameId,
-      auth_token: localStorage.getItem('auth_token')
-    });
+    // REMOVED: Send game end message - server already knows
     
-    // Show game results
+    // Show game results UI
     this.showGameResults(winnerId, winnerName);
   }
   
@@ -1122,12 +1012,16 @@ startWebSocketStatusChecks() {
     console.log(`Highlighting player with ID ${playerId}`);
   }
   
-  // Set whether it's the current player's turn
   setMyTurnState(isMyTurn) {
+    // UI-only function that visually indicates turn state
+    // This doesn't affect game logic - just updates the display
+    
     if (isMyTurn) {
       document.body.classList.add('my-turn');
+      console.log('UI updated: It is now my turn');
     } else {
       document.body.classList.remove('my-turn');
+      console.log('UI updated: Not my turn');
     }
   }
   
