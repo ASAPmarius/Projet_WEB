@@ -497,7 +497,9 @@ async function initializeGameState(gameId: number): Promise<GameState> {
     playerHands: {},
     playedCards: {},
     warPile: [],
-    lastWinner: null
+    lastWinner: null,
+    warRound: 0,
+    inWar: false
   };
   
   console.log(`Initialized game state for game ${gameId}: ${JSON.stringify(initialState)}`);
@@ -1117,6 +1119,80 @@ async function handlePlayCard(gameId: number, playerId: number, cardId: number):
   return true;
 }
 
+async function handleWarCardPlay(gameId: number, playerId: number, cardId: number): Promise<void> {
+  // Similar to handlePlayCard but with war-specific logic
+  const gameState = await getGameState(gameId);
+  if (!gameState) return;
+  
+  // Check if player has already played
+  if (gameState.playedCards[playerId]) {
+    console.log(`Player ${playerId} already played a card in this war round`);
+    return;
+  }
+  
+  // Get player's hand
+  const hand = gameState.playerHands[playerId] || [];
+  
+  // Find the card
+  const cardIndex = hand.findIndex(card => card.id === cardId);
+  if (cardIndex === -1) {
+    console.warn(`Card ${cardId} not found in player ${playerId}'s hand`);
+    return;
+  }
+  
+  // Get the card
+  const card = hand[cardIndex];
+  
+  // Remove from hand
+  hand.splice(cardIndex, 1);
+  
+  // Add to played cards
+  gameState.playedCards[playerId] = card;
+  
+  // Update game state
+  await updateGameState(gameId, gameState);
+  
+  // Notify about the card play
+  const users = await getUsersInGame(gameId);
+  const player = users.find(u => Number(u.idUser) === Number(playerId));
+  
+  notifyGameUsers(gameId, {
+    type: "player_action",
+    playerId,
+    username: player ? player.Username : "Unknown",
+    action: {
+      type: "play_card",
+      cardId,
+      warMode: true
+    }
+  });
+  
+  // Check if both players have played their war cards
+  if (Object.keys(gameState.playedCards).length === 2) {
+    // Resolve the war
+    setTimeout(() => resolveRound(gameId), 1000);
+  } else {
+    // Set the other player's turn
+    const playerIds = Object.keys(gameState.playerHands).map(Number);
+    const otherPlayerId = playerIds.find(id => id !== playerId);
+    
+    if (otherPlayerId) {
+      gameState.currentTurn = otherPlayerId;
+      await updateGameState(gameId, gameState);
+      
+      const otherPlayer = users.find(u => Number(u.idUser) === Number(otherPlayerId));
+      if (otherPlayer) {
+        notifyGameUsers(gameId, {
+          type: "turn_change",
+          playerId: otherPlayerId,
+          username: otherPlayer.Username,
+          warMode: true
+        });
+      }
+    }
+  }
+}
+
 async function resolveRound(gameId: number): Promise<void> {
   // Get current game state
   const gameState = await getGameState(gameId);
@@ -1130,6 +1206,12 @@ async function resolveRound(gameId: number): Promise<void> {
   const player1Id = playerIds[0];
   const player2Id = playerIds[1];
 
+  // Ensure both players have cards in hand
+  if (!gameState.playerHands[player1Id] || !gameState.playerHands[player2Id]) {
+    console.error(`One or both players don't have hands`);
+    return;
+  }
+
   // Add null checks
   const card1 = playedCards[player1Id];
   const card2 = playedCards[player2Id];
@@ -1139,41 +1221,90 @@ async function resolveRound(gameId: number): Promise<void> {
     return;
   }
 
-  // Compare cards to determine winner
-  let winnerId: number;
-  if (card1.value > card2.value) {
-    winnerId = player1Id;
-  } else if (card1.value < card2.value) {
-    winnerId = player2Id;
-  } else {
-    // Handle war (tie)
-    // For simplicity, default winner for ties
-    winnerId = player1Id;
+  // Initialize war pile if not already done
+  if (!gameState.warPile) {
+    gameState.warPile = [];
   }
   
-  // Update hands - add both cards to winner's hand
+  // Add played cards to war pile
+  gameState.warPile.push(card1, card2);
+  
+  // Compare cards to determine winner
+  let result = 0;
+  if (card1.value > card2.value) {
+    result = 1; // Player 1 wins
+  } else if (card1.value < card2.value) {
+    result = 2; // Player 2 wins
+  } else {
+    result = 0; // War (tie)
+  }
+  
+  // Handle the result
+  if (result === 0) {
+    // WAR - Players tied!
+    console.log(`WAR between players ${player1Id} and ${player2Id}`);
+    
+    // Check if players have enough cards for war
+    if (gameState.playerHands[player1Id].length < 2 || gameState.playerHands[player2Id].length < 2) {
+      // Not enough cards for war, determine winner based on who has more cards
+      const winnerId = gameState.playerHands[player1Id].length > gameState.playerHands[player2Id].length 
+                      ? player1Id : player2Id;
+      
+      // Award all cards to winner
+      handleWarEnd(gameId, gameState, winnerId, "not enough cards for war");
+      return;
+    }
+    
+    // Set up for war
+    gameState.inWar = true;
+    gameState.warRound = (gameState.warRound || 0) + 1;
+    
+    // Clear played cards to prepare for next round
+    gameState.playedCards = {};
+    
+    // Update game state
+    await updateGameState(gameId, gameState);
+    
+    // Notify clients about war
+    notifyGameUsers(gameId, {
+      type: "war_start",
+      warRound: gameState.warRound,
+      warPileSize: gameState.warPile.length
+    });
+    
+    // Request war cards from both players
+    setTimeout(() => {
+      requestWarCards(gameId, player1Id, player2Id);
+    }, 1000);
+    
+    return;
+  }
+  
+  // Normal round win - no war
+  const winnerId = result === 1 ? player1Id : player2Id;
+  handleWarEnd(gameId, gameState, winnerId, "normal win");
+}
+
+// Handle the end of a war (or regular round)
+async function handleWarEnd(gameId: number, gameState: GameState, winnerId: number, reason: string): Promise<void> {
+  // Get winner's hand
   if (!gameState.playerHands[winnerId]) {
     gameState.playerHands[winnerId] = [];
   }
   
-  // Add played cards to winner's hand (filter out nulls for safety)
-  const cardsToAdd = Object.values(playedCards)
-    .filter((card): card is CardMetadata => card !== null);
-
-  gameState.playerHands[winnerId].push(...cardsToAdd);
+  // Award all cards in war pile to winner
+  const cardsWon = [...gameState.warPile];
+  gameState.playerHands[winnerId].push(...cardsWon);
   
-  // Add any war pile cards if they exist
-  if (gameState.warPile && gameState.warPile.length > 0) {
-    gameState.playerHands[winnerId].push(...gameState.warPile);
-    gameState.warPile = []; // Clear war pile
-  }
+  // Clear war state
+  gameState.inWar = false;
+  gameState.warRound = 0;
+  gameState.warPile = [];
+  gameState.playedCards = {};
   
   // Update round
   gameState.round = (gameState.round || 1) + 1;
   gameState.lastWinner = winnerId;
-  
-  // Clear played cards
-  gameState.playedCards = {};
   
   // Update game state
   await updateGameState(gameId, gameState);
@@ -1187,11 +1318,15 @@ async function resolveRound(gameId: number): Promise<void> {
     type: "round_result",
     winnerId: winnerId,
     winnerName: winner ? winner.Username : "Unknown",
-    cardCount: cardsToAdd.length,
-    newRound: gameState.round
+    cardCount: cardsWon.length,
+    newRound: gameState.round,
+    reason: reason
   });
   
-  // Set the winner as the next player
+  // Check for game end conditions
+  checkGameEndCondition(gameId, gameState);
+  
+  // Set winner as next player
   gameState.currentTurn = winnerId;
   await updateGameState(gameId, gameState);
   
@@ -1203,6 +1338,91 @@ async function resolveRound(gameId: number): Promise<void> {
       username: winner.Username
     });
   }
+}
+
+async function requestWarCards(gameId: number, player1Id: number, player2Id: number): Promise<void> {
+  // Get game state
+  const gameState = await getGameState(gameId);
+  if (!gameState) return;
+  
+  // For each player, take one face-down card
+  const player1Hand = gameState.playerHands[player1Id];
+  const player2Hand = gameState.playerHands[player2Id];
+  
+  if (!player1Hand || !player2Hand) {
+    console.error("Missing player hands");
+    return;
+  }
+  
+  // Take face-down cards if available
+  if (player1Hand.length > 0) {
+    const faceDownCard = player1Hand.shift();
+    if (faceDownCard) gameState.warPile.push(faceDownCard);
+  }
+  
+  if (player2Hand.length > 0) {
+    const faceDownCard = player2Hand.shift();
+    if (faceDownCard) gameState.warPile.push(faceDownCard);
+  }
+  
+  // Set both players to play their next card
+  gameState.playedCards = {};
+  gameState.currentTurn = player1Id; // Set first player to go
+  
+  // Update game state
+  await updateGameState(gameId, gameState);
+  
+  // Notify players to play their face-up cards
+  const users = await getUsersInGame(gameId);
+  const player1 = users.find(u => Number(u.idUser) === Number(player1Id));
+  
+  if (player1) {
+    notifyGameUsers(gameId, {
+      type: "turn_change",
+      playerId: player1Id,
+      username: player1.Username,
+      warMode: true
+    });
+  }
+  
+  // Notify about war progress
+  notifyGameUsers(gameId, {
+    type: "war_progress",
+    warRound: gameState.warRound,
+    warPileSize: gameState.warPile.length,
+    message: "Place face-up card"
+  });
+}
+
+async function checkGameEndCondition(gameId: number, gameState: GameState): Promise<boolean> {
+  // Check if any player has no cards left
+  for (const [playerId, hand] of Object.entries(gameState.playerHands)) {
+    if (hand.length === 0) {
+      // Find winner (player with cards)
+      const winnerPlayerId = Object.entries(gameState.playerHands)
+        .find(([_, playerHand]) => playerHand.length > 0)?.[0];
+        
+      if (winnerPlayerId) {
+        const users = await getUsersInGame(gameId);
+        const winnerUser = users.find(u => String(u.idUser) === String(winnerPlayerId));
+        
+        // Update game status
+        gameState.phase = 'finished';
+        await updateGameState(gameId, gameState);
+        
+        // Notify about game end
+        notifyGameUsers(gameId, {
+          type: "game_end",
+          winnerId: Number(winnerPlayerId),
+          winnerName: winnerUser ? winnerUser.Username : "Unknown"
+        });
+        
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }
 
 async function initializeGame(gameId: number): Promise<void> {
@@ -1226,7 +1446,9 @@ async function initializeGame(gameId: number): Promise<void> {
       playerHands: {},
       playedCards: {},
       warPile: [],
-      lastWinner: null
+      lastWinner: null,
+      warRound: 0,
+      inWar: false
     };
   }
   
@@ -2122,9 +2344,24 @@ router.get("/", async (ctx) => {
             handleJoinGame(data, userId, ws);
             break;
           
-          case "player_action":
-            handlePlayerAction(data, userId, username, ws);
+          case "player_action": {
+            // First check if the cardId exists
+            if (!data.action.cardId) {
+              console.error("Missing cardId in player action");
+              return;
+            }
+            
+            // In war mode, playing a card might need special handling
+            const gameState = await getGameState(data.gameId);
+            if (gameState && gameState.inWar) {
+              // Special war card handling
+              await handleWarCardPlay(data.gameId, userId, data.action.cardId);
+            } else {
+              // Normal card play
+              await handlePlayerAction(data, userId, username, ws);
+            }
             break;
+          }
           
           case "chat_message":
             handleChatMessage(data, userId, username);

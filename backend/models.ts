@@ -57,6 +57,8 @@ export interface GameState {
   playedCards: Record<number, CardMetadata | null>;
   warPile: CardMetadata[];
   lastWinner: number | null;
+  inWar: boolean;        // Whether we're currently in a war
+  warRound: number;      // How many consecutive wars
 }
 
 // Player state in game
