@@ -2298,6 +2298,8 @@ router.post('/restart-game', authorizationMiddleware, async (ctx) => {
     
     // Re-initialize game with new cards
     await initializeGame(gameId);
+
+    await startGame(gameId);
     
     // Notify all clients
     notifyGameUsers(gameId, {
