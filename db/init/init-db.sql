@@ -3,6 +3,7 @@
 -- First drop unnecessary tables
 DROP TABLE IF EXISTS "ActiveCards" CASCADE;
 DROP TABLE IF EXISTS "GamesResults" CASCADE;
+DROP TABLE IF EXISTS "Cards" CASCADE;
 
 -- Keep core tables with simplified structure
 CREATE TABLE IF NOT EXISTS "User" (
