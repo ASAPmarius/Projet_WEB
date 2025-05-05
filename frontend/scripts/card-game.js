@@ -466,6 +466,11 @@ startWebSocketStatusChecks() {
           // Show game results with restart button
           this.showGameResults(data.winnerId, data.winnerName);
           break;
+
+        // In the handleWebSocketMessage switch statement:
+        case 'redirect_to_lobby':
+          this.handleRedirectToLobby(data);
+          break;
         
         default:
           console.log('Unknown message type:', data.type);
@@ -788,6 +793,23 @@ startWebSocketStatusChecks() {
     });
     
     this.showNotification('Game restarted! Enjoy!', 'success');
+  }
+
+  // Add this method to the CardGameFramework class
+  handleRedirectToLobby(data) {
+    console.log('Received redirect to lobby message from server');
+    
+    // Only redirect if not already navigating
+    if (sessionStorage.getItem('intentionalNavigation') !== 'true') {
+      // Set navigation flags
+      sessionStorage.setItem('intentionalNavigation', 'true');
+      sessionStorage.setItem('wsWasOpen', 'true');
+      
+      // Navigate to games page with a small delay
+      setTimeout(() => {
+        globalThis.location.href = 'games.html';
+      }, 10);
+    }
   }
   
   handleError(data) {
@@ -1530,11 +1552,22 @@ startWebSocketStatusChecks() {
     sessionStorage.setItem('intentionalNavigation', 'true');
     sessionStorage.setItem('wsWasOpen', 'true');
     
+    // Send a message to the server to redirect all players if game is finished
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN && 
+        this.currentGameId && this.gameState && this.gameState.phase === 'finished') {
+      this.sendWebSocketMessage({
+        type: 'redirect_to_lobby',
+        gameId: this.currentGameId,
+        auth_token: localStorage.getItem('auth_token')
+      });
+      console.log('Sent redirect request to server for all players');
+    }
+    
     // Small delay to ensure sessionStorage is updated before navigation
     setTimeout(() => {
       // Navigate to games page
       globalThis.location.href = 'games.html';
-    }, 10);
+    }, 100); // Increased delay slightly to allow WebSocket message to be sent
   }
 
   startGame() {

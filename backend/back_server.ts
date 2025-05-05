@@ -941,6 +941,18 @@ async function handleTurnChange(data: any, userId: number, username: string, ws:
   }
 }
 
+async function handleRedirectToLobby(data: any, userId: number, username: string) {
+  const gameIdToRedirect = data.gameId;
+  console.log(`User ${username} requested redirect to lobby for game ${gameIdToRedirect}`);
+  
+  // Verify the game state is finished before redirecting everyone
+  const gameState = await getGameState(gameIdToRedirect);
+  notifyGameUsers(gameIdToRedirect, {
+    type: "redirect_to_lobby"
+  });
+  console.log(`Broadcasting lobby redirect to all players in game ${gameIdToRedirect}`);
+}
+
 async function loadAllCardsWithMetadata(): Promise<CardMetadata[]> {
   try {
     // Load all cards from database
@@ -2619,12 +2631,16 @@ router.get("/", async (ctx) => {
             break;
 
           case "update_round":
-          handleRoundUpdate(data, userId, ws);
-          break;
+            handleRoundUpdate(data, userId, ws);
+            break;
 
           case "turn_change":
-          handleTurnChange(data, userId, username, ws);
-          break;
+            handleTurnChange(data, userId, username, ws);
+            break;
+
+          case "redirect_to_lobby":
+            handleRedirectToLobby(data, userId, username);
+            break;
         }
       } catch (error) {
         console.error("Error handling WebSocket message:", error);
