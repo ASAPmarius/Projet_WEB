@@ -1549,6 +1549,8 @@ async function checkGameEndCondition(gameId: number, gameState: GameState): Prom
         gameState.phase = 'finished';
         await updateGameState(gameId, gameState);
         
+        console.log(`Game ${gameId} ended - winner is ${winnerUser?.Username} (ID: ${winnerPlayerId})`);
+        
         // Notify about game end
         notifyGameUsers(gameId, {
           type: "game_end",
@@ -2218,6 +2220,98 @@ router.post('/start-game', authorizationMiddleware, async (ctx) => {
     ctx.response.status = 500;
     ctx.response.body = { 
       error: error instanceof Error ? error.message : 'Failed to start game' 
+    };
+  }
+});
+
+// Add OPTIONS handler for restart-game
+router.options('/restart-game', (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  ctx.response.status = 204; // No content for OPTIONS
+});
+
+// Add endpoint to restart a finished game
+router.post('/restart-game', authorizationMiddleware, async (ctx) => {
+  // Set CORS headers
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  try {
+    const body = await ctx.request.body.json();
+    const { gameId } = body;
+    
+    if (!gameId) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Missing game ID' };
+      return;
+    }
+    
+    // Check if the game exists
+    const gameCheck = await client.queryObject<{ GameStatus: string }>(
+      'SELECT "GameStatus" FROM "Game" WHERE "idGame" = $1',
+      [gameId]
+    );
+    
+    if (gameCheck.rows.length === 0) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'Game not found' };
+      return;
+    }
+    
+    // Check if user is in the game
+    const userId = ctx.state.tokenData.userId;
+    const usersInGame = await getUsersInGame(gameId);
+    const userInGame = usersInGame.some(u => u.idUser === userId);
+    
+    if (!userInGame) {
+      ctx.response.status = 403;
+      ctx.response.body = { error: 'You are not in this game' };
+      return;
+    }
+    
+    // Update game status back to 'active'
+    await client.queryObject(
+      'UPDATE "Game" SET "GameStatus" = \'active\' WHERE "idGame" = $1',
+      [gameId]
+    );
+    
+    // Initialize a fresh game state with proper type assertion
+    const gameState: GameState = {
+      phase: 'setup' as 'waiting' | 'setup' | 'playing' | 'finished',
+      currentTurn: null,
+      round: 1,
+      startTime: new Date(),
+      lastActionTime: new Date(),
+      playerHands: {},
+      playedCards: {},
+      warPile: [],
+      lastWinner: null,
+      warRound: 0,
+      inWar: false
+    };
+    
+    // Update game state in database
+    await updateGameState(gameId, gameState);
+    
+    // Re-initialize game with new cards
+    await initializeGame(gameId);
+    
+    // Notify all clients
+    notifyGameUsers(gameId, {
+      type: "game_restart",
+      gameId: gameId
+    });
+    
+    ctx.response.status = 200;
+    ctx.response.body = { success: true };
+  } catch (error) {
+    console.error('Error restarting game:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { 
+      error: error instanceof Error ? error.message : 'Failed to restart game' 
     };
   }
 });

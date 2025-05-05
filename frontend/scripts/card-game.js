@@ -243,8 +243,62 @@ class CardGameFramework {
     
     // Setup event listeners
     this.setupEventListeners();
+
+    // Add Finish Game button for debugging
+  const gameActionsDiv = document.getElementById('gameActions') || document.createElement('div');
+  if (!gameActionsDiv.id) {
+    gameActionsDiv.id = 'gameActions';
+    gameActionsDiv.className = 'game-actions';
+    document.body.appendChild(gameActionsDiv);
+  }
+
+  // Create Finish Game button if it doesn't exist
+  if (!document.getElementById('finishGameBtn')) {
+    const finishGameBtn = document.createElement('button');
+    finishGameBtn.id = 'finishGameBtn';
+    finishGameBtn.className = 'game-control-btn finish-game';
+    finishGameBtn.textContent = 'Finish Game (Debug)';
+    finishGameBtn.addEventListener('click', () => this.debugFinishGame());
+    gameActionsDiv.appendChild(finishGameBtn);
+  }
     
     console.log('Game components initialized');
+  }
+
+  // Add to CardGameFramework class
+  async debugFinishGame() {
+    try {
+      console.log('Manually finishing game for debugging');
+      this.showNotification('Finishing game...', 'info');
+      
+      // Find a winner (just use the first player for debugging)
+      const winnerId = this.players.length > 0 ? this.players[0].id : this.currentPlayerId;
+      const winnerName = this.players.find(p => p.id === winnerId)?.username || 'Player 1';
+      
+      // Set game phase to finished locally
+      this.gameState.phase = 'finished';
+      this.updateGamePhaseUI('finished');
+      
+      // Show game results UI
+      this.showGameResults(winnerId, winnerName);
+      
+      // Notify server (optional)
+      fetch('http://localhost:3000/finish-game', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({ gameId: this.currentGameId }),
+        credentials: 'include'
+      })
+      .then(response => console.log('Game manually finished, server response:', response.status))
+      .catch(error => console.error('Error finishing game:', error));
+      
+    } catch (error) {
+      console.error('Error in debug finish game:', error);
+      this.showErrorNotification('Error finishing game: ' + error.message);
+    }
   }
   
   // ====================== WEBSOCKET HANDLING ======================
@@ -395,6 +449,22 @@ startWebSocketStatusChecks() {
 
         case "round_result":
           this.handleRoundResult(data);
+          break;
+
+        case 'game_restart':
+          this.handleRestartGame();
+          break;
+
+        // Add or update this case in the handleWebSocketMessage switch statement
+        case 'game_end':
+          console.log('Game end message received:', data);
+          
+          // Update game state to finished
+          this.gameState.phase = 'finished';
+          this.updateGamePhaseUI('finished');
+          
+          // Show game results with restart button
+          this.showGameResults(data.winnerId, data.winnerName);
           break;
         
         default:
@@ -650,43 +720,75 @@ startWebSocketStatusChecks() {
     }
   }
 
-// In card-game.js, update the handleRoundResult method
-
-handleRoundResult(data) {
-  console.log(`Round result received: ${data.winnerName} won ${data.cardCount} cards`);
-  
-  // Get result indicator
-  const resultIndicator = document.getElementById('warResult');
-  if (resultIndicator) {
-    resultIndicator.textContent = `${data.winnerName} wins the round!`;
-    resultIndicator.className = 'war-result-indicator winner';
+  handleRoundResult(data) {
+    console.log(`Round result received: ${data.winnerName} won ${data.cardCount} cards`);
+    
+    // Get result indicator
+    const resultIndicator = document.getElementById('warResult');
+    if (resultIndicator) {
+      resultIndicator.textContent = `${data.winnerName} wins the round!`;
+      resultIndicator.className = 'war-result-indicator winner';
+    }
+    
+    // Update game state from server data
+    this.gameState.round = data.newRound;
+    
+    // Clear played cards (UI only)
+    this.playedCards = {};
+    
+    // Clear card slots
+    this.clearCardSlots();
+    
+    // Show notification
+    this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
+    
+    // Update scoreboard after a short delay (to receive updated hand sizes)
+    setTimeout(() => this.updateScoreboard(), 500);
+    
+    // Add this line to request fresh game state from server
+    setTimeout(() => {
+      this.sendWebSocketMessage({
+        type: 'game_state_request',
+        gameId: this.currentGameId,
+        auth_token: localStorage.getItem('auth_token')
+      });
+      console.log('Requesting updated game state after round result');
+    }, 700); // Wait a bit longer than the scoreboard update
   }
-  
-  // Update game state from server data
-  this.gameState.round = data.newRound;
-  
-  // Clear played cards (UI only)
-  this.playedCards = {};
-  
-  // Clear card slots
-  this.clearCardSlots();
-  
-  // Show notification
-  this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
-  
-  // Update scoreboard after a short delay (to receive updated hand sizes)
-  setTimeout(() => this.updateScoreboard(), 500);
-  
-  // Add this line to request fresh game state from server
-  setTimeout(() => {
-    this.sendWebSocketMessage({
-      type: 'game_state_request',
+
+  handleRestartGame() {
+    console.log('Game restarted');
+    
+    // Clear any game end UI
+    const resultsOverlay = document.querySelector('.results-overlay');
+    if (resultsOverlay) {
+      resultsOverlay.remove();
+    }
+    
+    // Reset local game state
+    this.clearTable();
+    this.updateGamePhaseUI('playing');
+    
+    // Clear hands and played cards locally
+    this.hands = {};
+    this.playedCards = {};
+    
+    // Request updated game state
+    this.sendWebSocketMessage({ 
+      type: 'game_state_request', 
       gameId: this.currentGameId,
       auth_token: localStorage.getItem('auth_token')
     });
-    console.log('Requesting updated game state after round result');
-  }, 700); // Wait a bit longer than the scoreboard update
-}
+    
+    // Request connected users
+    this.sendWebSocketMessage({ 
+      type: 'connected_users', 
+      gameId: this.currentGameId,
+      auth_token: localStorage.getItem('auth_token')
+    });
+    
+    this.showNotification('Game restarted! Enjoy!', 'success');
+  }
   
   handleError(data) {
     console.error('Game error:', data.message);
@@ -1239,6 +1341,14 @@ handleRoundResult(data) {
   }
   
   showGameResults(winnerId, winnerName) {
+    console.log(`Showing game results - winner: ${winnerName} (ID: ${winnerId})`);
+    
+    // Remove any existing results overlay
+    const existingOverlay = document.querySelector('.results-overlay');
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+    
     // Create a results overlay
     const resultsOverlay = document.createElement('div');
     resultsOverlay.className = 'results-overlay';
@@ -1277,23 +1387,91 @@ handleRoundResult(data) {
       resultsList.appendChild(playerResult);
     });
     
+    // Create button container for better styling
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'result-buttons';
+    
+    // Add "Play Again" button
+    const playAgainButton = document.createElement('button');
+    playAgainButton.textContent = 'Play Again';
+    playAgainButton.className = 'play-again-button';
+    playAgainButton.addEventListener('click', () => this.restartGame());
+    
     // Add button to return to lobby
     const returnButton = document.createElement('button');
     returnButton.textContent = 'Return to Lobby';
     returnButton.className = 'return-button';
-    returnButton.addEventListener('click', () => {
-      sessionStorage.setItem('intentionalNavigation', 'true');
-      globalThis.location.href = 'games.html';
-    });
+    returnButton.addEventListener('click', () => this.returnToLobby());
+    
+    // Add buttons to container
+    buttonContainer.appendChild(playAgainButton);
+    buttonContainer.appendChild(returnButton);
     
     // Assemble the results view
     resultsContainer.appendChild(resultsTitle);
     resultsContainer.appendChild(resultsList);
-    resultsContainer.appendChild(returnButton);
+    resultsContainer.appendChild(buttonContainer);
     resultsOverlay.appendChild(resultsContainer);
     
     // Add to document
     document.body.appendChild(resultsOverlay);
+    
+    // Hide start game button if visible
+    const startGameBtn = document.getElementById('startGameBtn');
+    if (startGameBtn) {
+      startGameBtn.style.display = 'none';
+    }
+  }
+
+  // Add to CardGameFramework class
+  async restartGame() {
+    try {
+      // Show loading state
+      this.showNotification('Restarting game...', 'info');
+      
+      // Call the backend to restart the game
+      const response = await fetch('http://localhost:3000/restart-game', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({ gameId: this.currentGameId }),
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to restart game');
+      }
+      
+      // Close the results overlay
+      const resultsOverlay = document.querySelector('.results-overlay');
+      if (resultsOverlay) {
+        resultsOverlay.remove();
+      }
+      
+      // Show success message
+      this.showNotification('Game restarted! Waiting for server update...', 'success');
+      
+      // Clear game state locally
+      this.gameState.phase = 'waiting';
+      this.gameState.round = 1;
+      this.updateGamePhaseUI('waiting');
+      this.hands = {};
+      this.playedCards = {};
+      
+      // Request updated game state
+      this.sendWebSocketMessage({
+        type: 'game_state_request',
+        gameId: this.currentGameId,
+        auth_token: localStorage.getItem('auth_token')
+      });
+      
+    } catch (error) {
+      console.error('Error restarting game:', error);
+      this.showErrorNotification('Error restarting game: ' + error.message);
+    }
   }
   
   showNotification(message, type = 'info') {
