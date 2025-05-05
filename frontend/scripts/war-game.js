@@ -327,12 +327,11 @@ class WarGame extends CardGameFramework {
     this.updateScoreboard();
   }
 
-  // In war-game.js, find where handlePlayerAction is used or add this method if not present:
   handlePlayerAction(data) {
-    // First call the parent handler
-    super.handlePlayerAction(data);
+    // Don't call super.handlePlayerAction to avoid conflicting animations
+    // super.handlePlayerAction(data);
     
-    const { playerId, action } = data;
+    const { playerId, username, action } = data;
     
     // Determine if the action is from an opponent
     const isOpponent = String(playerId) !== String(this.currentPlayerId);
@@ -344,8 +343,41 @@ class WarGame extends CardGameFramework {
       const card = this.cardsById[cardId];
       
       if (card) {
-        // Animate with proper source player
-        this.animateCardPlay(card, action.type === 'play_war_card', isOpponent);
+        // Check if we're in war mode for special handling
+        if (action.warMode || action.type === 'play_war_card') {
+          console.log(`War card played by ${username} (${playerId})`);
+          
+          // Update UI tracking
+          if (!this.playedCards[playerId]) {
+            this.playedCards[playerId] = card;
+          }
+          
+          // Update the card slot with minimal animation to avoid conflicts
+          const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
+          const slot = document.getElementById(slotId);
+          
+          if (slot) {
+            // Clean up any face down card
+            slot.innerHTML = '';
+            
+            // Create the new card image with a simple fade-in effect
+            const cardImage = document.createElement('img');
+            cardImage.src = card.picture;
+            cardImage.alt = `${card.rank} of ${card.suit}`;
+            cardImage.className = 'war-card-image';
+            cardImage.style.opacity = '0';
+            slot.appendChild(cardImage);
+            
+            // Fade in the card
+            setTimeout(() => {
+              cardImage.style.transition = 'opacity 0.5s ease';
+              cardImage.style.opacity = '1';
+            }, 50);
+          }
+        } else {
+          // For normal card plays, use the regular animation
+          this.animateCardPlay(card, false, isOpponent);
+        }
         
         // Clear any face down card previously in this slot if needed
         if (this.faceDownCardSlots && this.faceDownCardSlots[playerId]) {
