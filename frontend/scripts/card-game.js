@@ -737,7 +737,7 @@ handleRoundResult(data) {
     const totalCards = hand.length;
     
     // Calculate overlap for cards
-    let overlapOffset = Math.min(40, (containerWidth - cardWidth) / (totalCards - 1));
+    let overlapOffset = Math.min(60, (containerWidth - cardWidth) / (totalCards - 1));
     if (totalCards <= 1) overlapOffset = 0;
     
     // Calculate start position
@@ -947,7 +947,6 @@ handleRoundResult(data) {
     this.showNotification(`${username} played a war card!`, 'war-card');
   }
   
-  // In card-game.js, replace the existing animateCardPlay method with this:
   animateCardPlay(card, isWarCard = false, isOpponent = false) {
     // Create a temporary element for the animation
     const animatedCard = document.createElement('div');
@@ -969,13 +968,13 @@ handleRoundResult(data) {
     
     animatedCard.appendChild(cardImage);
     
-    // Position differently based on player source
+    // Set starting positions based on player source
     if (isOpponent) {
       // For opponent cards - come from top
-      animatedCard.style.top = '50px';
+      animatedCard.style.top = '80px';
       animatedCard.style.bottom = 'auto';
     } else {
-      // For player cards - come from bottom (original behavior)
+      // For player cards - come from bottom
       animatedCard.style.bottom = '150px';
       animatedCard.style.top = 'auto';
     }
@@ -986,20 +985,47 @@ handleRoundResult(data) {
     // Add to document
     document.body.appendChild(animatedCard);
     
-    // Animate to center
+    // Animate to destination position
     setTimeout(() => {
       if (isWarCard) {
+        // War cards go to center with special effect
         animatedCard.style.transform = 'translate(-50%, 0) scale(1.2)';
         animatedCard.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
+        
+        // Position in middle
+        if (isOpponent) {
+          animatedCard.style.top = 'calc(50% - 90px)';
+        } else {
+          animatedCard.style.bottom = 'calc(50% - 90px)';
+        }
       } else {
-        animatedCard.style.transform = 'translate(-50%, 0)';
+        // Normal cards go to their appropriate slots
+        if (isOpponent) {
+          // Opponent's card destination - player1 slot
+          const slot = document.getElementById('player1Slot');
+          if (slot) {
+            const rect = slot.getBoundingClientRect();
+            animatedCard.style.top = `${rect.top}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback if slot not found
+            animatedCard.style.top = 'calc(50% - 150px)';
+          }
+        } else {
+          // Player's card destination - player2 slot
+          const slot = document.getElementById('player2Slot');
+          if (slot) {
+            const rect = slot.getBoundingClientRect();
+            animatedCard.style.bottom = `${window.innerHeight - rect.bottom}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback if slot not found
+            animatedCard.style.bottom = 'calc(50% - 150px)';
+          }
+        }
       }
       
-      // Move to center position regardless of starting point
-      animatedCard.style.top = isOpponent ? '50%' : 'auto';
-      animatedCard.style.bottom = isOpponent ? 'auto' : '50%';
-      
-      // Remove after animation
+      // Remove after animation completes
       setTimeout(() => {
         animatedCard.remove();
       }, isWarCard ? 800 : 500);
@@ -1151,6 +1177,15 @@ handleRoundResult(data) {
     const startGameBtn = document.getElementById('startGameBtn');
     if (startGameBtn) {
       startGameBtn.style.display = phase === 'playing' ? 'none' : 'block';
+    }
+    
+    // Update round indicator visibility (will be handled by CSS)
+    const roundIndicator = document.getElementById('roundIndicator');
+    if (roundIndicator && phase === 'playing') {
+      // Ensure the round indicator is updated with current round when becoming visible
+      if (this.gameState && this.gameState.round) {
+        roundIndicator.textContent = `Round ${this.gameState.round}`;
+      }
     }
     
     // Show phase notification
