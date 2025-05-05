@@ -369,41 +369,100 @@ class WarGame extends CardGameFramework {
       
       // Add short delay for second player for better visual effect
       setTimeout(() => {
-        // Create a face down card element
-        const faceDownCard = {
-          picture: cardBackImage,
-          rank: 'hidden',
-          suit: 'hidden'
-        };
+        // Create a face down card element for animation
+        const animatedCard = document.createElement('div');
+        animatedCard.className = 'animated-card face-down';
+        animatedCard.style.position = 'absolute';
+        animatedCard.style.width = '120px';
+        animatedCard.style.height = '180px';
+        animatedCard.style.zIndex = '1000';
+        animatedCard.style.transition = 'all 0.5s ease';
         
-        // Animate the card being played with the isOpponent flag
-        this.animateCardPlay(faceDownCard, false, isOpponent);
+        // Add card back image
+        const cardImg = document.createElement('img');
+        cardImg.src = cardBackImage;
+        cardImg.alt = 'Card face down';
+        cardImg.style.width = '100%';
+        cardImg.style.height = '100%';
+        animatedCard.appendChild(cardImg);
         
-        // Update the card slot with the face down card
-        // Determine which slot to update
+        // Set starting position based on player
+        if (isOpponent) {
+          // For opponent cards - come from top
+          animatedCard.style.top = '80px';
+          animatedCard.style.bottom = 'auto';
+        } else {
+          // For player cards - come from bottom
+          animatedCard.style.bottom = '150px';
+          animatedCard.style.top = 'auto';
+        }
+        
+        animatedCard.style.left = '50%';
+        animatedCard.style.transform = 'translateX(-50%)';
+        
+        // Add to document
+        document.body.appendChild(animatedCard);
+        
+        // Clear the card slot first
         const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
         const slot = document.getElementById(slotId);
-        
         if (slot) {
-          // First, store the current content in a temporary element
-          const tempContent = slot.innerHTML;
-          
-          // Clear and update with face down card
           slot.innerHTML = '';
-          const cardImg = document.createElement('img');
-          cardImg.src = cardBackImage;
-          cardImg.alt = 'Card face down';
-          cardImg.className = 'war-card-image face-down';
-          slot.appendChild(cardImg);
-          
-          // Schedule removal of face down card when the face up card will be displayed
-          // Usually in the next round of play
-          this.faceDownCardSlots = this.faceDownCardSlots || {};
-          this.faceDownCardSlots[player.id] = true;
         }
+        
+        // Animate to destination
+        setTimeout(() => {
+          // War cards go to center with special effect
+          if (isOpponent) {
+            // Opponent's card destination - player1 slot
+            const slot = document.getElementById('player1Slot');
+            if (slot) {
+              const rect = slot.getBoundingClientRect();
+              animatedCard.style.top = `${rect.top}px`;
+              animatedCard.style.left = `${rect.left + rect.width/2}px`;
+            } else {
+              // Fallback if slot not found
+              animatedCard.style.top = 'calc(50% - 150px)';
+            }
+          } else {
+            // Player's card destination - player2 slot
+            const slot = document.getElementById('player2Slot');
+            if (slot) {
+              const rect = slot.getBoundingClientRect();
+              animatedCard.style.bottom = `${globalThis.innerHeight - rect.bottom}px`;
+              animatedCard.style.left = `${rect.left + rect.width/2}px`;
+            } else {
+              // Fallback if slot not found
+              animatedCard.style.bottom = 'calc(50% - 150px)';
+            }
+          }
+          
+          // Only update the slot AFTER animation completes
+          setTimeout(() => {
+            // Update the slot with the face down card
+            const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
+            const slot = document.getElementById(slotId);
+            if (slot) {
+              slot.innerHTML = '';
+              const finalCardImg = document.createElement('img');
+              finalCardImg.src = cardBackImage;
+              finalCardImg.alt = 'Card face down';
+              finalCardImg.className = 'war-card-image face-down';
+              slot.appendChild(finalCardImg);
+            }
+            
+            // Remove the animated element
+            animatedCard.remove();
+            
+            // Store that this slot has a face down card
+            this.faceDownCardSlots = this.faceDownCardSlots || {};
+            this.faceDownCardSlots[player.id] = true;
+          }, 500);
+        }, 10);
       }, index * 800); // Slight delay between players
     });
   }
+
   }
 
 // Initialize the War game when the window is loaded

@@ -1242,6 +1242,10 @@ async function resolveRound(gameId: number): Promise<void> {
   // Add played cards to war pile
   gameState.warPile.push(card1, card2);
   
+  // Add a delay before resolving the round - THIS IS THE KEY CHANGE
+  // Add a delay to allow users to see the cards
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
   // Compare cards to determine winner
   let result = 0;
   if (card1.value > card2.value) {

@@ -985,6 +985,13 @@ handleRoundResult(data) {
     // Add to document
     document.body.appendChild(animatedCard);
     
+    // Clear the card slot first - THIS IS THE KEY CHANGE
+    const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
+    const slot = document.getElementById(slotId);
+    if (slot) {
+      slot.innerHTML = '';
+    }
+    
     // Animate to destination position
     setTimeout(() => {
       if (isWarCard) {
@@ -1025,8 +1032,21 @@ handleRoundResult(data) {
         }
       }
       
-      // Remove after animation completes
+      // Only display the card in the slot AFTER animation completes
       setTimeout(() => {
+        // Update the slot with the final card
+        const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
+        const slot = document.getElementById(slotId);
+        if (slot) {
+          slot.innerHTML = '';
+          const finalCardImg = document.createElement('img');
+          finalCardImg.src = card.picture;
+          finalCardImg.alt = `${card.rank} of ${card.suit}`;
+          finalCardImg.className = 'war-card-image';
+          slot.appendChild(finalCardImg);
+        }
+        
+        // Remove the animated element
         animatedCard.remove();
       }, isWarCard ? 800 : 500);
     }, 10);
