@@ -600,8 +600,8 @@ startWebSocketStatusChecks() {
     // Find this player in the players array and set currentPlayerId
     const currentPlayer = this.players.find(p => p.username === this.currentUsername);
     if (currentPlayer && currentPlayer.id) {
-      this.currentPlayerId = currentPlayer.id;
-      console.log(`Set current player ID to: ${this.currentPlayerId}`);
+        this.currentPlayerId = currentPlayer.id;
+        console.log(`Set current player ID to: ${this.currentPlayerId}`);
     }
     
     // Update the poker table players
@@ -609,12 +609,13 @@ startWebSocketStatusChecks() {
     
     // Initialize player hands if not already done
     if (Object.keys(this.hands).length === 0 && this.gameState.phase === 'playing') {
-      this.initializeHands();
+        this.initializeHands();
     }
+    
+    // Update profiles container with connected users
+    this.updateProfilesContainer(users);
   }
   
-// Replace in card-game.js
-
   handleGameState(data) {
     console.log('Processing game state update', data);
     
@@ -918,6 +919,62 @@ startWebSocketStatusChecks() {
       cardCount: hand.length,
       gameId: this.currentGameId,
       auth_token: localStorage.getItem('auth_token')
+    });
+  }
+
+  // Add this to the CardGameFramework class in the UI METHODS section
+  updateProfilesContainer(users) {
+    // Get the profiles container
+    const profilesContainer = document.getElementById('profiles');
+    if (!profilesContainer) return;
+    
+    // Clear existing profiles
+    profilesContainer.innerHTML = '';
+    
+    // Add each user to the profiles container
+    users.forEach(user => {
+        // Create profile box
+        const profileBox = document.createElement('div');
+        profileBox.className = 'profile-box';
+        profileBox.dataset.username = user.username;
+        
+        // Create profile picture
+        const profilePic = document.createElement('img');
+        profilePic.className = 'profile-picture';
+        profilePic.alt = user.username;
+        
+        // Use provided profile picture or default
+        if (user.pp_path && user.pp_path.trim() !== '') {
+            profilePic.src = user.pp_path;
+        } else {
+            profilePic.src = 'profile_pictures/default.jpg';
+        }
+        
+        // Create profile name
+        const profileName = document.createElement('div');
+        profileName.className = 'profile-name';
+        profileName.textContent = user.username;
+        
+        // Add connection status indicator if needed
+        if (user.connected === false) {
+            profileBox.classList.add('disconnected');
+            profilePic.style.opacity = '0.5';
+        }
+        
+        // Add highlight for current user
+        if (user.username === this.currentUsername) {
+            profileBox.classList.add('current-user');
+        }
+        
+        // Add click event to redirect to profile
+        profileBox.addEventListener('click', () => {
+            goToProfilePage(user.username);
+        });
+        
+        // Assemble profile box
+        profileBox.appendChild(profilePic);
+        profileBox.appendChild(profileName);
+        profilesContainer.appendChild(profileBox);
     });
   }
   
@@ -1716,9 +1773,24 @@ startWebSocketStatusChecks() {
   }
 }
 
+// Function to navigate to profile page
+function goToProfilePage(username) {
+  // Track that user is coming from index page
+  sessionStorage.setItem('profileOrigin', 'index');
+  sessionStorage.setItem('intentionalNavigation', 'true');
+  sessionStorage.setItem('wsWasOpen', 'true');
+  
+  // Store the username to view
+  sessionStorage.setItem('profileToView', username);
+  
+  setTimeout(() => {
+      globalThis.location.href = 'profile.html';
+  }, 10);
+}
+
 // Make globally available
 globalThis.CardGameFramework = CardGameFramework;
-
+globalThis.goToProfilePage = goToProfilePage;
 // For chat message sending
 globalThis.sendJson = function() {
   if (globalThis.cardGame) {

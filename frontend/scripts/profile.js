@@ -32,9 +32,11 @@ async function loadProfileData() {
         // Get the current user's information
         const currentUsername = sessionStorage.getItem('currentUsername') || localStorage.getItem('currentUsername');
         
-        // In a real implementation, you would get a specific username from URL or session
-        // For now, we'll just use the current logged-in user
-        const profileToLoad = currentUsername;
+        // Check if we're viewing someone else's profile
+        const profileToLoad = sessionStorage.getItem('profileToView') || currentUsername;
+        
+        // Clear the stored profile to view after using it
+        sessionStorage.removeItem('profileToView');
         
         // Make request to backend
         const response = await fetch('http://localhost:3000/user-profile', {
