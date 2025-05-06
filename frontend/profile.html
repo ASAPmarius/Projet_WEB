@@ -3,16 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello Page</title>
-    <link rel="stylesheet" href="styles/profile-page.css">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="styles/profile.css">
+    <!-- Authentication check script -->
+    <script src="scripts/auth-check.js"></script>
 </head>
 <body>
-    <div class="content">
-        <h1>Hello!</h1>
-        <p>Welcome to this simple page</p>
-        <button class="back-button" onclick="goBackToGame()">Back to Game</button>
+    <!-- View Mode Container -->
+    <div id="viewMode" class="profile-container">
+        <h1>User Profile</h1>
+        <div class="profile-content">
+            <div class="profile-header">
+                <div class="profile-picture-container">
+                    <img id="profilePicture" src="" alt="Profile Picture" class="profile-picture">
+                </div>
+                <div class="profile-info">
+                    <h2 id="username">Loading...</h2>
+                </div>
+            </div>
+            
+            <div class="profile-details">
+                <div class="detail-section">
+                    <h3>Bio</h3>
+                    <p id="userBio">Loading...</p>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>Favorite Song</h3>
+                    <p id="userSong">Loading...</p>
+                </div>
+            </div>
+            
+            <div id="modifyButtonContainer" class="button-container">
+                <button id="modifyProfileBtn" class="primary-btn">Modify Profile</button>
+            </div>
+        </div>
+        
+        <button id="backToGameBtn" class="back-button">Go back</button>
     </div>
-
-    <script src="scripts/profile-page.js"></script>
+    
+    <!-- Edit Mode Container -->
+    <div id="editMode" class="profile-container hidden">
+        <h1>Edit Profile</h1>
+        <div class="profile-content">
+            <div class="profile-header">
+                <div class="profile-picture-container">
+                    <img id="editProfilePicture" src="" alt="Profile Picture" class="profile-picture">
+                    <div class="picture-upload">
+                        <label for="profilePictureUpload" class="upload-label">Change Picture</label>
+                        <input type="file" id="profilePictureUpload" accept="image/*" class="hidden">
+                    </div>
+                </div>
+                <div class="profile-info">
+                    <h2 id="editUsername">Loading...</h2>
+                    <p class="username-note">(Username cannot be changed)</p>
+                </div>
+            </div>
+            
+            <div class="profile-details">
+                <div class="detail-section">
+                    <h3>Bio</h3>
+                    <textarea id="editBio" placeholder="Write something about yourself..."></textarea>
+                </div>
+                
+                <div class="detail-section">
+                    <h3>Favorite Song</h3>
+                    <input type="text" id="editSong" placeholder="Your favorite song">
+                </div>
+            </div>
+            
+            <div class="button-container">
+                <button id="saveChangesBtn" class="primary-btn">Save Changes</button>
+                <button id="cancelBtn" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Status Message -->
+    <div id="statusMessage" class="status-message"></div>
+    
+    <script src="scripts/profile.js"></script>
 </body>
 </html>

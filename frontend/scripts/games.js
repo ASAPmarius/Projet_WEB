@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listeners
     createGameBtn.addEventListener('click', createNewGame);
     returnBtn.addEventListener('click', returnToGame);
+    document.getElementById('profileBtn').addEventListener('click', goToProfilePage);
     
     // Function to check if user is in a game
     async function checkUserGameStatus() {
@@ -194,6 +195,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    }
+
+    // Function to navigate to profile page
+    function goToProfilePage() {
+        // Track that user is coming from games page
+        sessionStorage.setItem('profileOrigin', 'games');
+        sessionStorage.setItem('intentionalNavigation', 'true');
+        sessionStorage.setItem('wsWasOpen', 'true');
+        
+        setTimeout(() => {
+            globalThis.location.href = 'profile.html';
+        }, 10);
     }
     
     // Function to create a new game

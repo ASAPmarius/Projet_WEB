@@ -2467,6 +2467,149 @@ router.post('/disconnect-from-game', async (ctx) => {
   }
 });
 
+// Add this with your other router definitions
+
+// Profile endpoint
+router.post('/user-profile', authorizationMiddleware, async (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  try {
+    const body = await ctx.request.body.json();
+    const { username } = body;
+    
+    if (!username) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'Username is required' };
+      return;
+    }
+    
+    // Get user from database
+    const user = await getUserByUsername(username);
+    
+    if (!user) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'User not found' };
+      return;
+    }
+    
+    // Convert profile picture to base64 if it exists
+    let profilePictureBase64 = null;
+    if (user.Profile_picture) {
+      profilePictureBase64 = safelyConvertToBase64(user.Profile_picture);
+    }
+    
+    // Return user data with profile picture as base64
+    ctx.response.status = 200;
+    ctx.response.body = {
+      user: {
+        idUser: user.idUser,
+        Username: user.Username,
+        Bio: user.Bio,
+        Favorite_song: user.Favorite_song,
+        Profile_picture: profilePictureBase64,
+        isAdmin: user.isAdmin
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Internal server error' };
+  }
+});
+
+// Update profile endpoint
+router.post('/update-profile', authorizationMiddleware, async (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  
+  try {
+    const body = await ctx.request.body.json();
+    const { username, bio, favoriteSong, profilePicture } = body;
+    
+    // Get current user ID from token
+    const userId = ctx.state.tokenData.userId;
+    
+    // Get user from database
+    const user = await getUserById(userId);
+    
+    if (!user) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'User not found' };
+      return;
+    }
+    
+    // Make sure user is only updating their own profile
+    if (user.Username !== username) {
+      ctx.response.status = 403;
+      ctx.response.body = { error: 'You can only update your own profile' };
+      return;
+    }
+    
+    // Process profile picture if provided
+    let profilePictureBytes = user.Profile_picture;
+    if (profilePicture) {
+      // Convert from base64 data URL
+      profilePictureBytes = base64ToBytes(profilePicture);
+    }
+    
+    // Update user in database
+    const result = await client.queryObject<User>(
+      'UPDATE "User" SET "Bio" = $1, "Favorite_song" = $2, "Profile_picture" = $3 WHERE "idUser" = $4 RETURNING *',
+      [bio || null, favoriteSong || null, profilePictureBytes, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: 'Failed to update profile' };
+      return;
+    }
+    
+    const updatedUser = result.rows[0];
+    
+    // Convert profile picture to base64 if it exists
+    let profilePictureBase64 = null;
+    if (updatedUser.Profile_picture) {
+      profilePictureBase64 = safelyConvertToBase64(updatedUser.Profile_picture);
+    }
+    
+    // Return updated user data
+    ctx.response.status = 200;
+    ctx.response.body = {
+      user: {
+        idUser: updatedUser.idUser,
+        Username: updatedUser.Username,
+        Bio: updatedUser.Bio,
+        Favorite_song: updatedUser.Favorite_song,
+        Profile_picture: profilePictureBase64,
+        isAdmin: updatedUser.isAdmin
+      }
+    };
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Internal server error' };
+  }
+});
+
+// Add OPTIONS handler for user-profile
+router.options('/user-profile', (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  ctx.response.status = 204; // No content for OPTIONS
+});
+
+// Add OPTIONS handler for update-profile
+router.options('/update-profile', (ctx) => {
+  ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+  ctx.response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
+  ctx.response.status = 204; // No content for OPTIONS
+});
+
 // New endpoint to get all card resources
 router.get("/api/cards", async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");

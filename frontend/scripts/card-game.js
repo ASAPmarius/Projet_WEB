@@ -257,7 +257,7 @@ class CardGameFramework {
     const finishGameBtn = document.createElement('button');
     finishGameBtn.id = 'finishGameBtn';
     finishGameBtn.className = 'game-control-btn finish-game';
-    finishGameBtn.textContent = 'Finish Game (Debug)';
+    finishGameBtn.textContent = 'Finish Game';
     finishGameBtn.addEventListener('click', () => this.debugFinishGame());
     gameActionsDiv.appendChild(finishGameBtn);
   }
