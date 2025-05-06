@@ -532,12 +532,12 @@ startWebSocketStatusChecks() {
     const message = data;
     const messageBox = document.createElement('div');
     messageBox.className = 'message-box';
-
+  
     // Store the userId as a data attribute if available
     if (message.userId) {
       messageBox.setAttribute('data-user-id', message.userId);
     }
-
+  
     const userPicture = document.createElement('img');
     
     // Check if user_pp_path is base64 or a regular path
@@ -551,30 +551,37 @@ startWebSocketStatusChecks() {
     
     userPicture.alt = 'User Picture';
     userPicture.className = 'user-picture';
-
+  
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
-
+  
     const userName = document.createElement('strong');
     userName.className = 'user-name';
     userName.textContent = `${message.owner}:`;
-
+  
     const messageText = document.createElement('span');
     messageText.className = 'message-text';
     messageText.textContent = message.message;
-
+  
     messageContent.appendChild(userName);
     messageContent.appendChild(messageText);
     messageBox.appendChild(userPicture);
     messageBox.appendChild(messageContent);
-
+  
     // Check if it's a message from the current user
     if (message.owner === this.currentUsername) {
       messageBox.classList.add('my-message');
     } else {
       messageBox.classList.add('other-message');
+      
+      // Show notification dot if chat is hidden and it's not from the current user
+      if (this.uiElements.chatContainer && 
+          this.uiElements.chatContainer.classList.contains('chat-hidden') &&
+          this.uiElements.chatNotificationDot) {
+        this.uiElements.chatNotificationDot.style.display = 'block';
+      }
     }
-
+  
     const messagesContainer = document.getElementById('messages');
     if (messagesContainer) {
       messagesContainer.appendChild(messageBox);
@@ -1226,10 +1233,25 @@ startWebSocketStatusChecks() {
       chatToggle.className = 'chat-toggle';
       chatToggle.id = 'chatToggle';
       document.body.appendChild(chatToggle);
+      
+      // Add notification dot
+      const notificationDot = document.createElement('div');
+      notificationDot.className = 'chat-notification-dot';
+      notificationDot.id = 'chatNotificationDot';
+      chatToggle.appendChild(notificationDot);
+    } else {
+      // Make sure the notification dot exists
+      if (!document.getElementById('chatNotificationDot')) {
+        const notificationDot = document.createElement('div');
+        notificationDot.className = 'chat-notification-dot';
+        notificationDot.id = 'chatNotificationDot';
+        chatToggle.appendChild(notificationDot);
+      }
     }
     
     // Store reference
     this.uiElements.chatToggle = chatToggle;
+    this.uiElements.chatNotificationDot = document.getElementById('chatNotificationDot');
     
     // Check if chat container exists
     if (!this.uiElements.chatContainer) {
@@ -1251,6 +1273,12 @@ startWebSocketStatusChecks() {
         this.uiElements.chatContainer.classList.toggle('chat-hidden');
         chatToggle.classList.toggle('chat-hidden');
         
+        // Hide notification dot when opening chat
+        if (!this.uiElements.chatContainer.classList.contains('chat-hidden') && 
+            this.uiElements.chatNotificationDot) {
+          this.uiElements.chatNotificationDot.style.display = 'none';
+        }
+        
         // Save state to sessionStorage
         const isHidden = this.uiElements.chatContainer.classList.contains('chat-hidden');
         sessionStorage.setItem('chatHidden', isHidden.toString());
@@ -1267,6 +1295,12 @@ startWebSocketStatusChecks() {
     // Toggle classes
     this.uiElements.chatContainer.classList.toggle('chat-hidden');
     this.uiElements.chatToggle.classList.toggle('chat-hidden');
+    
+    // Hide notification dot when opening chat
+    if (!this.uiElements.chatContainer.classList.contains('chat-hidden') && 
+        this.uiElements.chatNotificationDot) {
+      this.uiElements.chatNotificationDot.style.display = 'none';
+    }
     
     // Save state to sessionStorage
     const isHidden = this.uiElements.chatContainer.classList.contains('chat-hidden');
