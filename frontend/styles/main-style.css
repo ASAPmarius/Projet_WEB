@@ -994,15 +994,16 @@ body.my-turn .hand-container {
 /* Chat notification dot */
 .chat-notification-dot {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 10px;
-  height: 10px;
+  top: -8px;
+  left: -8px;
+  width: 16px;
+  height: 16px;
   background-color: #ff3b30;
   border-radius: 50%;
   display: none; /* Hidden by default */
   animation: pulse-notification 2s infinite;
   z-index: 1010;
+  border: 2px solid white; /* Added border to make it stand out better */
 }
 
 @keyframes pulse-notification {
