@@ -9,9 +9,10 @@ class WarGame extends CardGameFramework {
       allowedActions: ['play']
     });
     
-    // Keep UI state properties only
+    // War-specific properties
     this.warMode = false;
     this.playedCards = {};
+    this.faceDownCardSlots = {};
     
     // Create scoreboard when game is initialized
     document.addEventListener('DOMContentLoaded', () => {
@@ -21,7 +22,139 @@ class WarGame extends CardGameFramework {
     });
   }
   
-  // Keep UI methods
+  // Override the animateCardToPosition method for War-specific card animations
+  animateCardToPosition(animatedCard, card, isWarCard, isOpponent) {
+    setTimeout(() => {
+      if (isWarCard) {
+        // War cards go to center with special effect
+        animatedCard.style.transform = 'translate(-50%, 0) scale(1.2)';
+        animatedCard.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
+        
+        // Position in middle
+        if (isOpponent) {
+          animatedCard.style.top = 'calc(50% - 90px)';
+        } else {
+          animatedCard.style.bottom = 'calc(50% - 90px)';
+        }
+      } else {
+        // Normal cards go to their appropriate slots
+        if (isOpponent) {
+          // Opponent's card destination - player1 slot
+          const slot = document.getElementById('player1Slot');
+          if (slot) {
+            const rect = slot.getBoundingClientRect();
+            animatedCard.style.top = `${rect.top}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback if slot not found
+            animatedCard.style.top = 'calc(50% - 150px)';
+          }
+        } else {
+          // Player's card destination - player2 slot
+          const slot = document.getElementById('player2Slot');
+          if (slot) {
+            const rect = slot.getBoundingClientRect();
+            animatedCard.style.bottom = `${globalThis.innerHeight - rect.bottom}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback if slot not found
+            animatedCard.style.bottom = 'calc(50% - 150px)';
+          }
+        }
+      }
+      
+      // Only display the card in the slot AFTER animation completes
+      setTimeout(() => {
+        // Update the slot with the final card
+        const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
+        const slot = document.getElementById(slotId);
+        if (slot) {
+          slot.innerHTML = '';
+          const finalCardImg = document.createElement('img');
+          finalCardImg.src = card.picture;
+          finalCardImg.alt = `${card.rank} of ${card.suit}`;
+          finalCardImg.className = 'war-card-image';
+          slot.appendChild(finalCardImg);
+        }
+        
+        // Remove the animated element
+        animatedCard.remove();
+      }, isWarCard ? 800 : 500);
+    }, 10);
+  }
+  
+  // War-specific method to handle War card play
+  handleWarCardAction(playerId, username, cardId) {
+    console.log(`Player ${username} played war card ${cardId}`);
+    
+    // Get the card data
+    const card = this.cardsById[cardId];
+    if (!card) {
+      console.warn(`Card data not found for ID ${cardId}`);
+      return;
+    }
+    
+    // Check if there was a face-down card in this slot
+    if (this.faceDownCardSlots && this.faceDownCardSlots[playerId]) {
+      // Explicitly clear the slot before updating it
+      const slotId = String(playerId) === String(this.currentPlayerId) ? 'player2Slot' : 'player1Slot';
+      const slot = document.getElementById(slotId);
+      if (slot) {
+        slot.innerHTML = '';
+      }
+      // Mark as cleared
+      delete this.faceDownCardSlots[playerId];
+    }
+    
+    // Update the card slot
+    this.updateCardSlot(playerId, card);
+    
+    // Animate the card play with more dramatic effect for war
+    this.animateCardPlay(card, true); // Pass true to indicate war card
+    
+    // Show notification
+    this.showNotification(`${username} played a war card!`, 'war-card');
+  }
+  
+  // War-specific methods to update card display
+  updateCardSlot(playerId, card) {
+    let slot;
+    
+    if (String(playerId) === String(this.currentPlayerId)) {
+      slot = document.getElementById('player2Slot');
+    } else {
+      slot = document.getElementById('player1Slot');
+    }
+    
+    if (!slot) {
+      console.warn(`Card slot not found for player ${playerId}`);
+      return;
+    }
+    
+    slot.innerHTML = '';
+    
+    const cardImage = document.createElement('img');
+    cardImage.src = card.picture;
+    cardImage.alt = `${card.rank} of ${card.suit}`;
+    cardImage.className = 'war-card-image';
+    
+    slot.appendChild(cardImage);
+  }
+    
+  clearCardSlots() {
+    const player1Slot = document.getElementById('player1Slot');
+    const player2Slot = document.getElementById('player2Slot');
+    
+    if (player1Slot) player1Slot.innerHTML = '';
+    if (player2Slot) player2Slot.innerHTML = '';
+  }
+  
+  clearTable() {
+    this.clearCardSlots();
+    this.playedCards = {};
+  }
+  
+  // War-specific methods for poker table
   initPokerTable() {
     super.initPokerTable();
     
@@ -139,44 +272,6 @@ class WarGame extends CardGameFramework {
     });
   }
   
-  // UI methods only - update card display
-  updateCardSlot(playerId, card) {
-    let slot;
-    
-    if (String(playerId) === String(this.currentPlayerId)) {
-      slot = document.getElementById('player2Slot');
-    } else {
-      slot = document.getElementById('player1Slot');
-    }
-    
-    if (!slot) {
-      console.warn(`Card slot not found for player ${playerId}`);
-      return;
-    }
-    
-    slot.innerHTML = '';
-    
-    const cardImage = document.createElement('img');
-    cardImage.src = card.picture;
-    cardImage.alt = `${card.rank} of ${card.suit}`;
-    cardImage.className = 'war-card-image';
-    
-    slot.appendChild(cardImage);
-  }
-    
-  clearCardSlots() {
-    const player1Slot = document.getElementById('player1Slot');
-    const player2Slot = document.getElementById('player2Slot');
-    
-    if (player1Slot) player1Slot.innerHTML = '';
-    if (player2Slot) player2Slot.innerHTML = '';
-  }
-  
-  clearTable() {
-    this.clearCardSlots();
-    this.playedCards = {};
-  }
-  
   highlightCurrentPlayer(playerId) {
     const playerSeats = document.querySelectorAll('.player-seat');
     playerSeats.forEach(seat => seat.classList.remove('active-player'));
@@ -272,6 +367,11 @@ class WarGame extends CardGameFramework {
     this.updateScoreboard();
   }
 
+  // Override the updateTablePlayers method for War game
+  updateTablePlayers(players, currentUsername) {
+    this.updateTablePlayersWar(players, currentUsername);
+  }
+
   handleWebSocketMessage(event) {
     try {
       const data = JSON.parse(event.data);
@@ -327,6 +427,50 @@ class WarGame extends CardGameFramework {
     this.updateScoreboard();
   }
 
+  handleRoundResult(data) {
+    console.log(`Round result received: ${data.winnerName} won ${data.cardCount} cards`);
+    
+    // Get result indicator
+    const resultIndicator = document.getElementById('warResult');
+    if (resultIndicator) {
+      resultIndicator.textContent = `${data.winnerName} wins the round!`;
+      resultIndicator.className = 'war-result-indicator winner';
+    }
+    
+    // Update game state from server data
+    this.gameState.round = data.newRound;
+    
+    // Clear played cards (UI only)
+    this.playedCards = {};
+    
+    // Clear card slots
+    this.clearCardSlots();
+    
+    // Show notification
+    this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
+    
+    // Immediately request updated game state to get new card distribution
+    this.sendWebSocketMessage({
+      type: 'game_state_request',
+      gameId: this.currentGameId,
+      auth_token: localStorage.getItem('auth_token')
+    });
+    
+    // Request connected users to update UI with new card counts
+    setTimeout(() => {
+      this.sendWebSocketMessage({
+        type: 'connected_users',
+        gameId: this.currentGameId,
+        auth_token: localStorage.getItem('auth_token')
+      });
+      console.log('Requesting connected users to update card counts');
+      
+      // Update scoreboard after a short delay to ensure data has arrived
+      setTimeout(() => this.updateScoreboard(), 200);
+    }, 300);
+  }
+
+  // Override handlePlayerAction to handle war-specific card plays
   handlePlayerAction(data) {
     // Don't call super.handlePlayerAction to avoid conflicting animations
     // super.handlePlayerAction(data);
@@ -494,8 +638,7 @@ class WarGame extends CardGameFramework {
       }, index * 800); // Slight delay between players
     });
   }
-
-  }
+}
 
 // Initialize the War game when the window is loaded
 globalThis.addEventListener('load', function() {

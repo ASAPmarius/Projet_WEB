@@ -19,6 +19,7 @@ class CardGameFramework {
     this.hands = {}; // Player hands indexed by player ID
     this.discardPile = [];
     this.cardsById = {}; // Quick lookup for card data
+    this.playedCards = {};
     
     // UI Elements
     this.uiElements = {
@@ -39,7 +40,6 @@ class CardGameFramework {
       winCondition: options.winCondition || 'empty-hand', // empty-hand, points, etc.
       allowedActions: options.allowedActions || ['draw', 'play', 'discard']
     };
-    this.warMode = false;
     
     // Flag to track initialization status
     this.componentsInitialized = false;
@@ -245,27 +245,27 @@ class CardGameFramework {
     this.setupEventListeners();
 
     // Add Finish Game button for debugging
-  const gameActionsDiv = document.getElementById('gameActions') || document.createElement('div');
-  if (!gameActionsDiv.id) {
-    gameActionsDiv.id = 'gameActions';
-    gameActionsDiv.className = 'game-actions';
-    document.body.appendChild(gameActionsDiv);
-  }
+    const gameActionsDiv = document.getElementById('gameActions') || document.createElement('div');
+    if (!gameActionsDiv.id) {
+      gameActionsDiv.id = 'gameActions';
+      gameActionsDiv.className = 'game-actions';
+      document.body.appendChild(gameActionsDiv);
+    }
 
-  // Create Finish Game button if it doesn't exist
-  if (!document.getElementById('finishGameBtn')) {
-    const finishGameBtn = document.createElement('button');
-    finishGameBtn.id = 'finishGameBtn';
-    finishGameBtn.className = 'game-control-btn finish-game';
-    finishGameBtn.textContent = 'Finish Game';
-    finishGameBtn.addEventListener('click', () => this.debugFinishGame());
-    gameActionsDiv.appendChild(finishGameBtn);
-  }
+    // Create Finish Game button if it doesn't exist
+    if (!document.getElementById('finishGameBtn')) {
+      const finishGameBtn = document.createElement('button');
+      finishGameBtn.id = 'finishGameBtn';
+      finishGameBtn.className = 'game-control-btn finish-game';
+      finishGameBtn.textContent = 'Finish Game';
+      finishGameBtn.addEventListener('click', () => this.debugFinishGame());
+      gameActionsDiv.appendChild(finishGameBtn);
+    }
     
     console.log('Game components initialized');
   }
 
-  // Add to CardGameFramework class
+  // Debug method to finish game
   async debugFinishGame() {
     try {
       console.log('Manually finishing game for debugging');
@@ -339,8 +339,8 @@ class CardGameFramework {
     this.startWebSocketStatusChecks();
   }
 
-  // Add after connectWebSocket() method
-startWebSocketStatusChecks() {
+  // Check WebSocket status periodically
+  startWebSocketStatusChecks() {
     // Check WebSocket status every 5 seconds
     this.wsCheckInterval = setInterval(() => {
       if (!this.websocket) {
@@ -455,7 +455,6 @@ startWebSocketStatusChecks() {
           this.handleRestartGame();
           break;
 
-        // Add or update this case in the handleWebSocketMessage switch statement
         case 'game_end':
           console.log('Game end message received:', data);
           
@@ -467,7 +466,6 @@ startWebSocketStatusChecks() {
           this.showGameResults(data.winnerId, data.winnerName);
           break;
 
-        // In the handleWebSocketMessage switch statement:
         case 'redirect_to_lobby':
           this.handleRedirectToLobby(data);
           break;
@@ -692,18 +690,7 @@ startWebSocketStatusChecks() {
         break;
         
       case 'play_card':
-        // Handle standard card play
-        if (action.warMode) {
-          // This is a war card - handle differently
-          this.handleWarCardAction(playerId, username, action.cardId);
-        } else {
-          // Regular card play
-          this.handlePlayCardAction(playerId, username, action.cardId);
-        }
-        break;
-        
-      case 'play_war_card':
-        this.handleWarCardAction(playerId, username, action.cardId);
+        this.handlePlayCardAction(playerId, username, action.cardId);
         break;
         
       default:
@@ -711,7 +698,6 @@ startWebSocketStatusChecks() {
     }
   }
   
-  // Add this to the handleTurnChange method in card-game.js
   handleTurnChange(data) {
     console.log('Processing turn change');
     
@@ -736,13 +722,6 @@ startWebSocketStatusChecks() {
   handleRoundResult(data) {
     console.log(`Round result received: ${data.winnerName} won ${data.cardCount} cards`);
     
-    // Get result indicator
-    const resultIndicator = document.getElementById('warResult');
-    if (resultIndicator) {
-      resultIndicator.textContent = `${data.winnerName} wins the round!`;
-      resultIndicator.className = 'war-result-indicator winner';
-    }
-    
     // Update game state from server data
     this.gameState.round = data.newRound;
     
@@ -754,19 +733,6 @@ startWebSocketStatusChecks() {
     
     // Show notification
     this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
-    
-    // Update scoreboard after a short delay (to receive updated hand sizes)
-    setTimeout(() => this.updateScoreboard(), 500);
-    
-    // Add this line to request fresh game state from server
-    setTimeout(() => {
-      this.sendWebSocketMessage({
-        type: 'game_state_request',
-        gameId: this.currentGameId,
-        auth_token: localStorage.getItem('auth_token')
-      });
-      console.log('Requesting updated game state after round result');
-    }, 700); // Wait a bit longer than the scoreboard update
   }
 
   handleRestartGame() {
@@ -803,7 +769,6 @@ startWebSocketStatusChecks() {
     this.showNotification('Game restarted! Enjoy!', 'success');
   }
 
-  // Add this method to the CardGameFramework class
   handleRedirectToLobby(data) {
     console.log('Received redirect to lobby message from server');
     
@@ -922,7 +887,6 @@ startWebSocketStatusChecks() {
     });
   }
 
-  // Add this to the CardGameFramework class in the UI METHODS section
   updateProfilesContainer(users) {
     // Get the profiles container
     const profilesContainer = document.getElementById('profiles');
@@ -1047,8 +1011,6 @@ startWebSocketStatusChecks() {
   handleDrawCardAction(playerId, username) {
     console.log(`Player ${username} drew a card`);
     
-    // REMOVED: Logic for checking deck size and drawing cards
-    
     // Show notification only
     this.showNotification(`${username} drew a card`);
     
@@ -1087,14 +1049,9 @@ startWebSocketStatusChecks() {
         }
       }
       
-      // IMPORTANT: Check if we're in a WarGame subclass
-      // If we are, don't animate here - it's handled in WarGame's implementation
-      if (!this.warMode) {
-        // Only animate in base class if not in War game
-        // Determine if it's an opponent card based on player ID
-        const isOpponent = String(playerId) !== String(this.currentPlayerId);
-        this.animateCardPlay(cardData, false, isOpponent);
-      }
+      // Determine if it's an opponent card based on player ID
+      const isOpponent = String(playerId) !== String(this.currentPlayerId);
+      this.animateCardPlay(cardData, false, isOpponent);
       
       // Show notification
       this.showNotification(`${username} played a card`);
@@ -1102,44 +1059,12 @@ startWebSocketStatusChecks() {
       console.log(`Card ${cardId} already recorded for player ${playerId}, skipping duplicate handling`);
     }
   }
-
-  handleWarCardAction(playerId, username, cardId) {
-    console.log(`Player ${username} played war card ${cardId}`);
-    
-    // Get the card data
-    const card = this.cardsById[cardId];
-    if (!card) {
-      console.warn(`Card data not found for ID ${cardId}`);
-      return;
-    }
-    
-    // Check if there was a face-down card in this slot
-    if (this.faceDownCardSlots && this.faceDownCardSlots[playerId]) {
-      // Explicitly clear the slot before updating it
-      const slotId = String(playerId) === String(this.currentPlayerId) ? 'player2Slot' : 'player1Slot';
-      const slot = document.getElementById(slotId);
-      if (slot) {
-        slot.innerHTML = '';
-      }
-      // Mark as cleared
-      delete this.faceDownCardSlots[playerId];
-    }
-    
-    // Update the card slot
-    this.updateCardSlot(playerId, card);
-    
-    // Animate the card play with more dramatic effect for war
-    this.animateCardPlay(card, true); // Pass true to indicate war card
-    
-    // Show notification
-    this.showNotification(`${username} played a war card!`, 'war-card');
-  }
   
-  animateCardPlay(card, isWarCard = false, isOpponent = false) {
+  // Basic animation for a card play - to be overridden by subclasses
+  animateCardPlay(card, specialEffect = false, isOpponent = false) {
     // Create a temporary element for the animation
     const animatedCard = document.createElement('div');
     animatedCard.className = 'animated-card';
-    if (isWarCard) animatedCard.classList.add('war-card');
     
     animatedCard.style.position = 'absolute';
     animatedCard.style.width = '120px';
@@ -1173,71 +1098,46 @@ startWebSocketStatusChecks() {
     // Add to document
     document.body.appendChild(animatedCard);
     
-    // Clear the card slot first - THIS IS THE KEY CHANGE
-    const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
-    const slot = document.getElementById(slotId);
-    if (slot) {
-      slot.innerHTML = '';
-    }
-    
-    // Animate to destination position
+    // Track card animation for subclasses
+    this.animateCardToPosition(animatedCard, card, specialEffect, isOpponent);
+  }
+
+  // Animation helper for subclasses to override
+  animateCardToPosition(animatedCard, card, specialEffect, isOpponent) {
+    // Default implementation for generic card animation
     setTimeout(() => {
-      if (isWarCard) {
-        // War cards go to center with special effect
+      // Default animation to center
+      animatedCard.style.top = 'calc(50% - 90px)';
+      
+      if (specialEffect) {
         animatedCard.style.transform = 'translate(-50%, 0) scale(1.2)';
-        animatedCard.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
-        
-        // Position in middle
-        if (isOpponent) {
-          animatedCard.style.top = 'calc(50% - 90px)';
-        } else {
-          animatedCard.style.bottom = 'calc(50% - 90px)';
-        }
-      } else {
-        // Normal cards go to their appropriate slots
-        if (isOpponent) {
-          // Opponent's card destination - player1 slot
-          const slot = document.getElementById('player1Slot');
-          if (slot) {
-            const rect = slot.getBoundingClientRect();
-            animatedCard.style.top = `${rect.top}px`;
-            animatedCard.style.left = `${rect.left + rect.width/2}px`;
-          } else {
-            // Fallback if slot not found
-            animatedCard.style.top = 'calc(50% - 150px)';
-          }
-        } else {
-          // Player's card destination - player2 slot
-          const slot = document.getElementById('player2Slot');
-          if (slot) {
-            const rect = slot.getBoundingClientRect();
-            animatedCard.style.bottom = `${window.innerHeight - rect.bottom}px`;
-            animatedCard.style.left = `${rect.left + rect.width/2}px`;
-          } else {
-            // Fallback if slot not found
-            animatedCard.style.bottom = 'calc(50% - 150px)';
-          }
-        }
+        animatedCard.style.boxShadow = '0 0 20px rgba(33, 150, 243, 0.5)';
       }
       
-      // Only display the card in the slot AFTER animation completes
+      // Remove after animation
       setTimeout(() => {
-        // Update the slot with the final card
-        const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
-        const slot = document.getElementById(slotId);
-        if (slot) {
-          slot.innerHTML = '';
-          const finalCardImg = document.createElement('img');
-          finalCardImg.src = card.picture;
-          finalCardImg.alt = `${card.rank} of ${card.suit}`;
-          finalCardImg.className = 'war-card-image';
-          slot.appendChild(finalCardImg);
-        }
-        
-        // Remove the animated element
         animatedCard.remove();
-      }, isWarCard ? 800 : 500);
+      }, 500);
     }, 10);
+  }
+
+  // Generic placeholder for updateCardSlot - to be implemented by subclasses
+  updateCardSlot(playerId, card) {
+    console.log('Base updateCardSlot - override in subclass');
+    // Base class just logs the event - subclasses should override this
+  }
+
+  // Generic placeholder for clearCardSlots - to be implemented by subclasses
+  clearCardSlots() {
+    console.log('Base clearCardSlots - override in subclass');
+    // Base class just logs the event - subclasses should override this
+  }
+  
+  // Generic placeholder for clearTable - to be implemented by subclasses
+  clearTable() {
+    console.log('Base clearTable - override in subclass');
+    // This should be overridden by subclasses
+    this.clearCardSlots();
   }
   
   endGame(winnerId, winnerName) {
@@ -1250,13 +1150,11 @@ startWebSocketStatusChecks() {
     // Show game over notification
     this.showNotification(`Game Over! ${winnerName} wins!`, 'gameOver');
     
-    // REMOVED: Send game end message - server already knows
-    
     // Show game results UI
     this.showGameResults(winnerId, winnerName);
   }
   
-  // Simplified method for implementing in subclasses
+  // Basic placeholder for implementing in subclasses
   highlightCurrentPlayer(playerId) {
     // Implementation will be provided in subclasses
     console.log(`Highlighting player with ID ${playerId}`);
@@ -1536,7 +1434,6 @@ startWebSocketStatusChecks() {
     }
   }
 
-  // Add to CardGameFramework class
   async restartGame() {
     try {
       // Show loading state
@@ -1658,7 +1555,7 @@ startWebSocketStatusChecks() {
     setTimeout(() => {
       // Navigate to games page
       globalThis.location.href = 'games.html';
-    }, 100); // Increased delay slightly to allow WebSocket message to be sent
+    }, 100);
   }
 
   startGame() {
