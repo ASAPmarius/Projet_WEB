@@ -17,47 +17,47 @@ body {
 /* Profile Container */
 .profile-container {
     background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 0.625rem;
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
     width: 90%;
-    max-width: 800px;
-    padding: 30px;
-    margin: 20px;
+    max-width: 50rem;
+    padding: 1.875rem;
+    margin: 1.25rem;
 }
 
 h1 {
     color: #4CAF50;
     text-align: center;
-    margin-bottom: 30px;
-    border-bottom: 2px solid #f0f0f0;
-    padding-bottom: 15px;
+    margin-bottom: 1.875rem;
+    border-bottom: 0.125rem solid #f0f0f0;
+    padding-bottom: 0.9375rem;
 }
 
 /* Profile Header */
 .profile-header {
     display: flex;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 1.875rem;
 }
 
 .profile-picture-container {
     position: relative;
-    margin-right: 30px;
+    margin-right: 1.875rem;
 }
 
 .profile-picture {
-    width: 150px;
-    height: 150px;
+    width: 9.375rem;
+    height: 9.375rem;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid #4CAF50;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border: 0.1875rem solid #4CAF50;
+    box-shadow: 0 0.125rem 0.625rem rgba(0, 0, 0, 0.1);
 }
 
 .profile-info h2 {
-    margin: 0 0 10px 0;
+    margin: 0 0 0.625rem 0;
     color: #333;
-    font-size: 24px;
+    font-size: 1.5rem;
 }
 
 .username-note {
@@ -68,15 +68,15 @@ h1 {
 
 /* Picture Upload */
 .picture-upload {
-    margin-top: 10px;
+    margin-top: 0.625rem;
     text-align: center;
 }
 
 .upload-label {
     background-color: #4CAF50;
     color: white;
-    padding: 8px 15px;
-    border-radius: 5px;
+    padding: 0.5rem 0.9375rem;
+    border-radius: 0.3125rem;
     cursor: pointer;
     display: inline-block;
     transition: background-color 0.3s;
@@ -92,66 +92,66 @@ input[type="file"].hidden {
 
 /* Profile Details */
 .profile-details {
-    margin-bottom: 30px;
+    margin-bottom: 1.875rem;
 }
 
 .detail-section {
-    margin-bottom: 20px;
+    margin-bottom: 1.25rem;
 }
 
 .detail-section h3 {
     color: #4CAF50;
-    margin-bottom: 10px;
-    font-size: 18px;
+    margin-bottom: 0.625rem;
+    font-size: 1.125rem;
 }
 
 .detail-section p {
     color: #333;
     line-height: 1.6;
     margin: 0;
-    padding: 10px;
+    padding: 0.625rem;
     background-color: #f9f9f9;
-    border-radius: 5px;
-    min-height: 20px;
+    border-radius: 0.3125rem;
+    min-height: 1.25rem;
 }
 
 /* Form Controls */
 textarea, input[type="text"] {
     width: 100%;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+    padding: 0.75rem;
+    border: 0.0625rem solid #ddd;
+    border-radius: 0.3125rem;
     resize: vertical;
     font-family: Arial, sans-serif;
     box-sizing: border-box;
 }
 
 textarea {
-    min-height: 100px;
+    min-height: 6.25rem;
 }
 
 textarea:focus, input[type="text"]:focus {
     outline: none;
     border-color: #4CAF50;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+    box-shadow: 0 0 0.3125rem rgba(76, 175, 80, 0.5);
 }
 
 /* Buttons */
 .button-container {
     display: flex;
     justify-content: center;
-    gap: 15px;
-    margin-top: 20px;
+    gap: 0.9375rem;
+    margin-top: 1.25rem;
 }
 
 .primary-btn {
     background-color: #4CAF50;
     color: white;
     border: none;
-    padding: 12px 25px;
-    border-radius: 5px;
+    padding: 0.75rem 1.5625rem;
+    border-radius: 0.3125rem;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 1rem;
     transition: background-color 0.3s;
 }
 
@@ -162,11 +162,11 @@ textarea:focus, input[type="text"]:focus {
 .secondary-btn {
     background-color: #f1f1f1;
     color: #333;
-    border: 1px solid #ddd;
-    padding: 12px 25px;
-    border-radius: 5px;
+    border: 0.0625rem solid #ddd;
+    padding: 0.75rem 1.5625rem;
+    border-radius: 0.3125rem;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 1rem;
     transition: all 0.3s;
 }
 
@@ -178,11 +178,11 @@ textarea:focus, input[type="text"]:focus {
     background-color: #555;
     color: white;
     border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.3125rem;
     cursor: pointer;
-    font-size: 14px;
-    margin-top: 20px;
+    font-size: 0.875rem;
+    margin-top: 1.25rem;
     transition: background-color 0.3s;
 }
 
@@ -193,11 +193,11 @@ textarea:focus, input[type="text"]:focus {
 /* Status Message */
 .status-message {
     position: fixed;
-    top: 20px;
+    top: 1.25rem;
     left: 50%;
     transform: translateX(-50%);
-    padding: 12px 25px;
-    border-radius: 5px;
+    padding: 0.75rem 1.5625rem;
+    border-radius: 0.3125rem;
     background-color: rgba(0, 0, 0, 0.8);
     color: white;
     font-weight: bold;
@@ -220,7 +220,7 @@ textarea:focus, input[type="text"]:focus {
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
     .profile-header {
         flex-direction: column;
         text-align: center;
@@ -228,7 +228,7 @@ textarea:focus, input[type="text"]:focus {
     
     .profile-picture-container {
         margin-right: 0;
-        margin-bottom: 20px;
+        margin-bottom: 1.25rem;
     }
     
     .button-container {

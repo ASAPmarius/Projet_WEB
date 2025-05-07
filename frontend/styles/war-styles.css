@@ -2,195 +2,195 @@
 
 /* Battle area styles */
 .war-battle-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin-top: 20px;
-    width: 100%;
-    position: relative;
-  }
-  
-  /* Card slots for the battle */
-  .war-card-slot {
-    width: 120px;
-    height: 180px;
-    border: 2px dashed rgba(255, 255, 255, 0.4);
-    border-radius: 10px;
-    background-color: rgba(0, 0, 0, 0.2);
-    margin: 0 20px;
-    position: relative;
-    transition: all 0.3s ease;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  
-  /* Player 1 and 2 slots arrangement */
-  .player1-slot, .player2-slot {
-    display: inline-block;
-  }
-  
-  /* VS indicator between the cards */
-  .war-vs-indicator {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 24px;
-    font-weight: bold;
-    color: #ffcc00;
-    text-shadow: 0 0 10px rgba(255, 204, 0, 0.8);
-    z-index: 10;
-  }
-  
-  /* Card image in the slots */
-  .war-card-image {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    border-radius: 8px;
-    transition: transform 0.3s ease;
-  }
-  
-  /* War action button */
-  .war-action-button {
-    margin-top: 20px;
-    padding: 12px 24px;
-    font-size: 16px;
-    background-color: #d32f2f;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease;
-  }
-  
-  .war-action-button:hover {
-    background-color: #b71c1c;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-  }
-  
-  .war-action-button:disabled {
-    background-color: #bdbdbd;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-  
-  /* War result indicator */
-  .war-result-indicator {
-    margin-top: 15px;
-    font-size: 18px;
-    font-weight: bold;
-    padding: 8px 16px;
-    border-radius: 5px;
-    transition: all 0.3s ease;
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  
-  .war-result-indicator.winner {
-    background-color: #43a047;
-    color: white;
-    opacity: 1;
-    transform: translateY(0);
-  }
-  
-  .war-result-indicator.war {
-    background-color: #ff9800;
-    color: white;
-    opacity: 1;
-    transform: translateY(0);
-    animation: pulse 1s infinite;
-  }
-  
-  /* Scoreboard styles */
-  .war-scoreboard {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    z-index: 1000;
-    min-width: 200px;
-  }
-  
-  .war-scoreboard h3 {
-    margin-top: 0;
-    text-align: center;
-    color: #ffcc00;
-  }
-  
-  .war-scores {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .war-player-score {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  
-  .war-player-score:last-child {
-    border-bottom: none;
-  }
-  
-  .war-player-name {
-    font-weight: bold;
-  }
-  
-  .war-card-count {
-    color: #ffcc00;
-  }
-  
-  .war-round-counter {
-    text-align: center;
-    margin-top: 10px;
-    color: #bdbdbd;
-    font-size: 0.9em;
-  }
-  
-  /* Animation for war mode */
-  @keyframes pulse {
-    0% {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.25rem;
+  width: 100%;
+  position: relative;
+}
+
+/* Card slots for the battle */
+.war-card-slot {
+  width: 7.5rem;
+  height: 11.25rem;
+  border: 0.125rem dashed rgba(255, 255, 255, 0.4);
+  border-radius: 0.625rem;
+  background-color: rgba(0, 0, 0, 0.2);
+  margin: 0 1.25rem;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Player 1 and 2 slots arrangement */
+.player1-slot, .player2-slot {
+  display: inline-block;
+}
+
+/* VS indicator between the cards */
+.war-vs-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ffcc00;
+  text-shadow: 0 0 0.625rem rgba(255, 204, 0, 0.8);
+  z-index: 10;
+}
+
+/* Card image in the slots */
+.war-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  transition: transform 0.3s ease;
+}
+
+/* War action button */
+.war-action-button {
+  margin-top: 1.25rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 0.3125rem;
+  cursor: pointer;
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.war-action-button:hover {
+  background-color: #b71c1c;
+  transform: translateY(-0.125rem);
+  box-shadow: 0 0.375rem 0.75rem rgba(0, 0, 0, 0.3);
+}
+
+.war-action-button:disabled {
+  background-color: #bdbdbd;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* War result indicator */
+.war-result-indicator {
+  margin-top: 0.9375rem;
+  font-size: 1.125rem;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  border-radius: 0.3125rem;
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: translateY(0.625rem);
+}
+
+.war-result-indicator.winner {
+  background-color: #43a047;
+  color: white;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.war-result-indicator.war {
+  background-color: #ff9800;
+  color: white;
+  opacity: 1;
+  transform: translateY(0);
+  animation: pulse 1s infinite;
+}
+
+/* Scoreboard styles */
+.war-scoreboard {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 0.9375rem;
+  border-radius: 0.625rem;
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 12.5rem;
+}
+
+.war-scoreboard h3 {
+  margin-top: 0;
+  text-align: center;
+  color: #ffcc00;
+}
+
+.war-scores {
+  display: flex;
+  flex-direction: column;
+}
+
+.war-player-score {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 0.0625rem solid rgba(255, 255, 255, 0.2);
+}
+
+.war-player-score:last-child {
+  border-bottom: none;
+}
+
+.war-player-name {
+  font-weight: bold;
+}
+
+.war-card-count {
+  color: #ffcc00;
+}
+
+.war-round-counter {
+  text-align: center;
+  margin-top: 0.625rem;
+  color: #bdbdbd;
+  font-size: 0.9em;
+}
+
+/* Animation for war mode */
+@keyframes pulse {
+  0% {
       transform: scale(1);
-    }
-    50% {
+  }
+  50% {
       transform: scale(1.05);
-    }
-    100% {
+  }
+  100% {
       transform: scale(1);
-    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 48rem) {
+  .war-battle-area {
+      flex-direction: column;
   }
   
-  /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .war-battle-area {
-      flex-direction: column;
-    }
-    
-    .war-card-slot {
-      width: 100px;
-      height: 150px;
-      margin: 10px;
-    }
-    
-    .war-vs-indicator {
+  .war-card-slot {
+      width: 6.25rem;
+      height: 9.375rem;
+      margin: 0.625rem;
+  }
+  
+  .war-vs-indicator {
       position: relative;
-      margin: 10px 0;
-    }
-    
-    .war-scoreboard {
+      margin: 0.625rem 0;
+  }
+  
+  .war-scoreboard {
       position: static;
       width: 90%;
-      margin: 10px auto;
-    }
+      margin: 0.625rem auto;
   }
+}

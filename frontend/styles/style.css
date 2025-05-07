@@ -7,9 +7,9 @@ body {
 	height: 100vh;
 	margin: 0;
 	background-color: #d3d3d3;
-  }
+}
   
-  header {
+header {
 	background-color: #4CAF50;
 	color: white;
 	display: flex;
@@ -19,48 +19,48 @@ body {
 	text-align: center;
 	padding: 1em 0;
 	font-size: 1.5em;
-  }
+}
   
-  main {
-	padding: 20px;
-  }
+main {
+	padding: 1.25rem;
+}
   
-  div {
-	border: 2px solid black;
-	border-radius: 5px;
-	padding: 10px;
+div {
+	border: 0.125rem solid black;
+	border-radius: 0.3125rem;
+	padding: 0.625rem;
 	background-color: white;
-	box-shadow: 0 4px 8px rgb(0 0 0 / 10%);
-  }
+	box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
   
-  button {
+button {
 	display: block;
-	width: 200px;
-	margin: 10px auto;
+	width: 12.5rem;
+	margin: 0.625rem auto;
 	font-size: 1em;
-	padding: 10px 20px;
+	padding: 0.625rem 1.25rem;
 	cursor: pointer;
 	background-color: #4CAF50;
 	color: white;
 	border: none;
 	text-align: center;
 	text-decoration: none;
-	border-radius: 5px;
-  }
+	border-radius: 0.3125rem;
+}
   
-  button:hover {
+button:hover {
 	background-color: #45a049;
-  }
+}
   
-  form {
+form {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-  }
+}
   
-  .button-container {
+.button-container {
 	display: flex;
 	justify-content: center;
-	gap: 10px;
-	margin-top: 10px;
-  }
+	gap: 0.625rem;
+	margin-top: 0.625rem;
+}
