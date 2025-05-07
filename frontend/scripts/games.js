@@ -216,10 +216,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch('http://localhost:3000/create-game', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                  'Content-Type': 'application/json'
                 },
+                body: JSON.stringify({}), // Add this line to send an empty JSON object
                 credentials: 'include'
-            });
+              });
             
             if (!response.ok) {
                 throw new Error('Failed to create game');
