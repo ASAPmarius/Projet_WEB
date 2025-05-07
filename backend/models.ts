@@ -44,21 +44,30 @@ export interface CardMetadata {
   picture: string;
 }
 
-// Update in backend/models.ts
 export interface GameState {
+  gameType: string; // Add game type for discrimination
   phase: 'waiting' | 'setup' | 'playing' | 'finished';
   currentTurn: number | null;
   round: number;
   startTime?: Date;
   lastActionTime?: Date;
   
-  // Remove the ? to make these required properties
+  // Common properties for all card games
   playerHands: Record<number, CardMetadata[]>;
   playedCards: Record<number, CardMetadata | null>;
-  warPile: CardMetadata[];
   lastWinner: number | null;
-  inWar: boolean;        // Whether we're currently in a war
-  warRound: number;      // How many consecutive wars
+  
+  // Game-specific extensions (using type discrimination)
+  warState?: WarGameExtension;
+  // Future game types can add their own extensions
+  // pokerState?: PokerGameExtension;
+}
+
+// War-specific extension
+export interface WarGameExtension {
+  warPile: CardMetadata[];
+  inWar: boolean;
+  warRound: number;
 }
 
 // Player state in game

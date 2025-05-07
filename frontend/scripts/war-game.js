@@ -395,6 +395,7 @@ class WarGame extends CardGameFramework {
     }
   }
   
+  
   handleWarStart(data) {
     console.log(`War started! Round ${data.warRound}`);
     
@@ -488,8 +489,9 @@ class WarGame extends CardGameFramework {
       
       if (card) {
         // Check if we're in war mode for special handling
-        if (action.warMode || action.type === 'play_war_card') {
-          console.log(`War card played by ${username} (${playerId})`);
+        if (action.warMode || action.type === 'play_war_card' || 
+          (this.gameState && this.gameState.warState && this.gameState.warState.inWar)) {
+        console.log(`War card played by ${username} (${playerId})`);
           
           // Update UI tracking
           if (!this.playedCards[playerId]) {
