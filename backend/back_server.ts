@@ -1047,9 +1047,9 @@ async function advanceTurn(gameId: number): Promise<void> {
       return;
     }
     
-    // Find current player index
-    const currentTurn = gameState.currentTurn;
-    const currentPlayerIndex = players.findIndex(p => Number(p.idUser) === Number(currentTurn));
+    // Find current player index - ensure number comparison
+    const currentTurn = Number(gameState.currentTurn);
+    const currentPlayerIndex = players.findIndex(p => Number(p.idUser) === currentTurn);
     
     if (currentPlayerIndex === -1) {
       console.error(`Current turn player ${currentTurn} not found in players list`);
@@ -1058,11 +1058,11 @@ async function advanceTurn(gameId: number): Promise<void> {
     
     // Calculate next player index
     const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
-    const nextPlayerId = players[nextPlayerIndex].idUser;
+    const nextPlayerId = Number(players[nextPlayerIndex].idUser);
     
     console.log(`Advancing turn from player ${currentTurn} to player ${nextPlayerId}`);
     
-    // Update game state
+    // Update game state - store as number
     gameState.currentTurn = nextPlayerId;
     gameState.lastActionTime = new Date();
     await updateGameState(gameId, gameState);

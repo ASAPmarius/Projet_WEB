@@ -707,8 +707,9 @@ class CardGameFramework {
     // Highlight the current player
     this.highlightCurrentPlayer(data.playerId);
     
-    // Check if it's my turn
+    // Check if it's my turn - add explicit conversion
     const isMyTurn = Number(data.playerId) === Number(this.currentPlayerId);
+    console.log(`Turn change: server playerId=${data.playerId}, my playerId=${this.currentPlayerId}, isMyTurn=${isMyTurn}`);
     this.setMyTurnState(isMyTurn);
     
     // Show notification about whose turn it is
@@ -943,9 +944,6 @@ class CardGameFramework {
   }
   
   isMyTurn() {
-    // This function is purely for UI purposes - determining if the current player can interact
-    // It doesn't modify game state, just reads from the state sent by the server
-    
     // If game is not in playing phase, return false
     if (this.gameState.phase !== 'playing') {
       console.log('Not in playing phase');
