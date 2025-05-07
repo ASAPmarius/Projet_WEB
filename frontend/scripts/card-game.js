@@ -848,9 +848,12 @@ class CardGameFramework {
       cardElement.className = 'hand-card';
       cardElement.dataset.cardId = card.id;
       
-      // Create card image
+      // IMPORTANT CHANGE: Get full card data including picture from cardsById
+      const fullCardData = this.cardsById[card.id];
+      
+      // Create card image using the full card data
       const cardImage = document.createElement('img');
-      cardImage.src = card.picture;
+      cardImage.src = fullCardData ? fullCardData.picture : card.picture; // Try fullCardData first, fallback to card.picture
       cardImage.alt = `${card.rank} of ${card.suit}`;
       cardImage.className = 'card-image';
       
@@ -1020,7 +1023,7 @@ class CardGameFramework {
     console.log(`Player ${username} played card ${cardId}`);
     
     // Get the full card data from our local cache
-    const cardData = this.cardsById[cardId];
+    const cardData = this.cardsById[card.id] || card;
     if (!cardData) {
       console.warn(`Card data not found for ID ${cardId}`);
       return;

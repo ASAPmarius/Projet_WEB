@@ -134,8 +134,7 @@ class WarGame extends CardGameFramework {
     slot.innerHTML = '';
     
     // Always get full card data with picture from our cardsById cache
-    const fullCardData = this.cardsById[card.id] || card;
-    
+    const fullCardData = this.cardsById[card.id] || card;    
     const cardImage = document.createElement('img');
     cardImage.src = fullCardData.picture;
     cardImage.alt = `${card.rank} of ${card.suit}`;
@@ -143,7 +142,7 @@ class WarGame extends CardGameFramework {
     
     slot.appendChild(cardImage);
   }
-  
+
   clearCardSlots() {
     const player1Slot = document.getElementById('player1Slot');
     const player2Slot = document.getElementById('player2Slot');
