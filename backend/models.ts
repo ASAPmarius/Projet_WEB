@@ -35,15 +35,6 @@ export interface ChatMessage {
   Timestamp: Date;
 }
 
-// Add to backend/models.ts if not already there
-export interface CardMetadata {
-  id: number;
-  suit: string;
-  rank: string;
-  value: number;
-  picture: string;
-}
-
 export interface GameState {
   gameType: string; // Add game type for discrimination
   phase: 'waiting' | 'setup' | 'playing' | 'finished';
@@ -107,7 +98,6 @@ export interface CardMetadata {
   suit: string;
   rank: string;
   value: number;
-  picture: string;
 }
 
 // Connection information

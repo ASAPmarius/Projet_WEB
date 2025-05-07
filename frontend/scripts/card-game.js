@@ -1019,7 +1019,7 @@ class CardGameFramework {
   handlePlayCardAction(playerId, username, cardId) {
     console.log(`Player ${username} played card ${cardId}`);
     
-    // Get the card data
+    // Get the full card data from our local cache
     const cardData = this.cardsById[cardId];
     if (!cardData) {
       console.warn(`Card data not found for ID ${cardId}`);

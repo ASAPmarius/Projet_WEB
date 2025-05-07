@@ -1031,8 +1031,13 @@ async function handlePlayCard(gameId: number, playerId: number, cardId: number):
   // Remove from hand
   hand.splice(cardIndex, 1);
   
-  // Add to played cards
-  gameState.playedCards[playerId] = card;
+  // Add to played cards - only store necessary data, not picture
+  gameState.playedCards[playerId] = {
+    id: card.id,
+    suit: card.suit,
+    rank: card.rank,
+    value: card.value
+  };
   
   // Update game state
   await updateGameState(gameId, gameState);
@@ -1090,7 +1095,12 @@ async function handleWarCardPlay(gameId: number, playerId: number, cardId: numbe
   hand.splice(cardIndex, 1);
   
   // Add to played cards
-  gameState.playedCards[playerId] = card;
+  gameState.playedCards[playerId] = {
+    id: card.id,
+    suit: card.suit,
+    rank: card.rank,
+    value: card.value
+  };
   
   // Update game state
   await updateGameState(gameId, gameState);
@@ -1549,15 +1559,20 @@ async function initializeWarGame(gameId: number): Promise<void> {
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   
-  // Divide cards between players
+  // Divide cards between players - MODIFIED to remove picture data
   const halfDeck = Math.floor(deck.length / 2);
   
   gameState.playerHands = {};
   players.forEach((player, index) => {
     if (index === 0) {
-      gameState.playerHands[player.idUser] = deck.slice(0, halfDeck);
+      // Remove picture data from cards
+      gameState.playerHands[player.idUser] = deck.slice(0, halfDeck).map(({id, suit, rank, value}) => ({
+        id, suit, rank, value
+      }));
     } else if (index === 1) {
-      gameState.playerHands[player.idUser] = deck.slice(halfDeck);
+      gameState.playerHands[player.idUser] = deck.slice(halfDeck).map(({id, suit, rank, value}) => ({
+        id, suit, rank, value
+      }));
     } else {
       gameState.playerHands[player.idUser] = [];
     }
