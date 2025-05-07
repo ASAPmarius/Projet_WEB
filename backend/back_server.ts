@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any require-await
 import { loadSync } from 'dotenv';
 console.log('About to load .env file');
 const env = loadSync();
@@ -367,7 +368,6 @@ async function markGameAsFinished(gameId: number): Promise<void> {
     console.log(`Game ${gameId} successfully marked as finished`);
     
     // Once marked as finished, we can clean up the ActiveCards
-    await cleanupFinishedGame(gameId);
   } catch (error) {
     console.error(`Error marking game ${gameId} as finished:`, error);
     throw error; // Re-throw so caller can handle if needed
@@ -433,51 +433,8 @@ async function checkCardTypes(): Promise<void> {
   console.log(`Found ${existingCards.rows[0].count} card types in database`);
 }
 
-// Cleanup function for finished games - Only delete ActiveCards
-async function cleanupFinishedGame(gameId: number): Promise<void> {
-  try {
-    // Delete all active cards associated with this game
-    await client.queryObject(
-      'DELETE FROM "ActiveCards" WHERE "idGame" = $1',
-      [gameId]
-    );
-    
-    console.log(`Cleaned up ActiveCards for game ${gameId}`);
-  } catch (error) {
-    console.error(`Error cleaning up ActiveCards for game ${gameId}:`, error);
-  }
-}
-
-// Check if a game is finished (all players disconnected)
-async function checkAndCleanupFinishedGames(): Promise<void> {
-  // Get all active games
-  const activeGames = await client.queryObject<{ idGame: number }>(
-    'SELECT "idGame" FROM "Game"'
-  );
-  
-  for (const game of activeGames.rows) {
-    // Check if there are any active players for this game
-    const activeUsers = await client.queryObject<{ count: number }>(
-      'SELECT COUNT(*) as count FROM "Game_Users" gu ' +
-      'INNER JOIN "User" u ON gu."idUsers" = u."idUser" ' +
-      'WHERE gu."idGame" = $1 AND u."Username" IN (' +
-      '  SELECT ws.username FROM unnest($2::text[]) as ws(username)' +
-      ')',
-      [game.idGame, connections.map(conn => conn.username)]
-    );
-    
-    // If no active users, clean up the game's ActiveCards
-    if (activeUsers.rows[0].count === 0 && game.idGame !== currentGameId) {
-      await cleanupFinishedGame(game.idGame);
-    }
-  }
-}
-
 // Call this during server startup
 await checkCardTypes();
-
-// Cleanup any lingering ActiveCards from previous server sessions
-await checkAndCleanupFinishedGames();
 
 // Current game tracking
 let currentGameId: number | null = null;
@@ -771,51 +728,6 @@ async function handleChatMessage(data: any, userId: number, username: string) {
   }
 }
 
-async function handleSyncRequest(data: any, ws: WebSocket) {
-  const { gameId } = data;
-  
-  if (!gameId) {
-    ws.send(JSON.stringify({
-      type: "error",
-      message: "Missing game ID"
-    }));
-    return;
-  }
-  
-  try {
-    // Send game state
-    sendGameState(gameId, ws);
-    
-    // Send connected users
-    const usersInGame = await getUsersInGame(gameId);
-    
-    const connectedUsersData = await Promise.all(usersInGame.map(async (user) => {
-      let ppPath = "";
-      if (user.Profile_picture) {
-        ppPath = bytesToDataURL(user.Profile_picture, "image/png");
-      }
-      
-      return {
-        id: user.idUser,
-        username: user.Username,
-        pp_path: ppPath,
-        connected: connections.some(conn => conn.userId === user.idUser)
-      };
-    }));
-    
-    ws.send(JSON.stringify({
-      type: "connected_users",
-      users: connectedUsersData
-    }));
-  } catch (error) {
-    console.error("Error handling sync request:", error);
-    ws.send(JSON.stringify({
-      type: "error",
-      message: "Failed to sync game data"
-    }));
-  }
-}
-
 async function handleGameStateUpdate(data: any, userId: number, ws: WebSocket) {
   const { gameId, gameState } = data;
   
@@ -1017,8 +929,8 @@ function getCardMetadata(cardTypeId: number): { suit: string; rank: string; valu
   // Suit: 1-13 = hearts, 14-26 = diamonds, 27-39 = clubs, 40-52 = spades
   // Rank: Each suit starts with 2 and ends with Ace
   
-  let suitIndex = Math.floor((cardTypeId - 1) / 13);
-  let rankIndex = (cardTypeId - 1) % 13;
+  const suitIndex = Math.floor((cardTypeId - 1) / 13);
+  const rankIndex = (cardTypeId - 1) % 13;
   
   const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
   const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
@@ -2496,8 +2408,6 @@ router.post('/disconnect-from-game', async (ctx) => {
   }
 });
 
-// Add this with your other router definitions
-
 // Profile endpoint
 router.post('/user-profile', authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
@@ -2796,10 +2706,6 @@ router.get("/", async (ctx) => {
           
           case "chat_message":
             handleChatMessage(data, userId, username);
-            break;
-          
-          case "sync_request":
-            handleSyncRequest(data, ws);
             break;
           
           case "connected_users":
