@@ -1,4 +1,5 @@
 // war-game.js - War Card Game Implementation
+//IMPORTANT : current-player IS "you" AND active-player IS  whose turn it is currently
 class WarGame extends CardGameFramework {
   constructor() {
     // Initialize with game-specific settings
@@ -275,11 +276,17 @@ class WarGame extends CardGameFramework {
   }
   
   highlightCurrentPlayer(playerId) {
+    console.log('WarGame highlighting player:', playerId);
+    
+    // Clear ALL highlighting classes first
     const playerSeats = document.querySelectorAll('.player-seat');
-    playerSeats.forEach(seat => seat.classList.remove('active-player'));
+    playerSeats.forEach(seat => {
+      seat.classList.remove('active-player');
+      seat.classList.remove('current-player');
+    });
     
+    // Only highlight the player whose turn it is
     const player = this.players.find(p => String(p.id) === String(playerId));
-    
     if (!player) return;
     
     const seat = document.getElementById(`player-seat-${player.username}`);
@@ -287,11 +294,8 @@ class WarGame extends CardGameFramework {
       seat.classList.add('active-player');
     }
     
-    if (String(playerId) === String(this.currentPlayerId)) {
-      document.body.classList.add('my-turn');
-    } else {
-      document.body.classList.remove('my-turn');
-    }
+    // Log state for debugging
+    console.log(`Applied active-player class to seat for ${player.username}`);
   }
   
   updateTablePlayersWar(players, currentUsername) {

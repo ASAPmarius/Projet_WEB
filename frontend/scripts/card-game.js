@@ -718,6 +718,14 @@ class CardGameFramework {
     if (isMyTurn) {
       this.updateHandDisplay();
     }
+
+    if (this.gameState && this.gameState.currentTurn) {
+      // Update highlighting based on whose turn it is now
+      setTimeout(() => {
+        // Small delay to ensure other processes complete first
+        this.highlightCurrentPlayer(this.gameState.currentTurn);
+      }, 300);
+    }
   }
 
   handleRoundResult(data) {
@@ -1390,7 +1398,6 @@ class CardGameFramework {
       
       // Highlight winner
       if (String(player.id) === String(winnerId)) {
-        playerResult.classList.add('winner');
         playerName.textContent += ' (Winner!)';
       }
       
