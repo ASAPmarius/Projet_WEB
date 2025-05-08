@@ -303,12 +303,20 @@ class WarGame extends CardGameFramework {
     const existingSeats = document.querySelectorAll('.player-seat');
     existingSeats.forEach(seat => seat.remove());
     
+    // Create a sorted array where current player is always second (index 1)
+    const sortedPlayers = [...players.slice(0, 2)].sort((a, b) => {
+      if (a.username === currentUsername) return 1;
+      if (b.username === currentUsername) return -1;
+      return 0;
+    });
+    
+    // Use the original positions - we'll now control the order of players instead
     const positions = [
       { top: '-100px', left: '50%', transform: 'translateX(-50%)' },
       { bottom: '-100px', left: '50%', transform: 'translateX(-50%)' }
     ];
     
-    players.slice(0, 2).forEach((player, index) => {
+    sortedPlayers.forEach((player, index) => {
       const seat = document.createElement('div');
       seat.className = 'player-seat';
       seat.id = `player-seat-${player.username}`;
@@ -321,6 +329,7 @@ class WarGame extends CardGameFramework {
         seat.classList.add('active-player');
       }
       
+      // Now we can use the index to position, because we've sorted the array
       const position = positions[index];
       Object.assign(seat.style, position);
       
