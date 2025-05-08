@@ -14,6 +14,7 @@ class WarGame extends CardGameFramework {
     this.warMode = false;
     this.playedCards = {};
     this.faceDownCardSlots = {};
+    this.skipNextHighlightUpdate = false; // Add this new property
     
     // Create scoreboard when game is initialized
     document.addEventListener('DOMContentLoaded', () => {
@@ -455,6 +456,10 @@ class WarGame extends CardGameFramework {
     
     // Update game state from server data
     this.gameState.round = data.newRound;
+
+    this.skipNextHighlightUpdate = true;
+
+    this.highlightCurrentPlayer(data.winnerId);   
     
     // Clear played cards (UI only)
     this.playedCards = {};
