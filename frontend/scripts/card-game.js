@@ -1215,9 +1215,9 @@ class CardGameFramework {
       console.log("Chat container initialized:", this.uiElements.chatContainer);
     }
     
-    // Initialize chat state from sessionStorage (default to visible)
-    const chatHidden = sessionStorage.getItem('chatHidden') === 'true';
-    if (chatHidden && this.uiElements.chatContainer) {
+    // Initialize chat state to hidden by default
+    sessionStorage.setItem('chatHidden', 'true');
+    if (this.uiElements.chatContainer) {
       this.uiElements.chatContainer.classList.add('chat-hidden');
       chatToggle.classList.add('chat-hidden');
     }

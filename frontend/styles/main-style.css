@@ -828,9 +828,16 @@ body.my-turn .hand-container {
   background-color: #f44336;
   color: white;
   position: fixed;
-  bottom: var(--spacing-lg);
+  top: calc(var(--spacing-lg) + 100px); 
   right: var(--spacing-lg);
-  z-index: 1000;
+  z-index: 90; 
+}
+
+.game-actions {
+  position: fixed;
+  top: var(--spacing-lg);
+  right: var(--spacing-lg);
+  z-index: 90; 
 }
 
 .game-control-btn.finish-game:hover {
@@ -906,15 +913,15 @@ body.my-turn .hand-container {
 /* ====================== ROUND INDICATOR ====================== */
 .round-indicator {
   position: fixed;
-  top: var(--spacing-lg);
-  right: 26.25rem; /* Position it just before the chat panel */
+  top: calc(var(--spacing-lg) + 50px); /* Position below the start game button */
+  right: var(--spacing-lg);
   background-color: rgba(0, 0, 0, 0.7);
   color: white;
   padding: 0.5rem 0.9375rem;
   border-radius: var(--border-radius-sm);
   font-weight: bold;
   z-index: 100;
-  transition: right 0.3s ease; /* Add transition to match chat toggle */
+  transition: right 0.3s ease;
 }
 
 /* ====================== GAME RESULTS OVERLAY ====================== */
@@ -1033,5 +1040,21 @@ body.my-turn .hand-container {
   100% {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgba(255, 59, 48, 0);
+  }
+}
+
+body.phase-playing .card-stack {
+  display: none !important;
+}
+
+/* Additional selector for extra specificity at small screens */
+@media (max-width: 48rem) {
+  #cardStack,
+  .card-stack,
+  body[class*="war"] .card-stack,
+  body[class*="phase-playing"] .card-stack {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
   }
 }
