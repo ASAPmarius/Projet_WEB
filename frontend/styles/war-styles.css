@@ -9,7 +9,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 40px; /* Increase vertical gap between cards */
   width: auto;
 }
 
@@ -20,16 +20,15 @@
   gap: 30px; /* Space between cards */
 }
 
-/* Card slots for the battle */
 .war-card-slot {
   width: 7.5rem;
   height: 11.25rem;
   border: 0.125rem dashed rgba(255, 255, 255, 0.4);
   border-radius: 0.625rem;
   background-color: rgba(0, 0, 0, 0.2);
-  margin: 0 10px; /* Reduce horizontal margin */
+  margin: 0;
   position: relative;
-  transition: all 0.3s ease;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -42,8 +41,8 @@
 
 .war-vs-indicator {
   position: absolute;
-  right: -50px; /* Position to the right of the cards */
-  top: 50%; /* Position at half the height of the table */
+  right: -3rem; /* Position to right of card area */
+  top: 50%;
   transform: translateY(-50%);
   font-size: 1.5rem;
   font-weight: bold;
@@ -57,7 +56,6 @@
   height: 100%;
   object-fit: contain;
   border-radius: 0.5rem;
-  transition: transform 0.3s ease;
 }
 
 /* War action button */
@@ -90,7 +88,7 @@
 /* War result indicator */
 .war-result-indicator {
   position: absolute;
-  right: -180px; /* Position to the right of the table */
+  left: -400px; /* Position to the left of the table instead of right */
   top: 50%;
   transform: translateY(-50%);
   font-size: 1.125rem;
@@ -98,16 +96,19 @@
   padding: 0.5rem 1rem;
   border-radius: 0.3125rem;
   transition: all 0.3s ease;
-  opacity: 1; /* Make it visible by default */
+  opacity: 1;
   min-width: 150px;
   text-align: center;
+  background-color: rgba(0, 0, 0, 0.7); /* Add background for better visibility */
+  color: white;
 }
 
 .war-result-indicator.winner {
   background-color: #43a047;
   color: white;
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(-50%); /* Keep vertical centering */
+  box-shadow: 0 0 10px rgba(67, 160, 71, 0.5);
 }
 
 .war-result-indicator.war {
@@ -206,12 +207,11 @@
   }
 }
 
-/* Card stack styles for War game */
 .war-card-stack {
+  width: 7.5rem;
+  height: 11.25rem;
   position: absolute;
-  width: 120px;
-  height: 180px;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: transparent; /* Make background transparent */
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   transition: transform 0.2s ease;
@@ -223,13 +223,13 @@
 }
 
 .war-card-stack.player-stack {
-  bottom: 30px;
+  bottom: 4rem; /* Position relative to bottom of table */
   left: 50%;
   transform: translateX(-50%);
 }
 
 .war-card-stack.opponent-stack {
-  top: 30px;
+  top: 4rem; /* Position relative to top of table */
   left: 50%;
   transform: translateX(-50%);
 }
@@ -302,8 +302,9 @@
 
 .player-seat {
   position: absolute;
-  width: 11.25rem; /* Fixed width */
-  padding: 0.75rem;
+  width: 11.25rem;
+  height: 5.5rem; /* Fixed height */
+  padding: 0.5rem;
   background-color: rgba(0, 0, 0, 0.7);
   border-radius: 0.75rem;
   border: 3px solid #333;
@@ -312,22 +313,40 @@
   flex-direction: column;
   align-items: center;
   z-index: 20;
-  box-sizing: border-box; /* Critical for consistent sizing */
-  max-height: 8rem; /* Limit height to prevent expansion */
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  box-sizing: border-box;
+  overflow: hidden; /* Hide overflow content */
 }
 
-/* Position classes instead of inline styles */
-.player-seat.top-player {
-  top: -120px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
+/* Fix bottom player position */
 .player-seat.bottom-player {
-  bottom: -120px;
+  bottom: -6.25rem; /* Move further from table edge */
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* Fix top player position */
+.player-seat.top-player {
+  top: -6.25rem; /* Move further from table edge */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.player-avatar {
+  width: 2.75rem; /* Reduce further to prevent layout issues */
+  height: 2.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #666;
+  box-shadow: 0 0.125rem 0.3125rem rgba(0, 0, 0, 0.3);
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.player-details {
+  margin-left: 0.5rem;
+  max-width: 6.25rem; /* Limit width */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Modify active player to avoid size change */
@@ -352,20 +371,20 @@
   margin-bottom: 0.5rem;
 }
 
-/* Ensure player cards don't overflow */
 .player-cards {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  max-width: 9rem; /* Prevent overflow */
+  max-width: 9rem;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden; /* Hide overflow */
 }
 
-/* Keep mini cards compact */
 .card-mini {
   display: inline-block;
-  width: 1.5rem; /* Slightly reduced */
-  height: 2.25rem; /* Slightly reduced */
-  margin-right: -0.75rem; /* More overlap */
+  width: 1.5rem;
+  height: 2.25rem;
+  margin-right: -0.75rem;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 /* Always show the cards count clearly */
