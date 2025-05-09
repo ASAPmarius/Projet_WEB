@@ -1075,9 +1075,10 @@ class CardGameFramework {
         }
       }
       
-      // Determine if it's an opponent card based on player ID
-      const isOpponent = String(playerId) !== String(this.currentPlayerId);
-      this.animateCardPlay(cardData, false, isOpponent);
+      if (this.constructor.name !== 'WarGame') {
+        const isOpponent = String(playerId) !== String(this.currentPlayerId);
+        this.animateCardPlay(cardData, false, isOpponent);
+      }
       
       // Show notification
       this.showNotification(`${username} played a card`);
