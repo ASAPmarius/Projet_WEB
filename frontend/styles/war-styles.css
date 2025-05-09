@@ -27,7 +27,7 @@
   border: 0.125rem dashed rgba(255, 255, 255, 0.4);
   border-radius: 0.625rem;
   background-color: rgba(0, 0, 0, 0.2);
-  margin: 0 1.25rem;
+  margin: 0 10px; /* Reduce horizontal margin */
   position: relative;
   transition: all 0.3s ease;
   display: flex;
@@ -89,14 +89,18 @@
 
 /* War result indicator */
 .war-result-indicator {
-  margin-top: 0.9375rem;
+  position: absolute;
+  right: -180px; /* Position to the right of the table */
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 1.125rem;
   font-weight: bold;
   padding: 0.5rem 1rem;
   border-radius: 0.3125rem;
   transition: all 0.3s ease;
-  opacity: 0;
-  transform: translateY(0.625rem);
+  opacity: 1; /* Make it visible by default */
+  min-width: 150px;
+  text-align: center;
 }
 
 .war-result-indicator.winner {
@@ -315,13 +319,13 @@
 
 /* Position classes instead of inline styles */
 .player-seat.top-player {
-  top: -100px;
+  top: -120px;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .player-seat.bottom-player {
-  bottom: -100px;
+  bottom: -120px;
   left: 50%;
   transform: translateX(-50%);
 }
