@@ -1356,7 +1356,6 @@ class CardGameFramework {
         this.showNotification('Game is being set up...');
         break;
       case 'playing':
-        this.showNotification('Game in progress');
         break;
       case 'finished':
         this.showNotification('Game has ended');

@@ -875,9 +875,10 @@ body.my-turn .hand-container {
 /* ====================== NOTIFICATION SYSTEM ====================== */
 .game-notification {
   position: fixed;
-  top: var(--spacing-lg);
-  left: 50%;
-  transform: translateX(-50%);
+  top: 50%; /* Center vertically */
+  right: 400px; /* Position it closer to the table, mirroring war-result-indicator */
+  left: auto; /* Override the original left positioning */
+  transform: translateY(-50%); /* Center vertically only */
   padding: 0.75rem 1.25rem;
   background-color: rgba(0, 0, 0, 0.75);
   color: white;
@@ -885,12 +886,14 @@ body.my-turn .hand-container {
   font-weight: bold;
   z-index: 2000;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease; /* Keep only the fade transition */
   pointer-events: none;
-  max-width: 80%;
+  min-width: 150px; /* Add minimum width similar to war-result-indicator */
+  max-width: 300px;
   text-align: center;
 }
 
+/* Update the show class to only change opacity without moving */
 .game-notification.show {
   opacity: 1;
 }
