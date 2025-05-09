@@ -201,3 +201,97 @@
       margin: 0.625rem auto;
   }
 }
+
+/* Card stack styles for War game */
+.war-card-stack {
+  position: absolute;
+  width: 120px;
+  height: 180px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+  z-index: 20;
+}
+
+.war-card-stack:hover {
+  transform: translateY(-5px);
+}
+
+.war-card-stack.player-stack {
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.war-card-stack.opponent-stack {
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.stack-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.stack-card-count {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 30px;
+  height: 30px;
+  background-color: #ff5722;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Add shine effect to indicate interactivity */
+.war-card-stack.player-stack.my-turn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  border-radius: 10px;
+  animation: shine 2s infinite;
+}
+
+@keyframes shine {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Hide the original hand container */
+#handContainer {
+  display: none !important;
+}
+
+/* Clicked animation for card stack */
+.war-card-stack.clicked {
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
+}

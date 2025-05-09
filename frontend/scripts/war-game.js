@@ -14,7 +14,8 @@ class WarGame extends CardGameFramework {
     this.warMode = false;
     this.playedCards = {};
     this.faceDownCardSlots = {};
-    this.skipNextHighlightUpdate = false; // Add this new property
+    this.skipNextHighlightUpdate = false;
+    this.uiInitialized = false;
     
     // Create scoreboard when game is initialized
     document.addEventListener('DOMContentLoaded', () => {
@@ -22,6 +23,22 @@ class WarGame extends CardGameFramework {
         this.createScoreboard();
       }
     });
+    
+    // Listen for game state changes
+    document.addEventListener('gameStateChanged', () => {
+      if (this.gameState && this.gameState.phase === 'playing' && !this.uiInitialized) {
+        this.initializeWarUI();
+      }
+    });
+  }
+  
+  // Initialize War-specific UI elements
+  initializeWarUI() {
+    console.log('Initializing War UI');
+    this.createPlayerCardStacks();
+    this.updateCardStackCounts();
+    this.updateCardStackState();
+    this.uiInitialized = true;
   }
   
   // Override the animateCardToPosition method for War-specific card animations
@@ -176,6 +193,217 @@ class WarGame extends CardGameFramework {
     }
   }
   
+  // NEW METHOD: Create card stacks for both players
+  createPlayerCardStacks() {
+    console.log('Creating player card stacks');
+    
+    // First remove any existing stacks to avoid duplicates
+    const existingStacks = document.querySelectorAll('.war-card-stack');
+    existingStacks.forEach(stack => stack.remove());
+    
+    // Get card back image
+    const cardBackImage = this.cardsById[54]?.picture || 'card_back.png';
+    
+    // Create player card stack (always your stack at the bottom)
+    const playerStack = document.createElement('div');
+    playerStack.id = 'playerCardStack';
+    playerStack.className = 'war-card-stack player-stack';
+    
+    // Add face down card image
+    const playerCardImage = document.createElement('img');
+    playerCardImage.src = cardBackImage;
+    playerCardImage.alt = 'Your cards';
+    playerCardImage.className = 'stack-card-image';
+    
+    // Add card count indicator
+    const playerCardCount = document.createElement('div');
+    playerCardCount.className = 'stack-card-count';
+    playerCardCount.id = 'playerCardCount';
+    playerCardCount.textContent = '0';
+    
+    playerStack.appendChild(playerCardImage);
+    playerStack.appendChild(playerCardCount);
+    
+    // Add click handler for playing top card
+    playerStack.addEventListener('click', () => this.playTopCard());
+    
+    // Create opponent card stack
+    const opponentStack = document.createElement('div');
+    opponentStack.id = 'opponentCardStack';
+    opponentStack.className = 'war-card-stack opponent-stack';
+    
+    // Add face down card image
+    const opponentCardImage = document.createElement('img');
+    opponentCardImage.src = cardBackImage;
+    opponentCardImage.alt = 'Opponent cards';
+    opponentCardImage.className = 'stack-card-image';
+    
+    // Add card count indicator
+    const opponentCardCount = document.createElement('div');
+    opponentCardCount.className = 'stack-card-count';
+    opponentCardCount.id = 'opponentCardCount';
+    opponentCardCount.textContent = '0';
+    
+    opponentStack.appendChild(opponentCardImage);
+    opponentStack.appendChild(opponentCardCount);
+    
+    // Add to the table
+    if (this.uiElements.pokerTable) {
+      this.uiElements.pokerTable.appendChild(playerStack);
+      this.uiElements.pokerTable.appendChild(opponentStack);
+      console.log('Card stacks added to poker table');
+    } else {
+      console.warn('Poker table element not found, card stacks not added');
+      document.body.appendChild(playerStack);
+      document.body.appendChild(opponentStack);
+    }
+  }
+  
+  // NEW METHOD: Play top card when player's stack is clicked
+  playTopCard() {
+    if (!this.isMyTurn()) {
+      this.showNotification("It's not your turn to play");
+      return;
+    }
+    
+    // Get the player's hand
+    const playerHand = this.hands[this.currentPlayerId];
+    if (!playerHand || playerHand.length === 0) {
+      this.showNotification("You don't have any cards to play");
+      return;
+    }
+    
+    // Get the top card (first in the array)
+    const topCard = playerHand[0];
+    
+    // Play the card through the existing system
+    this.playCard(topCard.id);
+    
+    // Visual feedback for click
+    const playerStack = document.getElementById('playerCardStack');
+    if (playerStack) {
+      playerStack.classList.add('clicked');
+      
+      // Remove the class after animation completes
+      setTimeout(() => {
+        playerStack.classList.remove('clicked');
+      }, 300);
+    }
+  }
+  
+  // Override the updateHandDisplay method to also update the card stacks
+  updateHandDisplay() {
+    // First call the parent method to keep its functionality
+    super.updateHandDisplay();
+    
+    // Make sure card stacks exist
+    if (!document.getElementById('playerCardStack') && this.gameState && this.gameState.phase === 'playing') {
+      this.createPlayerCardStacks();
+    }
+    
+    // Update card stack counts
+    this.updateCardStackCounts();
+    
+    // Update visual state of card stacks based on whose turn it is
+    this.updateCardStackState();
+  }
+  
+  // Dispatch a custom event when game state changes
+  handleGameState(data) {
+    // Call the parent method first
+    super.handleGameState(data);
+    
+    // Dispatch custom event for phase change
+    if (this.gameState && this.gameState.phase === 'playing' && !this.uiInitialized) {
+      document.dispatchEvent(new CustomEvent('gameStateChanged'));
+    }
+    
+    // Always update card stacks if they exist
+    if (document.getElementById('playerCardStack')) {
+      this.updateCardStackCounts();
+      this.updateCardStackState();
+    }
+  }
+  
+  // NEW METHOD: Update card stack counts
+  updateCardStackCounts() {
+    // Find both players
+    if (!this.players || this.players.length < 2) return;
+    
+    let currentPlayer = null;
+    let opponent = null;
+    
+    // Find the current player and opponent
+    for (const player of this.players) {
+      if (String(player.id) === String(this.currentPlayerId)) {
+        currentPlayer = player;
+      } else {
+        opponent = player;
+      }
+    }
+    
+    if (!currentPlayer || !opponent) {
+      console.warn('Could not identify players for updating card stacks');
+      return;
+    }
+    
+    // Update player stack count
+    const playerCount = document.getElementById('playerCardCount');
+    const playerStack = document.getElementById('playerCardStack');
+    
+    if (playerCount && playerStack && currentPlayer) {
+      const handSize = this.hands[currentPlayer.id] ? this.hands[currentPlayer.id].length : 0;
+      playerCount.textContent = handSize;
+      
+      // Hide stack if no cards
+      playerStack.style.visibility = handSize > 0 ? 'visible' : 'hidden';
+    }
+    
+    // Update opponent stack count
+    const opponentCount = document.getElementById('opponentCardCount');
+    const opponentStack = document.getElementById('opponentCardStack');
+    
+    if (opponentCount && opponentStack && opponent) {
+      const handSize = this.hands[opponent.id] ? this.hands[opponent.id].length : 0;
+      opponentCount.textContent = handSize;
+      
+      // Hide stack if no cards
+      opponentStack.style.visibility = handSize > 0 ? 'visible' : 'hidden';
+    }
+  }
+  
+  // NEW METHOD: Update card stack visual state
+  updateCardStackState() {
+    const playerStack = document.getElementById('playerCardStack');
+    const opponentStack = document.getElementById('opponentCardStack');
+    
+    if (!playerStack || !opponentStack) return;
+    
+    // Check whose turn it is
+    const isMyTurn = this.isMyTurn();
+    
+    // Update player stack - highlight if it's their turn
+    if (isMyTurn) {
+      playerStack.classList.add('my-turn');
+      playerStack.style.cursor = 'pointer';
+    } else {
+      playerStack.classList.remove('my-turn');
+      playerStack.style.cursor = 'default';
+    }
+    
+    // Update opponent stack - highlight if it's their turn
+    const opponentTurn = this.gameState.currentTurn && 
+                        this.players.some(p => 
+                          String(p.id) === String(this.gameState.currentTurn) && 
+                          String(p.id) !== String(this.currentPlayerId));
+    
+    if (opponentTurn) {
+      opponentStack.classList.add('opponent-turn');
+    } else {
+      opponentStack.classList.remove('opponent-turn');
+    }
+  }
+  
   createBattleArea() {
     if (!this.uiElements.pokerTable) return;
     
@@ -255,6 +483,11 @@ class WarGame extends CardGameFramework {
     if (roundCounter) {
       roundCounter.textContent = `Round: ${this.gameState.round || 1}`;
     }
+    
+    // Also update card stack counts if they exist
+    if (document.getElementById('playerCardStack')) {
+      this.updateCardStackCounts();
+    }
   }
   
   // Modified to use WebSocket message only
@@ -299,6 +532,11 @@ class WarGame extends CardGameFramework {
     const seat = document.getElementById(`player-seat-${player.username}`);
     if (seat) {
       seat.classList.add('active-player');
+    }
+    
+    // Update card stack highlighting if stacks exist
+    if (document.getElementById('playerCardStack')) {
+      this.updateCardStackState();
     }
     
     // Log state for debugging
@@ -392,11 +630,33 @@ class WarGame extends CardGameFramework {
     });
     
     this.updateScoreboard();
+    
+    // If game is in playing phase and UI not yet initialized, create card stacks
+    if (this.gameState && this.gameState.phase === 'playing') {
+      if (!this.uiInitialized) {
+        this.initializeWarUI();
+      } else if (!document.getElementById('playerCardStack')) {
+        // If stacks don't exist but should, create them
+        this.createPlayerCardStacks();
+        this.updateCardStackCounts();
+      }
+    }
   }
 
   // Override the updateTablePlayers method for War game
   updateTablePlayers(players, currentUsername) {
     this.updateTablePlayersWar(players, currentUsername);
+  }
+  
+  // Override updateGamePhaseUI to handle card stacks
+  updateGamePhaseUI(phase) {
+    // Call parent method
+    super.updateGamePhaseUI(phase);
+    
+    // If phase changes to playing, initialize War UI
+    if (phase === 'playing' && !this.uiInitialized) {
+      this.initializeWarUI();
+    }
   }
 
   handleWebSocketMessage(event) {
@@ -502,7 +762,14 @@ class WarGame extends CardGameFramework {
       console.log('Requesting connected users to update card counts');
       
       // Update scoreboard after a short delay to ensure data has arrived
-      setTimeout(() => this.updateScoreboard(), 200);
+      setTimeout(() => {
+        this.updateScoreboard();
+        
+        // Also update card stacks if they exist
+        if (document.getElementById('playerCardStack')) {
+          this.updateCardStackCounts();
+        }
+      }, 200);
     }, 300);
   }
 
@@ -564,6 +831,13 @@ class WarGame extends CardGameFramework {
         if (this.faceDownCardSlots && this.faceDownCardSlots[playerId]) {
           delete this.faceDownCardSlots[playerId];
         }
+        
+        // Update card stack counts after a short delay to ensure hand data is updated
+        setTimeout(() => {
+          if (document.getElementById('playerCardStack')) {
+            this.updateCardStackCounts();
+          }
+        }, 500);
       }
     }
   }
