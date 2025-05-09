@@ -562,19 +562,12 @@ class WarGame extends CardGameFramework {
   }
   
   highlightCurrentPlayer(playerId) {
-    // Check if we should skip the highlight update
-    if (this.skipNextHighlightUpdate) {
-      console.log('Skipping highlight update due to flag');
-      this.skipNextHighlightUpdate = false; // Reset the flag
-      return;
-    }
     console.log('WarGame highlighting player:', playerId);
     
     // Clear ALL highlighting classes first
     const playerSeats = document.querySelectorAll('.player-seat');
     playerSeats.forEach(seat => {
       seat.classList.remove('active-player');
-      seat.classList.remove('current-player');
     });
     
     // Only highlight the player whose turn it is
@@ -591,7 +584,6 @@ class WarGame extends CardGameFramework {
       this.updateCardStackState();
     }
     
-    // Log state for debugging
     console.log(`Applied active-player class to seat for ${player.username}`);
   }
   
@@ -601,6 +593,7 @@ class WarGame extends CardGameFramework {
       return;
     }
     
+    // Remove existing seats
     const existingSeats = document.querySelectorAll('.player-seat');
     existingSeats.forEach(seat => seat.remove());
     
@@ -611,33 +604,22 @@ class WarGame extends CardGameFramework {
       return 0;
     });
     
-    // Use the original positions - we'll now control the order of players instead
-    const positions = [
-      { top: '-100px', left: '50%', transform: 'translateX(-50%)' },
-      { bottom: '-100px', left: '50%', transform: 'translateX(-50%)' }
-    ];
+    // Define consistent fixed positions - using position classes rather than inline styles
+    const positions = ['top-player', 'bottom-player'];
     
     sortedPlayers.forEach((player, index) => {
       const seat = document.createElement('div');
-      seat.className = 'player-seat';
+      seat.className = `player-seat ${positions[index]}`;
       seat.id = `player-seat-${player.username}`;
       
       if (player.username === currentUsername) {
         seat.classList.add('current-player');
       }
       
-      if (!this.skipNextHighlightUpdate && this.gameState && 
-        Number(this.gameState.currentTurn) === Number(player.id)) {
-      seat.classList.add('active-player');
-    } else if (this.skipNextHighlightUpdate && 
-               Number(this.gameState.lastWinner) === Number(player.id)) {
-      // If we're skipping normal highlights, use lastWinner to determine active player
-      seat.classList.add('active-player');
-    }
-      
-      // Now we can use the index to position, because we've sorted the array
-      const position = positions[index];
-      Object.assign(seat.style, position);
+      // Apply active player class if needed, without using skipNextHighlightUpdate
+      if (this.gameState && Number(this.gameState.currentTurn) === Number(player.id)) {
+        seat.classList.add('active-player');
+      }
       
       const playerInfo = document.createElement('div');
       playerInfo.className = 'player-info';
@@ -659,7 +641,9 @@ class WarGame extends CardGameFramework {
       
       const handSize = this.hands[player.id] ? this.hands[player.id].length : 0;
       
-      for (let i = 0; i < Math.min(5, handSize); i++) {
+      // Limit number of mini cards displayed to prevent layout issues
+      const maxMiniCards = 3;
+      for (let i = 0; i < Math.min(maxMiniCards, handSize); i++) {
         const miniCard = document.createElement('div');
         miniCard.className = 'card-mini';
         cardCount.appendChild(miniCard);
@@ -798,14 +782,6 @@ class WarGame extends CardGameFramework {
     
     // Update game state from server data
     this.gameState.round = data.newRound;
-
-    this.skipNextHighlightUpdate = true;
-
-    this.highlightCurrentPlayer(data.winnerId);  
-    
-    setTimeout(() => {
-      this.skipNextHighlightUpdate = false;
-    }, 1000);
     
     // Clear played cards (UI only)
     this.playedCards = {};
@@ -816,7 +792,7 @@ class WarGame extends CardGameFramework {
     // Show notification
     this.showNotification(`${data.winnerName} wins the round and takes ${data.cardCount} cards!`, "winner");
     
-    // Immediately request updated game state to get new card distribution
+    // Request updated game state with correct sequencing
     this.sendWebSocketMessage({
       type: 'game_state_request',
       gameId: this.currentGameId,
@@ -830,15 +806,19 @@ class WarGame extends CardGameFramework {
         gameId: this.currentGameId,
         auth_token: localStorage.getItem('auth_token')
       });
-      console.log('Requesting connected users to update card counts');
       
       // Update scoreboard after a short delay to ensure data has arrived
       setTimeout(() => {
         this.updateScoreboard();
         
-        // Also update card stacks if they exist
+        // Update card stacks if they exist
         if (document.getElementById('playerCardStack')) {
           this.updateCardStackCounts();
+        }
+        
+        // Apply highlighting only after all updates are complete
+        if (data.winnerId) {
+          this.highlightCurrentPlayer(data.winnerId);
         }
       }, 200);
     }, 300);

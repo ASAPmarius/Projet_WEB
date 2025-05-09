@@ -295,3 +295,80 @@
   transform: scale(0.95);
   transition: transform 0.1s ease;
 }
+
+.player-seat {
+  position: absolute;
+  width: 11.25rem; /* Fixed width */
+  padding: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 0.75rem;
+  border: 3px solid #333;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 20;
+  box-sizing: border-box; /* Critical for consistent sizing */
+  max-height: 8rem; /* Limit height to prevent expansion */
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Position classes instead of inline styles */
+.player-seat.top-player {
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.player-seat.bottom-player {
+  bottom: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Modify active player to avoid size change */
+.player-seat.active-player {
+  border: 3px solid #ffd700;
+  background-color: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 0.9375rem rgba(255, 215, 0, 0.7);
+  /* Remove the scale transform that was causing issues */
+  /* transform: scale(1.05); */ 
+  z-index: 25;
+}
+
+/* For current-player status */
+.player-seat.current-player {
+  background-color: rgba(0, 0, 0, 0.85);
+}
+
+.player-info {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+/* Ensure player cards don't overflow */
+.player-cards {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 9rem; /* Prevent overflow */
+}
+
+/* Keep mini cards compact */
+.card-mini {
+  display: inline-block;
+  width: 1.5rem; /* Slightly reduced */
+  height: 2.25rem; /* Slightly reduced */
+  margin-right: -0.75rem; /* More overlap */
+}
+
+/* Always show the cards count clearly */
+.cards-count {
+  margin-left: 0.75rem;
+  font-weight: bold;
+  font-size: 1rem;
+  color: #ffcc00;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
