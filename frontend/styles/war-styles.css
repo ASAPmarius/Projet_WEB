@@ -1,5 +1,14 @@
 /* War Game specific styles */
 
+/* Base card dimensions and properties - standardized for both stacks and slots */
+.war-card-stack, .war-card-slot {
+  width: 6rem;
+  height: 8.5rem;
+  border-radius: 8px;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
 /* Battle area styles */
 .war-battle-area {
   position: absolute;
@@ -9,45 +18,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 40px; /* Increase vertical gap between cards */
+  gap: 1.5rem;
   width: auto;
 }
 
-.war-card-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 30px; /* Space between cards */
-}
-
+/* Card slot styles */
 .war-card-slot {
-  width: 7.5rem;
-  height: 11.25rem;
-  border: 0.125rem dashed rgba(255, 255, 255, 0.4);
-  border-radius: 0.625rem;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
   background-color: rgba(0, 0, 0, 0.2);
-  margin: 0;
-  position: relative;
-  box-sizing: border-box;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-/* Player 1 and 2 slots arrangement */
-.player1-slot, .player2-slot {
-  display: inline-block;
-}
-
-.war-vs-indicator {
-  position: absolute;
-  right: -3rem; /* Position to right of card area */
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #ffcc00;
-  text-shadow: 0 0 10px rgba(255, 204, 0, 0.8);
+  margin: 0;
+  box-sizing: border-box;
 }
 
 /* Card image in the slots */
@@ -58,37 +41,112 @@
   border-radius: 0.5rem;
 }
 
-/* War action button */
-.war-action-button {
-  margin-top: 1.25rem;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  background-color: #d32f2f;
-  color: white;
-  border: none;
-  border-radius: 0.3125rem;
+.war-card-image.face-down {
+  opacity: 0.9;
+}
+
+/* VS indicator */
+.war-vs-indicator {
+  position: absolute;
+  right: -3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ffcc00;
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.8);
+}
+
+/* Card stacks */
+.war-card-stack {
+  position: absolute;
+  background-color: transparent;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  z-index: 20;
+  left: 50%;
+}
+
+/* Position player card stack */
+.war-card-stack.player-stack {
+  top: calc(50% + 11rem);
+  transform: translateX(-50%);
+}
+
+/* Position opponent card stack */
+.war-card-stack.opponent-stack {
+  top: calc(50% - 19.5rem);
+  transform: translateX(-50%);
+}
+
+/* Card stack hover effects */
+.war-card-stack:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Enhanced hover effect for player's card stack */
+.war-card-stack.player-stack:hover {
+  transform: translateX(-50%) translateY(-10px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5), 0 0 20px rgba(76, 175, 80, 0.5);
   cursor: pointer;
-  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.3);
-  transition: all 0.2s ease;
 }
 
-.war-action-button:hover {
-  background-color: #b71c1c;
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.375rem 0.75rem rgba(0, 0, 0, 0.3);
+/* Clicked animation */
+.war-card-stack.clicked {
+  transform: translateX(-50%) scale(0.95) !important;
+  transition: transform 0.1s ease;
 }
 
-.war-action-button:disabled {
-  background-color: #bdbdbd;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+/* Stack card image */
+.stack-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
-/* War result indicator */
+/* Card count indicator */
+.stack-card-count {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 30px;
+  height: 30px;
+  background-color: #ff5722;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Interactive highlight effects when it's player's turn */
+.war-card-stack.player-stack.my-turn:hover {
+  animation: card-pulse 1.5s infinite;
+}
+
+@keyframes card-pulse {
+  0% {
+    transform: translateX(-50%) scale(1);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5), 0 0 20px rgba(76, 175, 80, 0.5);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.6), 0 0 30px rgba(76, 175, 80, 0.7);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5), 0 0 20px rgba(76, 175, 80, 0.5);
+  }
+}
+
+/* War result indicator - positioned on LEFT side of table */
 .war-result-indicator {
   position: absolute;
-  left: -400px; /* Position to the left of the table instead of right */
+  left: -300px; /* Moved further left from -220px */
   top: 50%;
   transform: translateY(-50%);
   font-size: 1.125rem;
@@ -98,25 +156,37 @@
   transition: all 0.3s ease;
   opacity: 1;
   min-width: 150px;
+  max-width: 220px;
   text-align: center;
-  background-color: rgba(0, 0, 0, 0.7); /* Add background for better visibility */
+  background-color: rgba(0, 0, 0, 0.7);
   color: white;
+  z-index: 1000;
 }
 
+/* Result indicator states */
 .war-result-indicator.winner {
   background-color: #43a047;
   color: white;
-  opacity: 1;
-  transform: translateY(-50%); /* Keep vertical centering */
   box-shadow: 0 0 10px rgba(67, 160, 71, 0.5);
 }
 
 .war-result-indicator.war {
   background-color: #ff9800;
   color: white;
-  opacity: 1;
-  transform: translateY(0);
   animation: pulse 1s infinite;
+}
+
+/* Animation for war mode */
+@keyframes pulse {
+  0% {
+    transform: scale(1) translateY(-50%);
+  }
+  50% {
+    transform: scale(1.05) translateY(-50%);
+  }
+  100% {
+    transform: scale(1) translateY(-50%);
+  }
 }
 
 /* Scoreboard styles */
@@ -170,140 +240,16 @@
   font-size: 0.9em;
 }
 
-/* Animation for war mode */
-@keyframes pulse {
-  0% {
-      transform: scale(1);
-  }
-  50% {
-      transform: scale(1.05);
-  }
-  100% {
-      transform: scale(1);
-  }
-}
-
-/* Responsive adjustments */
-@media (max-width: 48rem) {
-  .war-battle-area {
-      flex-direction: column;
-  }
-  
-  .war-card-slot {
-      width: 6.25rem;
-      height: 9.375rem;
-      margin: 0.625rem;
-  }
-  
-  .war-vs-indicator {
-      position: relative;
-      margin: 0.625rem 0;
-  }
-  
-  .war-scoreboard {
-      position: static;
-      width: 90%;
-      margin: 0.625rem auto;
-  }
-}
-
-.war-card-stack {
-  width: 7.5rem;
-  height: 11.25rem;
-  position: absolute;
-  background-color: transparent; /* Make background transparent */
-  border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease;
-  z-index: 20;
-}
-
-.war-card-stack:hover {
-  transform: translateY(-5px);
-}
-
-.war-card-stack.player-stack {
-  bottom: 4rem; /* Position relative to bottom of table */
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.war-card-stack.opponent-stack {
-  top: 4rem; /* Position relative to top of table */
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.stack-card-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 10px;
-}
-
-.stack-card-count {
-  position: absolute;
-  top: -10px;
-  right: -10px;
-  width: 30px;
-  height: 30px;
-  background-color: #ff5722;
-  color: white;
-  font-size: 14px;
-  font-weight: bold;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-}
-
-/* Add shine effect to indicate interactivity */
-.war-card-stack.player-stack.my-turn::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.3) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  border-radius: 10px;
-  animation: shine 2s infinite;
-}
-
-@keyframes shine {
-  0% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
 /* Hide the original hand container */
 #handContainer {
   display: none !important;
 }
 
-/* Clicked animation for card stack */
-.war-card-stack.clicked {
-  transform: scale(0.95);
-  transition: transform 0.1s ease;
-}
-
+/* Player seat styles */
 .player-seat {
   position: absolute;
   width: 11.25rem;
-  height: 5.5rem; /* Fixed height */
+  height: 5.5rem;
   padding: 0.5rem;
   background-color: rgba(0, 0, 0, 0.7);
   border-radius: 0.75rem;
@@ -314,52 +260,50 @@
   align-items: center;
   z-index: 20;
   box-sizing: border-box;
-  overflow: hidden; /* Hide overflow content */
+  overflow: hidden;
 }
 
 /* Fix bottom player position */
 .player-seat.bottom-player {
-  bottom: -6.25rem; /* Move further from table edge */
+  bottom: -6.25rem;
   left: 50%;
   transform: translateX(-50%);
 }
 
 /* Fix top player position */
 .player-seat.top-player {
-  top: -6.25rem; /* Move further from table edge */
+  top: -6.25rem;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .player-avatar {
-  width: 2.75rem; /* Reduce further to prevent layout issues */
+  width: 2.75rem;
   height: 2.75rem;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #666;
   box-shadow: 0 0.125rem 0.3125rem rgba(0, 0, 0, 0.3);
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0;
 }
 
 .player-details {
   margin-left: 0.5rem;
-  max-width: 6.25rem; /* Limit width */
+  max-width: 6.25rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Modify active player to avoid size change */
+/* Active player styling */
 .player-seat.active-player {
   border: 3px solid #ffd700;
   background-color: rgba(0, 0, 0, 0.85);
   box-shadow: 0 0 0.9375rem rgba(255, 215, 0, 0.7);
-  /* Remove the scale transform that was causing issues */
-  /* transform: scale(1.05); */ 
   z-index: 25;
 }
 
-/* For current-player status */
+/* Current player styling */
 .player-seat.current-player {
   background-color: rgba(0, 0, 0, 0.85);
 }
@@ -375,8 +319,8 @@
   display: flex;
   align-items: center;
   max-width: 9rem;
-  white-space: nowrap; /* Prevent wrapping */
-  overflow: hidden; /* Hide overflow */
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .card-mini {
@@ -384,14 +328,213 @@
   width: 1.5rem;
   height: 2.25rem;
   margin-right: -0.75rem;
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0;
 }
 
-/* Always show the cards count clearly */
 .cards-count {
   margin-left: 0.75rem;
   font-weight: bold;
   font-size: 1rem;
   color: #ffcc00;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Responsive adjustments */
+/* Add game notification styling from main-style.css for consistency - positioned on RIGHT side */
+.game-notification {
+  position: fixed;
+  top: 50%;
+  right: 400px; /* Position to the right of the table */
+  left: auto;
+  transform: translateY(-50%);
+  padding: 0.75rem 1.25rem;
+  background-color: rgba(0, 0, 0, 0.75);
+  color: white;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  min-width: 150px;
+  max-width: 200px;
+  text-align: center;
+}
+
+.game-notification.show {
+  opacity: 1;
+}
+
+.game-notification.error {
+  background-color: rgba(244, 67, 54, 0.9);
+}
+
+.game-notification.turn {
+  background-color: rgba(255, 193, 7, 0.9);
+  color: #333;
+}
+
+.game-notification.card-played {
+  background-color: rgba(33, 150, 243, 0.9);
+}
+
+@media (max-width: 75rem) {
+  /* Large screens */
+  .war-card-stack, .war-card-slot {
+    width: 5.5rem;
+    height: 7.75rem;
+  }
+  
+  .war-card-stack.player-stack {
+    top: calc(50% + 10rem);
+  }
+  
+  .war-card-stack.opponent-stack {
+    top: calc(50% - 17.5rem);
+  }
+  
+  .war-vs-indicator {
+    font-size: 1.25rem;
+    right: -2.5rem;
+  }
+  
+  .war-result-indicator {
+    left: -250px; /* Moved further left */
+    font-size: 1rem;
+    max-width: 180px;
+  }
+  
+  .game-notification {
+    right: 350px;
+    font-size: 1rem;
+    padding: 0.7rem 1.1rem;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 48rem) {
+  /* Medium screens */
+  .war-card-stack, .war-card-slot {
+    width: 4.5rem;
+    height: 6.5rem;
+  }
+  
+  .war-battle-area {
+    gap: 1rem;
+  }
+  
+  .war-card-stack.player-stack {
+    top: calc(50% + 8.5rem);
+  }
+  
+  .war-card-stack.opponent-stack {
+    top: calc(50% - 15rem);
+  }
+  
+  .war-vs-indicator {
+    font-size: 1.1rem;
+    right: -2rem;
+  }
+  
+  .war-result-indicator {
+    left: -200px; /* Moved further left */
+    min-width: 120px;
+    max-width: 150px;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .game-notification {
+    right: 300px;
+    min-width: 120px;
+    max-width: 150px;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .player-seat {
+    width: 9.5rem;
+    height: 5rem;
+  }
+  
+  .player-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+}
+
+@media (max-width: 30rem) {
+  /* Small screens and mobile */
+  .war-card-stack, .war-card-slot {
+    width: 3.5rem;
+    height: 5rem;
+  }
+  
+  .war-battle-area {
+    gap: 0.75rem;
+  }
+  
+  .war-card-stack.player-stack {
+    top: calc(50% + 6.5rem);
+  }
+  
+  .war-card-stack.opponent-stack {
+    top: calc(50% - 11.5rem);
+  }
+  
+  .war-vs-indicator {
+    font-size: 0.9rem;
+    right: -1.5rem;
+  }
+  
+  /* On mobile, position both notifications at bottom but with vertical separation */
+  .war-result-indicator {
+    position: fixed;
+    bottom: 8rem; /* Higher position */
+    left: 50%;
+    top: auto;
+    transform: translateX(-50%);
+    min-width: 100px;
+    max-width: 90%;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+  }
+  
+  .game-notification {
+    position: fixed;
+    bottom: 5rem; /* Lower position */
+    left: 50%;
+    right: auto;
+    top: auto;
+    transform: translateX(-50%);
+    min-width: 100px;
+    max-width: 90%;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+  }
+  
+  .player-seat {
+    width: 8rem;
+    height: 4.5rem;
+    padding: 0.35rem;
+  }
+  
+  .player-avatar {
+    width: 2rem;
+    height: 2rem;
+  }
+  
+  .player-details {
+    margin-left: 0.3rem;
+    max-width: 5rem;
+  }
+  
+  .war-scoreboard {
+    top: auto;
+    bottom: 1rem;
+    right: 1rem;
+    padding: 0.5rem;
+    min-width: 8rem;
+    font-size: 0.8rem;
+  }
 }
