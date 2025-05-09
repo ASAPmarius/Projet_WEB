@@ -35,10 +35,20 @@ class WarGame extends CardGameFramework {
   // Initialize War-specific UI elements
   initializeWarUI() {
     console.log('Initializing War UI');
+    // Force create card stacks regardless of previous state
     this.createPlayerCardStacks();
     this.updateCardStackCounts();
     this.updateCardStackState();
+    
+    // Flag that UI is initialized
     this.uiInitialized = true;
+    
+    // Force update game state to ensure turn is properly set
+    this.sendWebSocketMessage({ 
+      type: 'game_state_request', 
+      gameId: this.currentGameId,
+      auth_token: localStorage.getItem('auth_token')
+    });
   }
   
   // Override the animateCardToPosition method for War-specific card animations
@@ -193,7 +203,6 @@ class WarGame extends CardGameFramework {
     }
   }
   
-  // NEW METHOD: Create card stacks for both players
   createPlayerCardStacks() {
     console.log('Creating player card stacks');
     
@@ -201,8 +210,9 @@ class WarGame extends CardGameFramework {
     const existingStacks = document.querySelectorAll('.war-card-stack');
     existingStacks.forEach(stack => stack.remove());
     
-    // Get card back image
-    const cardBackImage = this.cardsById[54]?.picture || 'card_back.png';
+    // Get card back image (with fallback)
+    const cardBackImage = this.cardsById && this.cardsById[54] ? 
+      this.cardsById[54].picture : 'card_back.png';
     
     // Create player card stack (always your stack at the bottom)
     const playerStack = document.createElement('div');
@@ -224,8 +234,9 @@ class WarGame extends CardGameFramework {
     playerStack.appendChild(playerCardImage);
     playerStack.appendChild(playerCardCount);
     
-    // Add click handler for playing top card
-    playerStack.addEventListener('click', () => this.playTopCard());
+    // Add click handler with proper binding
+    const boundPlayTopCard = this.playTopCard.bind(this);
+    playerStack.addEventListener('click', boundPlayTopCard);
     
     // Create opponent card stack
     const opponentStack = document.createElement('div');
@@ -253,15 +264,24 @@ class WarGame extends CardGameFramework {
       this.uiElements.pokerTable.appendChild(opponentStack);
       console.log('Card stacks added to poker table');
     } else {
-      console.warn('Poker table element not found, card stacks not added');
+      console.warn('Poker table element not found, adding to body instead');
       document.body.appendChild(playerStack);
       document.body.appendChild(opponentStack);
     }
+    
+    // Force update counts immediately
+    this.updateCardStackCounts();
+    
+    // Force update visual state
+    this.updateCardStackState();
   }
   
-  // NEW METHOD: Play top card when player's stack is clicked
   playTopCard() {
+    console.log('playTopCard called - checking turn state');
+    
     if (!this.isMyTurn()) {
+      console.log('Not my turn, current turn: ' + this.gameState.currentTurn + 
+                  ', my ID: ' + this.currentPlayerId);
       this.showNotification("It's not your turn to play");
       return;
     }
@@ -269,12 +289,14 @@ class WarGame extends CardGameFramework {
     // Get the player's hand
     const playerHand = this.hands[this.currentPlayerId];
     if (!playerHand || playerHand.length === 0) {
+      console.log('No cards in hand');
       this.showNotification("You don't have any cards to play");
       return;
     }
     
     // Get the top card (first in the array)
     const topCard = playerHand[0];
+    console.log('Playing top card with ID: ' + topCard.id);
     
     // Play the card through the existing system
     this.playCard(topCard.id);
@@ -314,15 +336,32 @@ class WarGame extends CardGameFramework {
     super.handleGameState(data);
     
     // Dispatch custom event for phase change
-    if (this.gameState && this.gameState.phase === 'playing' && !this.uiInitialized) {
-      document.dispatchEvent(new CustomEvent('gameStateChanged'));
+    if (this.gameState && this.gameState.phase === 'playing') {
+      if (!this.uiInitialized) {
+        console.log('Game phase changed to playing, initializing UI');
+        document.dispatchEvent(new CustomEvent('gameStateChanged'));
+        this.initializeWarUI(); // Direct call in addition to event
+      } else {
+        console.log('Game phase is playing, UI already initialized');
+        // Even if UI is initialized, make sure card stacks exist
+        if (!document.getElementById('playerCardStack')) {
+          console.log('Card stacks missing, creating them');
+          this.createPlayerCardStacks();
+        }
+      }
     }
     
     // Always update card stacks if they exist
-    if (document.getElementById('playerCardStack')) {
-      this.updateCardStackCounts();
-      this.updateCardStackState();
-    }
+    setTimeout(() => {
+      if (document.getElementById('playerCardStack')) {
+        console.log('Updating card stack counts and state');
+        this.updateCardStackCounts();
+        this.updateCardStackState();
+      } else if (this.gameState && this.gameState.phase === 'playing') {
+        console.log('Card stacks should exist but don\'t, creating them');
+        this.createPlayerCardStacks();
+      }
+    }, 100); // Short delay to ensure DOM is updated
   }
   
   // NEW METHOD: Update card stack counts
@@ -372,20 +411,33 @@ class WarGame extends CardGameFramework {
     }
   }
   
-  // NEW METHOD: Update card stack visual state
   updateCardStackState() {
     const playerStack = document.getElementById('playerCardStack');
     const opponentStack = document.getElementById('opponentCardStack');
     
-    if (!playerStack || !opponentStack) return;
+    if (!playerStack || !opponentStack) {
+      console.log('Card stacks not found, deferring update');
+      // If stacks don't exist yet, try to create them
+      if (this.gameState && this.gameState.phase === 'playing') {
+        setTimeout(() => {
+          if (!document.getElementById('playerCardStack')) {
+            console.log('Creating card stacks during deferred update');
+            this.createPlayerCardStacks();
+          }
+        }, 300);
+      }
+      return;
+    }
     
     // Check whose turn it is
     const isMyTurn = this.isMyTurn();
+    console.log('Updating card stack state, my turn: ' + isMyTurn);
     
     // Update player stack - highlight if it's their turn
     if (isMyTurn) {
       playerStack.classList.add('my-turn');
       playerStack.style.cursor = 'pointer';
+      console.log('Added my-turn class to player stack');
     } else {
       playerStack.classList.remove('my-turn');
       playerStack.style.cursor = 'default';
@@ -648,14 +700,22 @@ class WarGame extends CardGameFramework {
     this.updateTablePlayersWar(players, currentUsername);
   }
   
-  // Override updateGamePhaseUI to handle card stacks
-  updateGamePhaseUI(phase) {
+   // Override updateGamePhaseUI to handle card stacks
+   updateGamePhaseUI(phase) {
     // Call parent method
     super.updateGamePhaseUI(phase);
     
     // If phase changes to playing, initialize War UI
-    if (phase === 'playing' && !this.uiInitialized) {
-      this.initializeWarUI();
+    if (this.gameState && this.gameState.phase === 'playing') {
+      if (!this.uiInitialized) {
+        console.log('Table updated but UI not initialized, initializing now');
+        this.initializeWarUI();
+      } else if (!document.getElementById('playerCardStack')) {
+        // If stacks don't exist but should, create them
+        console.log('Table updated but card stacks missing, creating them');
+        this.createPlayerCardStacks();
+        this.updateCardStackCounts();
+      }
     }
   }
 
@@ -680,6 +740,17 @@ class WarGame extends CardGameFramework {
     } catch (error) {
       console.error('Error handling WebSocket message:', error);
     }
+  }
+
+  handleTurnChange(data) {
+    // Call parent method
+    super.handleTurnChange(data);
+    
+    // Force update card stack state after turn changes
+    setTimeout(() => {
+      console.log('Turn changed, updating card stack state');
+      this.updateCardStackState();
+    }, 200);
   }
   
   
