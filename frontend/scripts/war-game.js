@@ -139,7 +139,8 @@ class WarGame extends CardGameFramework {
     this.updateCardSlot(playerId, card);
     
     // Animate the card play with more dramatic effect for war
-    this.animateCardPlay(card, true); // Pass true to indicate war card
+    const isOpponent = String(playerId) !== String(this.currentPlayerId);
+    this.animateCardPlay(card, true, isOpponent); // Pass true to indicate war card
     
     // Show notification
     this.showNotification(`${username} played a war card!`, 'war-card');
@@ -907,13 +908,16 @@ class WarGame extends CardGameFramework {
       
       // Add short delay for second player for better visual effect
       setTimeout(() => {
+        // Get responsive dimensions
+        const cardDimensions = this.getCardDimensions();
+        
         // Create a face down card element for animation
         const animatedCard = document.createElement('div');
         animatedCard.className = 'animated-card face-down';
         animatedCard.style.position = 'absolute';
-        animatedCard.style.width = '120px';
-        animatedCard.style.height = '180px';
-        animatedCard.style.zIndex = '1000';
+        animatedCard.style.width = cardDimensions.width;
+        animatedCard.style.height = cardDimensions.height;
+        animatedCard.style.zIndex = '2000'; // Higher z-index to ensure it appears above stacks
         animatedCard.style.transition = 'all 0.5s ease';
         
         // Add card back image
@@ -922,20 +926,36 @@ class WarGame extends CardGameFramework {
         cardImg.alt = 'Card face down';
         cardImg.style.width = '100%';
         cardImg.style.height = '100%';
+        cardImg.style.borderRadius = '8px';
         animatedCard.appendChild(cardImg);
         
         // Set starting position based on player
         if (isOpponent) {
-          // For opponent cards - come from top
-          animatedCard.style.top = '80px';
-          animatedCard.style.bottom = 'auto';
+          // For opponent cards - come from top stack
+          const opponentStack = document.getElementById('opponentCardStack');
+          if (opponentStack) {
+            const rect = opponentStack.getBoundingClientRect();
+            animatedCard.style.top = `${rect.top + rect.height/2}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback starting position
+            animatedCard.style.top = '80px';
+            animatedCard.style.bottom = 'auto';
+          }
         } else {
-          // For player cards - come from bottom
-          animatedCard.style.bottom = '150px';
-          animatedCard.style.top = 'auto';
+          // For player cards - come from bottom stack
+          const playerStack = document.getElementById('playerCardStack');
+          if (playerStack) {
+            const rect = playerStack.getBoundingClientRect();
+            animatedCard.style.bottom = `${globalThis.innerHeight - rect.bottom - rect.height/2}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback starting position
+            animatedCard.style.bottom = '150px';
+            animatedCard.style.top = 'auto';
+          }
         }
         
-        animatedCard.style.left = '50%';
         animatedCard.style.transform = 'translateX(-50%)';
         
         // Add to document

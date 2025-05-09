@@ -1092,11 +1092,20 @@ class CardGameFramework {
     const animatedCard = document.createElement('div');
     animatedCard.className = 'animated-card';
     
+    // Get responsive dimensions
+    const cardDimensions = this.getCardDimensions();
+    
+    // Set styles
     animatedCard.style.position = 'absolute';
-    animatedCard.style.width = '120px';
-    animatedCard.style.height = '180px';
-    animatedCard.style.zIndex = '1000';
+    animatedCard.style.width = cardDimensions.width;
+    animatedCard.style.height = cardDimensions.height;
+    animatedCard.style.zIndex = '2000'; // Higher z-index to appear above card stacks
     animatedCard.style.transition = 'all 0.5s ease';
+    animatedCard.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
+    
+    if (specialEffect) {
+      animatedCard.classList.add('war-effect');
+    }
     
     // Add card image
     const cardImage = document.createElement('img');
@@ -1104,28 +1113,99 @@ class CardGameFramework {
     cardImage.alt = `${card.rank} of ${card.suit}`;
     cardImage.style.width = '100%';
     cardImage.style.height = '100%';
+    cardImage.style.borderRadius = '8px';
     
     animatedCard.appendChild(cardImage);
     
     // Set starting positions based on player source
     if (isOpponent) {
       // For opponent cards - come from top
-      animatedCard.style.top = '80px';
+      const opponentStack = document.getElementById('opponentCardStack');
+      if (opponentStack) {
+        const rect = opponentStack.getBoundingClientRect();
+        animatedCard.style.top = `${rect.top + rect.height/2}px`;
+        animatedCard.style.left = `${rect.left + rect.width/2}px`;
+      } else {
+        animatedCard.style.top = '80px';
+      }
       animatedCard.style.bottom = 'auto';
     } else {
       // For player cards - come from bottom
-      animatedCard.style.bottom = '150px';
+      const playerStack = document.getElementById('playerCardStack');
+      if (playerStack) {
+        const rect = playerStack.getBoundingClientRect();
+        animatedCard.style.bottom = `${globalThis.innerHeight - rect.bottom - rect.height/2}px`;
+        animatedCard.style.left = `${rect.left + rect.width/2}px`;
+      } else {
+        animatedCard.style.bottom = '150px';
+      }
       animatedCard.style.top = 'auto';
     }
     
-    animatedCard.style.left = '50%';
     animatedCard.style.transform = 'translateX(-50%)';
     
     // Add to document
     document.body.appendChild(animatedCard);
     
-    // Track card animation for subclasses
-    this.animateCardToPosition(animatedCard, card, specialEffect, isOpponent);
+    // Determine destination
+    setTimeout(() => {
+      // Move to destination
+      if (specialEffect) {
+        // War cards go to center with special effect
+        animatedCard.style.transform = 'translate(-50%, 0) scale(1.2)';
+        animatedCard.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
+        
+        // Position in middle
+        if (isOpponent) {
+          animatedCard.style.top = 'calc(50% - 90px)';
+        } else {
+          animatedCard.style.bottom = 'calc(50% - 90px)';
+        }
+      } else {
+        // Normal cards go to their appropriate slots
+        if (isOpponent) {
+          // Opponent's card destination - player1 slot
+          const slot = document.getElementById('player1Slot');
+          if (slot) {
+            const rect = slot.getBoundingClientRect();
+            animatedCard.style.top = `${rect.top}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback if slot not found
+            animatedCard.style.top = 'calc(50% - 150px)';
+          }
+        } else {
+          // Player's card destination - player2 slot
+          const slot = document.getElementById('player2Slot');
+          if (slot) {
+            const rect = slot.getBoundingClientRect();
+            animatedCard.style.bottom = `${globalThis.innerHeight - rect.bottom}px`;
+            animatedCard.style.left = `${rect.left + rect.width/2}px`;
+          } else {
+            // Fallback if slot not found
+            animatedCard.style.bottom = 'calc(50% - 150px)';
+          }
+        }
+      }
+      
+      // Only display the card in the slot AFTER animation completes
+      setTimeout(() => {
+        // Update the slot with the final card
+        const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
+        const slot = document.getElementById(slotId);
+        if (slot) {
+          slot.innerHTML = '';
+          const finalCardImg = document.createElement('img');
+          finalCardImg.src = card.picture;
+          finalCardImg.alt = `${card.rank} of ${card.suit}`;
+          finalCardImg.className = 'war-card-image';
+          slot.appendChild(finalCardImg);
+        }
+        
+        // Remove the animated element
+        animatedCard.remove();
+      }, specialEffect ? 800 : 500);
+    }, 10);
   }
 
   // Animation helper for subclasses to override
@@ -1692,7 +1772,44 @@ class CardGameFramework {
       gamePhase: this.gameState.phase
     };
   }
+
+  getCardDimensions() {
+    // Try to get dimensions from an existing card slot or stack
+    const slot = document.querySelector('.war-card-slot');
+    if (slot) {
+      const rect = slot.getBoundingClientRect();
+      return {
+        width: `${rect.width}px`,
+        height: `${rect.height}px`
+      };
+    }
+    
+    // Fallback to stack dimensions
+    const stack = document.querySelector('.war-card-stack');
+    if (stack) {
+      const rect = stack.getBoundingClientRect();
+      return {
+        width: `${rect.width}px`,
+        height: `${rect.height}px`
+      };
+    }
+    
+    // Fallback based on viewport width for responsive sizing
+    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    
+    if (vw <= 480) { // Small screens
+      return { width: '3.5rem', height: '5rem' };
+    } else if (vw <= 768) { // Medium screens
+      return { width: '4.5rem', height: '6.5rem' };
+    } else if (vw <= 1200) { // Large screens
+      return { width: '5.5rem', height: '7.75rem' };
+    } else { // Extra large screens
+      return { width: '6rem', height: '8.5rem' };
+    }
+  }
+
 }
+
 
 // Function to navigate to profile page
 function goToProfilePage(username) {
