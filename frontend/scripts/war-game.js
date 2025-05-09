@@ -277,6 +277,12 @@ class WarGame extends CardGameFramework {
   }
   
   highlightCurrentPlayer(playerId) {
+    // Check if we should skip the highlight update
+    if (this.skipNextHighlightUpdate) {
+      console.log('Skipping highlight update due to flag');
+      this.skipNextHighlightUpdate = false; // Reset the flag
+      return;
+    }
     console.log('WarGame highlighting player:', playerId);
     
     // Clear ALL highlighting classes first

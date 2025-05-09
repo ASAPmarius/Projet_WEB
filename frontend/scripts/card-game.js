@@ -710,15 +710,32 @@ class CardGameFramework {
     // Check if it's my turn - add explicit conversion
     const isMyTurn = Number(data.playerId) === Number(this.currentPlayerId);
     console.log(`Turn change: server playerId=${data.playerId}, my playerId=${this.currentPlayerId}, isMyTurn=${isMyTurn}`);
+    
     this.setMyTurnState(isMyTurn);
     
     // Show notification about whose turn it is
     this.showTurnNotification(data.username);
     
     if (isMyTurn) {
-      this.updateHandDisplay();
+      // Add first turn handling for card interactivity
+      if (!this.hasProcessedFirstTurn) {
+        // First, update the display normally
+        this.updateHandDisplay();
+        
+        // Add a short delay to ensure all elements are ready
+        setTimeout(() => {
+          // Force update hand display again to ensure cards are clickable
+          this.updateHandDisplay();
+          // Mark that we've handled the first turn
+          this.hasProcessedFirstTurn = true;
+          console.log("First turn processing complete, cards should be clickable now");
+        }, 200);
+      } else {
+        // Normal processing for subsequent turns
+        this.updateHandDisplay();
+      }
     }
-
+    
     if (this.gameState && this.gameState.currentTurn) {
       // Update highlighting based on whose turn it is now
       setTimeout(() => {
