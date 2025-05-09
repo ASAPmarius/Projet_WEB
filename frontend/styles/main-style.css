@@ -495,9 +495,7 @@ input[type="text"] {
 }
 
 .player-seat.current-player {
-  border: 3px solid #ffcc00;
   background-color: rgba(0, 0, 0, 0.85);
-  box-shadow: 0 0 0.9375rem rgba(255, 204, 0, 0.5);
 }
 
 .player-info {
@@ -692,7 +690,7 @@ body.phase-playing .round-indicator {
 
 /* ====================== TURN-BASED INDICATORS ====================== */
 .player-seat.active-player {
-  border: 3px solid #ffd700; /* Gold border */
+  border: 3px solid #ffd700; 
   background-color: rgba(0, 0, 0, 0.85);
   box-shadow: 0 0 0.9375rem rgba(255, 215, 0, 0.7);
   transform: scale(1.05);

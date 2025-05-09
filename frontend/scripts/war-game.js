@@ -336,9 +336,14 @@ class WarGame extends CardGameFramework {
         seat.classList.add('current-player');
       }
       
-      if (this.gameState && this.gameState.currentTurn === player.id) {
-        seat.classList.add('active-player');
-      }
+      if (!this.skipNextHighlightUpdate && this.gameState && 
+        Number(this.gameState.currentTurn) === Number(player.id)) {
+      seat.classList.add('active-player');
+    } else if (this.skipNextHighlightUpdate && 
+               Number(this.gameState.lastWinner) === Number(player.id)) {
+      // If we're skipping normal highlights, use lastWinner to determine active player
+      seat.classList.add('active-player');
+    }
       
       // Now we can use the index to position, because we've sorted the array
       const position = positions[index];
@@ -465,7 +470,11 @@ class WarGame extends CardGameFramework {
 
     this.skipNextHighlightUpdate = true;
 
-    this.highlightCurrentPlayer(data.winnerId);   
+    this.highlightCurrentPlayer(data.winnerId);  
+    
+    setTimeout(() => {
+      this.skipNextHighlightUpdate = false;
+    }, 1000);
     
     // Clear played cards (UI only)
     this.playedCards = {};
