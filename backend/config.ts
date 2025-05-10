@@ -16,7 +16,7 @@ export const frontendPort = isProduction
 
 // Get the host (domain) - Heroku provides this in the HOST env var
 export const host = isProduction 
-  ? Deno.env.get('HOST') || 'your-app-name.herokuapp.com' 
+  ? Deno.env.get('APP_DOMAIN') || '<your-app-name>.herokuapp.com' 
   : 'localhost';
 
 // Build the complete URLs
