@@ -707,10 +707,16 @@ class WarGame extends CardGameFramework {
   handleWebSocketMessage(event) {
     try {
       const data = JSON.parse(event.data);
-      console.log('WebSocket message received:', data.type);
+      console.log('WebSocket message received in WarGame:', data.type);
       
-      // Call parent handler first
-      super.handleWebSocketMessage(event);
+      // Special handling for player actions
+      if (data.type === 'player_action') {
+        // Handle this directly without calling parent
+        this.handlePlayerAction(data);
+      } else {
+        // For other message types, call parent handler
+        super.handleWebSocketMessage(event);
+      }
       
       // Handle war-specific messages
       switch(data.type) {
@@ -723,7 +729,7 @@ class WarGame extends CardGameFramework {
           break;
       }
     } catch (error) {
-      console.error('Error handling WebSocket message:', error);
+      console.error('Error handling WebSocket message in WarGame:', error);
     }
   }
 
@@ -825,7 +831,6 @@ class WarGame extends CardGameFramework {
     }, 300);
   }
 
-  // Override handlePlayerAction to handle war-specific card plays
   handlePlayerAction(data) {
     // Don't call super.handlePlayerAction to avoid conflicting animations
     // super.handlePlayerAction(data);
@@ -842,40 +847,32 @@ class WarGame extends CardGameFramework {
       const card = this.cardsById[cardId];
       
       if (card) {
+        // Create the same animation key as the parent class would
+        const animationKey = `card-play-${playerId}-${cardId}`;
+        
+        // Check if animation is already in progress from parent class
+        if (this.isAnimationInProgress(animationKey)) {
+          console.log(`WAR: Animation already in progress for ${animationKey}, skipping duplicate`);
+          return;
+        }
+        
         // Check if we're in war mode for special handling
         if (action.warMode || action.type === 'play_war_card' || 
           (this.gameState && this.gameState.warState && this.gameState.warState.inWar)) {
-        console.log(`War card played by ${username} (${playerId})`);
+          console.log(`War card played by ${username} (${playerId})`);
           
           // Update UI tracking
           if (!this.playedCards[playerId]) {
             this.playedCards[playerId] = card;
           }
           
-          // Update the card slot with minimal animation to avoid conflicts
-          const slotId = isOpponent ? 'player1Slot' : 'player2Slot';
-          const slot = document.getElementById(slotId);
-          
-          if (slot) {
-            // Clean up any face down card
-            slot.innerHTML = '';
-            
-            // Create the new card image with a simple fade-in effect
-            const cardImage = document.createElement('img');
-            cardImage.src = card.picture;
-            cardImage.alt = `${card.rank} of ${card.suit}`;
-            cardImage.className = 'war-card-image';
-            cardImage.style.opacity = '0';
-            slot.appendChild(cardImage);
-            
-            // Fade in the card
-            setTimeout(() => {
-              cardImage.style.transition = 'opacity 0.5s ease';
-              cardImage.style.opacity = '1';
-            }, 50);
-          }
+          // Update the card slot
+          this.handleWarCardAction(playerId, username, cardId);
         } else {
-          // For normal card plays, use the regular animation
+          // For normal card plays, use the regular animation, but mark it as in progress first
+          this.setAnimationInProgress(animationKey, 1000);
+          console.log(`WAR: Animation started for ${animationKey}`);
+          
           this.animateCardPlay(card, false, isOpponent);
         }
         

@@ -8,6 +8,7 @@ class CardGameFramework {
     this.currentPlayerId = null;
     this.currentUsername = null;
     this.players = [];
+    this._animationsInProgress = {};
     this.gameState = {
       phase: 'waiting', // waiting, setup, playing, finished
       currentTurn: null,
@@ -1048,25 +1049,28 @@ class CardGameFramework {
     console.log(`Player ${username} played card ${cardId}`);
     
     // Get the full card data from our local cache
-    const cardData = this.cardsById[card.id] || card;
-    if (!cardData) {
+    const card = this.cardsById[cardId];
+    if (!card) {
       console.warn(`Card data not found for ID ${cardId}`);
       return;
     }
     
+    // Create a unique animation key
+    const animationKey = `card-play-${playerId}-${cardId}`;
+    
     // Only add to played cards if not already there
     if (!this.playedCards[playerId]) {
       console.log(`Adding card ${cardId} to played cards for player ${playerId}`);
-      this.playedCards[playerId] = cardData;
+      this.playedCards[playerId] = card;
       
       // Update the card slot with the played card
-      this.updateCardSlot(playerId, cardData);
+      this.updateCardSlot(playerId, card);
       
       // For the player who played the card, update hand if needed
       if (String(playerId) === String(this.currentPlayerId)) {
         const playerHand = this.hands[playerId];
         if (playerHand) {
-          const cardIndex = playerHand.findIndex(card => Number(card.id) === Number(cardId));
+          const cardIndex = playerHand.findIndex(c => Number(c.id) === Number(cardId));
           if (cardIndex !== -1) {
             console.log(`Removing card ${cardId} from hand (if not already removed)`);
             playerHand.splice(cardIndex, 1);
@@ -1075,9 +1079,22 @@ class CardGameFramework {
         }
       }
       
-      if (this.constructor.name !== 'WarGame') {
+      // Only animate from parent class if this is not a WarGame instance
+      // AND no animation is already in progress
+      if (this.constructor.name !== 'WarGame' && !this._animationsInProgress[animationKey]) {
         const isOpponent = String(playerId) !== String(this.currentPlayerId);
-        this.animateCardPlay(cardData, false, isOpponent);
+        
+        // Mark this animation as in progress
+        this._animationsInProgress[animationKey] = true;
+        console.log(`BASE: Animation started for ${animationKey}`);
+        
+        this.animateCardPlay(card, false, isOpponent);
+        
+        // Clear the animation flag after animation completes
+        setTimeout(() => {
+          delete this._animationsInProgress[animationKey];
+          console.log(`BASE: Animation completed for ${animationKey}`);
+        }, 1000); // Adjust timeout based on animation duration
       }
       
       // Show notification
@@ -1087,8 +1104,24 @@ class CardGameFramework {
     }
   }
   
+  isAnimationInProgress(key) {
+    return !!this._animationsInProgress[key];
+  }
+
+  setAnimationInProgress(key, timeout = 1000) {
+    this._animationsInProgress[key] = true;
+    
+    // Auto-clear after timeout
+    setTimeout(() => {
+      delete this._animationsInProgress[key];
+    }, timeout);
+    
+    return true;
+  }
+  
   // Basic animation for a card play - to be overridden by subclasses
   animateCardPlay(card, specialEffect = false, isOpponent = false) {
+    console.log(`PARENT: animateCardPlay called for card ${card.id}`);
     // Create a temporary element for the animation
     const animatedCard = document.createElement('div');
     animatedCard.className = 'animated-card';
