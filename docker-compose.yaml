@@ -28,7 +28,7 @@ services:
       - ./backend/cards_images:/app/cards_images  # Mount card images only, not the source code
       - ./backend/convertIMG.ts:/app/convertIMG.ts  # Mount the convertIMG.ts file
 
-  # New service for database initialization
+  # Improved db-init service with restricted permissions
   db-init:
     build:
       context: ./backend
@@ -44,7 +44,7 @@ services:
     depends_on:
       db:
         condition: service_healthy  # Wait for DB to be healthy
-    command: ["run", "--allow-net", "--allow-read", "--allow-env", "--unstable-ffi", "--no-lock", "insert_cards.ts"]
+    command: ["run", "--allow-net=db:5432", "--allow-read=/app/cards_images,/app/convertIMG.ts,/app/insert_cards.ts,/app/.env", "--allow-env", "--unstable-ffi", "--no-lock", "insert_cards.ts"]
 
   frontend:
     build:
@@ -56,6 +56,8 @@ services:
       - "8080:8080"
     volumes:
       - ./frontend:/app/frontend
+    # Note: Frontend security is handled in the Dockerfile with:
+    # RUN deno compile --allow-net --allow-read=./frontend --output app server.ts 8080
 
   nginx:
     image: nginx:latest
@@ -94,11 +96,9 @@ services:
       retries: 5
       start_period: 15s
 
-# Networks section
 networks:
   app-network:
     driver: bridge
 
-# Volumes section
 volumes:
   postgres_data:
