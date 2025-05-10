@@ -267,6 +267,7 @@ class CardGameFramework {
   }
 
   // Debug method to finish game
+  // deno-lint-ignore require-await
   async debugFinishGame() {
     try {
       console.log('Manually finishing game for debugging');
@@ -367,7 +368,7 @@ class CardGameFramework {
     }, 5000);
   }
   
-  handleWebSocketOpen(event) {
+  handleWebSocketOpen(_event) {
     console.log('WebSocket connection established');
     
     // Make sure we load the currentGameId from sessionStorage if not set
@@ -497,7 +498,7 @@ class CardGameFramework {
     }
   }
   
-  handlePageUnload(event) {
+  handlePageUnload(_event) {
     // Check if this is intentional navigation between our pages
     if (sessionStorage.getItem('intentionalNavigation') === 'true' || 
         sessionStorage.getItem('wsWasOpen') === 'true') {
@@ -796,7 +797,7 @@ class CardGameFramework {
     this.showNotification('Game restarted! Enjoy!', 'success');
   }
 
-  handleRedirectToLobby(data) {
+  handleRedirectToLobby(_data) {
     console.log('Received redirect to lobby message from server');
     
     // Only redirect if not already navigating
@@ -1035,7 +1036,7 @@ class CardGameFramework {
     }, 500);
   }
   
-  handleDrawCardAction(playerId, username) {
+  handleDrawCardAction(_playerId, username) {
     console.log(`Player ${username} drew a card`);
     
     // Show notification only
@@ -1243,7 +1244,7 @@ class CardGameFramework {
   }
 
   // Animation helper for subclasses to override
-  animateCardToPosition(animatedCard, card, specialEffect, isOpponent) {
+  animateCardToPosition(animatedCard, _card, specialEffect, _isOpponent) {
     // Default implementation for generic card animation
     setTimeout(() => {
       // Default animation to center
@@ -1262,7 +1263,7 @@ class CardGameFramework {
   }
 
   // Generic placeholder for updateCardSlot - to be implemented by subclasses
-  updateCardSlot(playerId, card) {
+  updateCardSlot(_playerId, _card) {
     console.log('Base updateCardSlot - override in subclass');
     // Base class just logs the event - subclasses should override this
   }
@@ -1434,7 +1435,7 @@ class CardGameFramework {
     this.uiElements.messageInput.value = '';
   }
   
-  updateTablePlayers(players, currentUsername) {
+  updateTablePlayers(_players, _currentUsername) {
     // Implementation will vary by game type
     console.log('Updating table players UI');
   }
@@ -1829,7 +1830,7 @@ class CardGameFramework {
     }
     
     // Fallback based on viewport width for responsive sizing
-    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    const vw = Math.max(document.documentElement.clientWidth || 0, globalThis.innerWidth || 0);
     
     if (vw <= 480) { // Small screens
       return { width: '3.5rem', height: '5rem' };
