@@ -594,26 +594,52 @@ class CardGameFramework {
     console.log('Processing connected users update');
     const users = data.users;
     
-    // Store the players
-    this.players = users;
+    // Create a map of current players to track who's already in the game
+    const currentPlayersMap = {};
+    this.players.forEach(player => {
+      currentPlayersMap[player.username] = player;
+    });
+    
+    // Process the incoming user list
+    users.forEach(user => {
+      // If this is a player we already know about, update their connected status
+      if (currentPlayersMap[user.username]) {
+        // Update other properties but keep the ID
+        Object.assign(currentPlayersMap[user.username], user);
+      } else {
+        // This is a new player, add them to our map
+        currentPlayersMap[user.username] = user;
+      }
+    });
+    
+    // Check for players who were in our list but aren't in the new list - they disconnected
+    this.players.forEach(player => {
+      if (!users.some(u => u.username === player.username)) {
+        // This player is no longer in the server's list, mark as disconnected
+        currentPlayersMap[player.username].connected = false;
+      }
+    });
+    
+    // Convert map back to array
+    this.players = Object.values(currentPlayersMap);
     
     // Find this player in the players array and set currentPlayerId
     const currentPlayer = this.players.find(p => p.username === this.currentUsername);
     if (currentPlayer && currentPlayer.id) {
-        this.currentPlayerId = currentPlayer.id;
-        console.log(`Set current player ID to: ${this.currentPlayerId}`);
+      this.currentPlayerId = currentPlayer.id;
+      console.log(`Set current player ID to: ${this.currentPlayerId}`);
     }
     
     // Update the poker table players
-    this.updateTablePlayers(users, this.currentUsername);
+    this.updateTablePlayers(this.players, this.currentUsername);
     
     // Initialize player hands if not already done
     if (Object.keys(this.hands).length === 0 && this.gameState.phase === 'playing') {
-        this.initializeHands();
+      this.initializeHands();
     }
     
     // Update profiles container with connected users
-    this.updateProfilesContainer(users);
+    this.updateProfilesContainer(this.players);
   }
   
   handleGameState(data) {

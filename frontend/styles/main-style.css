@@ -1059,3 +1059,16 @@ body.phase-playing .card-stack {
     opacity: 0 !important;
   }
 }
+
+.player-seat.disconnected {
+  border: 2px dashed #aaa;
+  opacity: 0.8;
+}
+
+.player-seat.disconnected .player-avatar {
+  opacity: 0.5;
+}
+
+.player-seat.disconnected .player-name {
+  color: #aaa;
+}
