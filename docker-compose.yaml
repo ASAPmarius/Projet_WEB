@@ -12,7 +12,7 @@ services:
     environment:
       - DB_HOST=db  # Override DB_HOST to use the service name instead of localhost
       - ALLOW_ORIGIN=localhost:8080  # Make sure this is explicitly set
-    command: ["run", "--allow-net","--allow-ffi", "--allow-write", "--allow-env", "--allow-read", "--unstable-ffi", "--no-lock", "back_server.ts", "3000", "localhost:8080"]
+    command: ["run", "--allow-net","--allow-ffi", "--allow-write", "--allow-env", "--allow-read", "--unstable-ffi", "--no-lock", "back_server.ts"]
     depends_on:
       db:
         condition: service_healthy

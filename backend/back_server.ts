@@ -16,6 +16,7 @@ import { Client } from 'postgres';
 import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
 import { CardService } from "./card_service.ts";
 import { GameState, User, Connection, WebSocketMessage, ChatMessage, Card, Game , CardMetadata} from "./models.ts";
+import * as config from './config.ts';
 
 // Global error handler
 addEventListener("error", (event) => {
@@ -2794,41 +2795,43 @@ router.get('/test_cookie', authorizationMiddleware, (ctx) => {
   ctx.response.body = { message: 'Token verified successfully', token_data: ctx.state.tokenData };
 });
 
-// Vérification des arguments (port)
-if (Deno.args.length < 2) {
-  console.log(
-    `Usage: $ deno run --allow-net --allow-env backend/back_server.ts PORT ALLOW_ORIGIN [CERT_PATH KEY_PATH]`,
-  );
-  Deno.exit();
-}
-const PORT = parseInt(Deno.args[0]);
-const ALLOW_ORIGIN = Deno.args[1];
-
-const options: { port: number; hostname?: string; certFile?: string; keyFile?: string } = {
-  port: PORT,
-};
-
-if (Deno.args.length >= 4) {
-  options.certFile = Deno.args[2];
-  options.keyFile = Deno.args[3];
-  console.log(`SSL conf ready (use https)`);
-}
-
 // Add custom CORS middleware
 app.use(async (ctx, next) => {
   try {
     // Log the incoming request
     console.log(`${ctx.request.method} ${ctx.request.url.pathname} - Origin: ${ctx.request.headers.get("origin")}`);
     
-    // Add CORS headers manually
+    // Add CORS headers based on configuration
     const origin = ctx.request.headers.get("origin");
-    if (origin === "http://localhost:8080" || origin === `http://${ALLOW_ORIGIN}`) {
-      ctx.response.headers.set("Access-Control-Allow-Origin", origin);
-    } else {
-      // Default fallback - you might want to restrict this in production
-      ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
+    let allowOrigin = '';
+    
+    // Set the appropriate origin header based on the request origin
+    if (origin) {
+      for (const allowedOrigin of config.allowedOrigins) {
+        // Handle wildcard domains
+        if (allowedOrigin.includes('*')) {
+          const pattern = new RegExp(
+            '^' + allowedOrigin.replace('.', '\\.').replace('*', '.*') + '$'
+          );
+          if (pattern.test(origin)) {
+            allowOrigin = origin;
+            break;
+          }
+        } 
+        // Exact match
+        else if (origin === allowedOrigin) {
+          allowOrigin = origin;
+          break;
+        }
+      }
     }
     
+    // If no match was found, use the default frontend URL
+    if (!allowOrigin) {
+      allowOrigin = config.frontendUrl;
+    }
+    
+    ctx.response.headers.set("Access-Control-Allow-Origin", allowOrigin);
     ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
     ctx.response.headers.set("Access-Control-Allow-Methods", "GET,HEAD,PUT,POST,DELETE,PATCH,OPTIONS");
     ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
@@ -2849,7 +2852,7 @@ app.use(async (ctx, next) => {
 
 // Configure CORS options
 const corsOptions: CorsOptions = {
-  origin: [`http://${ALLOW_ORIGIN}`, 'http://localhost:8080'],
+  origin: config.allowedOrigins,
   credentials: true,
   allowMethods: ["GET", "POST", "PUT", "DELETE"],
   allowHeaders: ["Content-Type", "Authorization", "Accept"]
@@ -2877,9 +2880,26 @@ app.use(async (ctx, next) => {
 });
 
 console.log(
-  `Oak back server running on port ${options.port}, with CORS enabled for ${ALLOW_ORIGIN}`,
+  `Oak back server running on ${config.isProduction ? 'production' : 'development'} mode`,
+  `Backend URL: ${config.backendUrl}`,
+  `Allowed origins: ${config.allowedOrigins.join(', ')}`
 );
+
 app.use(router.routes());
 app.use(router.allowedMethods());
+
+// Use configuration from config.ts instead of command-line arguments
+const PORT = config.isProduction ? Number(Deno.env.get('PORT')) : 3000;
+
+const options: { port: number; hostname?: string; certFile?: string; keyFile?: string } = {
+  port: PORT,
+};
+
+// Check for SSL config from environment variables
+if (config.isProduction && Deno.env.get('SSL_CERT') && Deno.env.get('SSL_KEY')) {
+  options.certFile = Deno.env.get('SSL_CERT');
+  options.keyFile = Deno.env.get('SSL_KEY');
+  console.log(`SSL configuration loaded from environment variables`);
+}
 
 await app.listen(options);
