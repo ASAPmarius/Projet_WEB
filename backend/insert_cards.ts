@@ -1,5 +1,5 @@
 import { Client } from "postgres";
-import { readAll } from "https://deno.land/std@0.224.0/io/read_all.ts";
+import { convertImageToBytes } from "./convertIMG.ts";
 
 function getEnv(key: string): string {
   const val = Deno.env.get(key);
@@ -25,19 +25,6 @@ async function cardsExist(): Promise<boolean> {
   const count = result.rows[0].count;
   console.log(`Found ${count} cards in database`);
   return count > 0;
-}
-
-// Function to read an image file as a Uint8Array
-async function readImageAsBytes(path: string): Promise<Uint8Array> {
-  try {
-    const file = await Deno.open(path, { read: true });
-    const buffer = await readAll(file);
-    file.close();
-    return buffer;
-  } catch (error) {
-    console.error(`Error reading file ${path}:`, (error as Error).message);
-    throw error;
-  }
 }
 
 async function insertCards() {
@@ -66,7 +53,8 @@ async function insertCards() {
         const path = `/app/cards_images/${id}.png`;
         try {
           console.log(`Reading image ${path}`);
-          const imageBytes = await readImageAsBytes(path);
+          // Use convertImageToBytes from convertIMG.ts instead of readImageAsBytes
+          const imageBytes = await convertImageToBytes(path);
           
           // Insert into the Cards table (card types)
           await client.queryObject(
@@ -86,7 +74,8 @@ async function insertCards() {
     for (const name of specialCards) {
       const path = `/app/cards_images/${name}.png`;
       try {
-        const imageBytes = await readImageAsBytes(path);
+        // Use convertImageToBytes from convertIMG.ts
+        const imageBytes = await convertImageToBytes(path);
         await client.queryObject(
           'INSERT INTO "Cards" ("idCardType", "Picture") VALUES ($1, $2)',
           [cardId, imageBytes],
