@@ -1,14 +1,27 @@
-// auth-check.js - Include this script at the top of games.html and index.html
-
-// Check authentication status immediately when page loads
+// Wait for appConfig to be available before checking auth
 (function() {
-  checkAuthAndRedirect();
-  
-  // Register beforeunload event to handle page navigation
-  globalThis.addEventListener('beforeunload', handleAuthBeforeUnload);
+  // Check if appConfig exists, if not, wait for it
+  if (typeof appConfig === 'undefined') {
+    // Wait for DOM content to be loaded, which ensures all scripts are executed
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof appConfig !== 'undefined') {
+        initAuth();
+      } else {
+        console.error('appConfig is not defined, auth checks will not run');
+      }
+    });
+  } else {
+    // appConfig is already available, proceed immediately
+    initAuth();
+  }
+
+  function initAuth() {
+    checkAuthAndRedirect();
+    globalThis.addEventListener('beforeunload', handleAuthBeforeUnload);
+  }
 })();
 
-function handleAuthBeforeUnload(event) {
+function handleAuthBeforeUnload(_event) {
   // Check if this is intentional navigation within our app
   if (sessionStorage.getItem('intentionalNavigation') === 'true' || 
       sessionStorage.getItem('wsWasOpen') === 'true') {
