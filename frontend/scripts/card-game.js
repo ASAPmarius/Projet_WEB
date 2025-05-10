@@ -1733,6 +1733,19 @@ class CardGameFramework {
       return;
     }
     
+    // Check if this is a war game and enforce the 2-player requirement
+    if (this.constructor.name === 'WarGame') {
+      console.log('War game detected, checking player count');
+      if (this.players.length !== 2) {
+        this.showErrorNotification('War game requires exactly 2 players to start');
+        return;
+      }
+    } else if (this.players.length < 2) {
+      // For other game types, just check minimum player count
+      this.showErrorNotification('Game requires at least 2 players to start');
+      return;
+    }
+    
     // Show loading state
     const startBtn = document.getElementById('startGameBtn');
     if (startBtn) {
