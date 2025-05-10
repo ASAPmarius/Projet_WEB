@@ -350,6 +350,13 @@ class WarGame extends CardGameFramework {
           this.createPlayerCardStacks();
         }
       }
+      
+      // NEW CODE: Update player UI with current hands data
+      // This ensures mini cards are displayed once hands data is available
+      if (this.players && this.players.length >= 2 && Object.keys(this.hands).length > 0) {
+        console.log('Hands data received, updating player UI with mini cards');
+        this.updateTablePlayersWar(this.players, this.currentUsername);
+      }
     }
     
     // Always update card stacks if they exist
