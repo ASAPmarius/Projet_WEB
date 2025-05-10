@@ -39,7 +39,7 @@ async function loadProfileData() {
         sessionStorage.removeItem('profileToView');
         
         // Make request to backend
-        const response = await fetch('http://localhost:3000/user-profile', {
+        const response = await fetch(appConfig.apiEndpoint('/user-profile'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -142,7 +142,7 @@ async function saveProfileChanges() {
         };
         
         // Make request to backend
-        const response = await fetch('http://localhost:3000/update-profile', {
+        const response = await fetch(appConfig.apiEndpoint('/update-profile'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

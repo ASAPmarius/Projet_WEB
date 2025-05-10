@@ -24,7 +24,7 @@ function login() {
   
   console.log('Sending login request to server');
   
-  fetch('http://localhost:3000/login', {
+  fetch(appConfig.apiEndpoint('/login'), {
     method: 'POST',
     mode: 'cors',
     credentials: 'include',
@@ -70,6 +70,7 @@ if (password) {
 }
 
 // Function to redirect to account creation page
+// deno-lint-ignore no-unused-vars
 function create_account_page() {
   globalThis.location.href = 'create_acount.html';
 }

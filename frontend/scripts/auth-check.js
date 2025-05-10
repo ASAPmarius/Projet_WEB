@@ -25,7 +25,7 @@ function handleAuthBeforeUnload(event) {
       const authToken = localStorage.getItem('auth_token');
       if (authToken) {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:3000/disconnect-from-game', false); // false for synchronous
+        xhr.open('POST', appConfig.apiEndpoint('/disconnect-from-game'), false); // false for synchronous
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
         xhr.withCredentials = true;
@@ -65,7 +65,7 @@ function verifyTokenWithServer(token) {
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), 5000); // 5 second timeout
   
-  fetch('http://localhost:3000/test_cookie', {
+  fetch(appConfig.apiEndpoint('/test_cookie'), {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -148,7 +148,7 @@ function checkActiveGame() {
   console.log('Checking for active game on server...');
   
   // Try both header and cookie authentication
-  fetch('http://localhost:3000/active-game', {
+  fetch(appConfig.apiEndpoint('/active-game'), {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

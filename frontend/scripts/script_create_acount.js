@@ -75,7 +75,7 @@ async function createAccount() {
   // and the server will use the default
 
   // Proceed with account creation
-  fetch('http://localhost:3000/create_account', {
+  fetch(appConfig.apiEndpoint('/create_account'), {
     method: 'POST',
     mode: 'cors',
     credentials: 'include',
@@ -95,7 +95,7 @@ async function createAccount() {
     })
     .then(data => {
       alert('Account created successfully!');
-      window.location.href = '../login.html';
+      globalThis.location.href = '../login.html';
     })
     .catch(error => {
       errorMessage.textContent = error.message;

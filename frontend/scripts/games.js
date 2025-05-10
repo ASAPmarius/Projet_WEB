@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
             userStatus.textContent = 'Checking your game status...';
             
             // Instead of relying just on sessionStorage, check with the server
-            const response = await fetch('http://localhost:3000/active-game', {
+            const response = await fetch(appConfig.apiEndpoint('/active-game'), {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to load all active games
     async function loadGames() {
         try {
-            const response = await fetch('http://localhost:3000/games', {
+            const response = await fetch(appConfig.apiEndpoint('/games'), {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function createNewGame() {
         try {
             // Call the server to create a new game
-            const response = await fetch('http://localhost:3000/create-game', {
+            const response = await fetch(appConfig.apiEndpoint('/create-game'), {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Join the game
-            const response = await fetch('http://localhost:3000/join-game', {
+            const response = await fetch(appConfig.apiEndpoint('/join-game'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -346,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Check with server first if the game is still active
         try {
-            const response = await fetch('http://localhost:3000/active-game', {
+            const response = await fetch(appConfig.apiEndpoint('/active-game'), {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

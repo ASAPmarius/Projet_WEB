@@ -143,8 +143,7 @@ class CardGameFramework {
   async loadCardResources() {
     try {
       console.log('Loading card resources');
-      const response = await fetch('http://localhost:3000/api/cards');
-      
+      const response = await fetch(appConfig.apiEndpoint('/api/cards'));      
       if (!response.ok) {
         throw new Error(`Failed to load cards: ${response.status}`);
       }
@@ -193,7 +192,7 @@ class CardGameFramework {
   // Check if user has an active game
   async checkActiveGame() {
     try {
-      const response = await fetch('http://localhost:3000/active-game', {
+      const response = await fetch(appConfig.apiEndpoint('/active-game'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -285,7 +284,7 @@ class CardGameFramework {
       this.showGameResults(winnerId, winnerName);
       
       // Notify server (optional)
-      fetch('http://localhost:3000/finish-game', {
+      fetch(appConfig.apiEndpoint('/finish-game'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -309,8 +308,12 @@ class CardGameFramework {
       console.log('Attempting to connect WebSocket...');
       // Add the auth token to the URL for authentication
       const authToken = localStorage.getItem('auth_token');
-      // Use explicit protocol and full URL with token as query parameter
-      this.websocket = new WebSocket(`ws://localhost:3000/?token=${encodeURIComponent(authToken)}`);
+      
+      // Use the config for WebSocket URL
+      const wsUrl = `${appConfig.websocketUrl}/?token=${encodeURIComponent(authToken)}`;
+      console.log(`Connecting to WebSocket: ${wsUrl}`);
+      
+      this.websocket = new WebSocket(wsUrl);
       
       // Add unbound functions with proper error handling
       this.websocket.onopen = (event) => {
@@ -337,9 +340,10 @@ class CardGameFramework {
     } catch (error) {
       console.error('Error initializing WebSocket:', error);
     }
-
+  
     this.startWebSocketStatusChecks();
   }
+  
 
   // Check WebSocket status periodically
   startWebSocketStatusChecks() {
@@ -520,9 +524,8 @@ class CardGameFramework {
     
     // Use navigator.sendBeacon for more reliable disconnection
     if (navigator.sendBeacon) {
-      navigator.sendBeacon(
-        `http://localhost:3000/disconnect-from-game?auth_token=${encodeURIComponent(authToken)}`
-      );
+      const disconnectUrl = appConfig.apiEndpoint(`/disconnect-from-game?auth_token=${encodeURIComponent(authToken)}`);
+      navigator.sendBeacon(disconnectUrl);
     }
   }
   
@@ -1601,7 +1604,7 @@ class CardGameFramework {
       this.showNotification('Restarting game...', 'info');
       
       // Call the backend to restart the game
-      const response = await fetch('http://localhost:3000/restart-game', {
+      const response = await fetch(appConfig.apiEndpoint('/restart-game'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1750,7 +1753,7 @@ class CardGameFramework {
     }
     
     // Call the backend API directly
-    fetch('http://localhost:3000/start-game', {
+    fetch(appConfig.apiEndpoint('/start-game'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
