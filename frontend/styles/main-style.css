@@ -1072,3 +1072,54 @@ body.phase-playing .card-stack {
 .player-seat.disconnected .player-name {
   color: #aaa;
 }
+
+/* Enhanced styling for disconnected player seats */
+.player-seat.disconnected {
+  border: 2px dashed #aaa;
+  box-shadow: none;
+  opacity: 0.8;
+  background-color: rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+/* Add a "disconnected" label */
+.player-seat.disconnected::after {
+  content: "Disconnected";
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  font-size: 0.7rem;
+  color: #ff6b6b;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-style: italic;
+}
+
+/* Fade the avatar */
+.player-seat.disconnected .player-avatar {
+  opacity: 0.5;
+  filter: grayscale(70%);
+  border-color: #aaa;
+}
+
+/* Change text color */
+.player-seat.disconnected .player-name {
+  color: #aaa;
+}
+
+/* Add a crossed line through the player's card count */
+.player-seat.disconnected .player-cards {
+  position: relative;
+  opacity: 0.6;
+}
+
+.player-seat.disconnected .card-mini {
+  border-color: #777;
+  background-color: #555;
+}
+
+/* Style the player info section */
+.player-seat.disconnected .player-info {
+  opacity: 0.8;
+}

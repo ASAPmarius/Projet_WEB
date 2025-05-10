@@ -601,7 +601,7 @@ class WarGame extends CardGameFramework {
       console.warn('Poker table not initialized');
       return;
     }
-    
+  
     // Remove existing seats
     const existingSeats = document.querySelectorAll('.player-seat');
     existingSeats.forEach(seat => seat.remove());
@@ -625,9 +625,14 @@ class WarGame extends CardGameFramework {
         seat.classList.add('current-player');
       }
       
-      // Apply active player class if needed, without using skipNextHighlightUpdate
+      // Apply active player class if needed
       if (this.gameState && Number(this.gameState.currentTurn) === Number(player.id)) {
         seat.classList.add('active-player');
+      }
+      
+      // Add this check for the connected status
+      if (player.connected === false) {
+        seat.classList.add('disconnected');
       }
       
       const playerInfo = document.createElement('div');
