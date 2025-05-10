@@ -477,8 +477,9 @@ class WarGame extends CardGameFramework {
     player2Slot.id = 'player2Slot';
     
     const resultIndicator = document.createElement('div');
-    resultIndicator.className = 'war-result-indicator';
+    resultIndicator.className = 'war-result-indicator'; // Initially without show class
     resultIndicator.id = 'warResult';
+    resultIndicator.textContent = ''; // Start with empty text
     
     battleArea.appendChild(player1Slot);
     battleArea.appendChild(vsIndicator);
@@ -759,7 +760,12 @@ class WarGame extends CardGameFramework {
     const resultIndicator = document.getElementById('warResult');
     if (resultIndicator) {
       resultIndicator.textContent = 'WAR!';
-      resultIndicator.className = 'war-result-indicator war';
+      resultIndicator.className = 'war-result-indicator war show'; // Add 'show' class
+      
+      // Add timeout to hide the result after 3 seconds
+      setTimeout(() => {
+        resultIndicator.classList.remove('show');
+      }, 3000);
     }
   }
 
@@ -782,10 +788,15 @@ class WarGame extends CardGameFramework {
     
     // Get result indicator
     const resultIndicator = document.getElementById('warResult');
-    if (resultIndicator) {
-      resultIndicator.textContent = `${data.winnerName} wins the round!`;
-      resultIndicator.className = 'war-result-indicator winner';
-    }
+  if (resultIndicator) {
+    resultIndicator.textContent = `${data.winnerName} wins the round!`;
+    resultIndicator.className = 'war-result-indicator winner show'; // Add 'show' class
+    
+    // Add timeout to hide the result after 3 seconds
+    setTimeout(() => {
+      resultIndicator.classList.remove('show');
+    }, 3000);
+  }
     
     // Update game state from server data
     this.gameState.round = data.newRound;
