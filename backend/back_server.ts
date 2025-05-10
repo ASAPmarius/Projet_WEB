@@ -10,7 +10,6 @@ for (const [key, value] of Object.entries(env)) {
 
 import { Application, Context, Router } from 'oak';
 import { cors, type CorsOptions } from 'cors';
-import * as bcrypt from 'bcrypt';
 import { create, verify } from 'djwt';
 import { Client } from 'postgres';
 import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
@@ -222,7 +221,95 @@ const checkIfAlreadyConnected = async (ctx: Context, next: () => Promise<unknown
 };
 
 async function get_hash(password: string): Promise<string> {
-  return await bcrypt.hash(password);
+  // Convert password to bytes
+  const encoder = new TextEncoder();
+  const passwordBytes = encoder.encode(password);
+  
+  // Generate random salt (16 bytes)
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  
+  // Hash the password using PBKDF2
+  const key = await crypto.subtle.importKey(
+    "raw", 
+    passwordBytes,
+    { name: "PBKDF2" },
+    false, 
+    ["deriveBits"]
+  );
+  
+  const hash = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 210000, // High iteration count for security
+      hash: "SHA-256"
+    },
+    key,
+    256 // Output 256 bits (32 bytes)
+  );
+  
+  // Convert to Base64 for storage
+  const hashArray = Array.from(new Uint8Array(hash));
+  const saltArray = Array.from(salt);
+  const hashBase64 = btoa(String.fromCharCode(...hashArray));
+  const saltBase64 = btoa(String.fromCharCode(...saltArray));
+  
+  // Format as salt:hash
+  return `${saltBase64}:${hashBase64}`;
+}
+
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  // Split stored hash into salt and hash
+  const [saltBase64, hashBase64] = storedHash.split(':');
+  
+  if (!saltBase64 || !hashBase64) {
+    console.error("Invalid stored hash format");
+    return false;
+  }
+  
+  try {
+    // Convert salt from Base64
+    const saltString = atob(saltBase64);
+    const salt = new Uint8Array(saltString.length);
+    for (let i = 0; i < saltString.length; i++) {
+      salt[i] = saltString.charCodeAt(i);
+    }
+    
+    // Convert password to bytes
+    const encoder = new TextEncoder();
+    const passwordBytes = encoder.encode(password);
+    
+    // Import password for PBKDF2
+    const key = await crypto.subtle.importKey(
+      "raw", 
+      passwordBytes,
+      { name: "PBKDF2" },
+      false, 
+      ["deriveBits"]
+    );
+    
+    // Hash with same parameters
+    const newHash = await crypto.subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: 210000,
+        hash: "SHA-256"
+      },
+      key,
+      256
+    );
+    
+    // Convert to Base64 for comparison
+    const newHashArray = Array.from(new Uint8Array(newHash));
+    const newHashBase64 = btoa(String.fromCharCode(...newHashArray));
+    
+    // Compare hashes
+    return newHashBase64 === hashBase64;
+  } catch (error) {
+    console.error("Error verifying password:", error);
+    return false;
+  }
 }
 
 async function getUserById(userId: number): Promise<User | null> {
@@ -1683,8 +1770,7 @@ router.post('/login', checkIfAlreadyConnected, async (ctx) => {
     return;
   }
 
-  const result = await bcrypt.verify(password, user.Password);
-  if (!result) {
+  const result = await verifyPassword(password, user.Password);  if (!result) {
     ctx.response.status = 401;
     ctx.response.body = { error: 'Invalid username or password' };
     console.log('Invalid username or password');
