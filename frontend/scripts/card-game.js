@@ -1164,10 +1164,6 @@ class CardGameFramework {
     animatedCard.style.transition = 'all 0.5s ease';
     animatedCard.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
     
-    if (specialEffect) {
-      animatedCard.classList.add('war-effect');
-    }
-    
     // Add card image
     const cardImage = document.createElement('img');
     cardImage.src = card.picture;

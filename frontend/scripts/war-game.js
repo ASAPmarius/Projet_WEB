@@ -52,43 +52,30 @@ class WarGame extends CardGameFramework {
   }
   
   // Override the animateCardToPosition method for War-specific card animations
-  animateCardToPosition(animatedCard, card, isWarCard, isOpponent) {
+  animateCardToPosition(animatedCard, card, _isWarCard, isOpponent) {
     setTimeout(() => {
-      if (isWarCard) {
-        // War cards go to center with special effect
-        animatedCard.style.transform = 'translate(-50%, 0) scale(1.2)';
-        animatedCard.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
-        
-        // Position in middle
-        if (isOpponent) {
-          animatedCard.style.top = 'calc(50% - 90px)';
+      // Use the same animation logic for all cards, regardless of war status
+      if (isOpponent) {
+        // Opponent's card destination - player1 slot
+        const slot = document.getElementById('player1Slot');
+        if (slot) {
+          const rect = slot.getBoundingClientRect();
+          animatedCard.style.top = `${rect.top}px`;
+          animatedCard.style.left = `${rect.left + rect.width/2}px`;
         } else {
-          animatedCard.style.bottom = 'calc(50% - 90px)';
+          // Fallback if slot not found
+          animatedCard.style.top = 'calc(50% - 150px)';
         }
       } else {
-        // Normal cards go to their appropriate slots
-        if (isOpponent) {
-          // Opponent's card destination - player1 slot
-          const slot = document.getElementById('player1Slot');
-          if (slot) {
-            const rect = slot.getBoundingClientRect();
-            animatedCard.style.top = `${rect.top}px`;
-            animatedCard.style.left = `${rect.left + rect.width/2}px`;
-          } else {
-            // Fallback if slot not found
-            animatedCard.style.top = 'calc(50% - 150px)';
-          }
+        // Player's card destination - player2 slot
+        const slot = document.getElementById('player2Slot');
+        if (slot) {
+          const rect = slot.getBoundingClientRect();
+          animatedCard.style.bottom = `${globalThis.innerHeight - rect.bottom}px`;
+          animatedCard.style.left = `${rect.left + rect.width/2}px`;
         } else {
-          // Player's card destination - player2 slot
-          const slot = document.getElementById('player2Slot');
-          if (slot) {
-            const rect = slot.getBoundingClientRect();
-            animatedCard.style.bottom = `${globalThis.innerHeight - rect.bottom}px`;
-            animatedCard.style.left = `${rect.left + rect.width/2}px`;
-          } else {
-            // Fallback if slot not found
-            animatedCard.style.bottom = 'calc(50% - 150px)';
-          }
+          // Fallback if slot not found
+          animatedCard.style.bottom = 'calc(50% - 150px)';
         }
       }
       
@@ -108,7 +95,7 @@ class WarGame extends CardGameFramework {
         
         // Remove the animated element
         animatedCard.remove();
-      }, isWarCard ? 800 : 500);
+      }, 500); // Use consistent timing for all cards
     }, 10);
   }
   
@@ -140,7 +127,7 @@ class WarGame extends CardGameFramework {
     
     // Animate the card play with more dramatic effect for war
     const isOpponent = String(playerId) !== String(this.currentPlayerId);
-    this.animateCardPlay(card, true, isOpponent); // Pass true to indicate war card
+    this.animateCardPlay(card, false, isOpponent); // Pass true to indicate war card
     
     // Show notification
     this.showNotification(`${username} played a war card!`, 'war-card');

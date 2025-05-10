@@ -571,12 +571,6 @@
   opacity: 0.9;
 }
 
-/* War effect */
-.animated-card.war-effect {
-  z-index: 2100 !important; /* Even higher for war effects */
-  box-shadow: 0 0 20px rgba(255, 0, 0, 0.5) !important;
-}
-
 .war-card-stack .stack-card-count {
   display: none;
 }
