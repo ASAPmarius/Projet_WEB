@@ -30,7 +30,10 @@ export const frontendUrl = isProduction
 
 // For CORS configuration - allowable origins
 export const allowedOrigins = isProduction 
-  ? [frontendUrl, 'https://*.herokuapp.com'] 
+  ? [
+      frontendUrl, 
+      `https://caracaca-frontend-app-a3a330139af1.herokuapp.com/`
+    ] 
   : [`http://${host}:${frontendPort}`, `http://localhost:${frontendPort}`];
 
 // For WebSocket connection URLs

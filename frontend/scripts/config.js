@@ -22,8 +22,8 @@ const config = (function() {
   // In production, the backend might be at the same domain but different path,
   // or it could be a completely different domain based on your deployment
   const backendUrl = isProduction 
-    ? `${protocol}://${domain}${backendPort ? ':' + backendPort : ''}/api` // Adjust this based on your setup
-    : `http://localhost:3000`; // Local development
+    ? (globalThis.BACKEND_URL || `https://caracaca-backend-app-50a2aebeae3d.herokuapp.com/`)
+    : `http://localhost:3000`;
   
   // WebSocket URL
   const websocketUrl = isProduction 
