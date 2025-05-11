@@ -59,20 +59,6 @@ services:
     # Note: Frontend security is handled in the Dockerfile with:
     # RUN deno compile --allow-net --allow-read=./frontend --output app server.ts 8080
 
-  nginx:
-    image: nginx:latest
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - ./proxy/conf.d:/etc/nginx/conf.d
-      - ./proxy/ngnix.conf:/etc/nginx/nginx.conf
-    depends_on:
-      - backend
-      - frontend
-    networks:
-      - app-network
-
   # Database service with health check
   db:
     image: postgres:14
