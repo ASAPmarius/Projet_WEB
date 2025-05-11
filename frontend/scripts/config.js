@@ -27,7 +27,7 @@ const config = (function() {
   
   // WebSocket URL
   const websocketUrl = isProduction 
-    ? `${wsProtocol}://${domain}${backendPort ? ':' + backendPort : ''}/ws` // Adjust path as needed
+    ? `${wsProtocol}://${domain}${backendPort ? ':' + backendPort : ''}`
     : `ws://localhost:3000`;
   
   console.log('Frontend Config:', {

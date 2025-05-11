@@ -310,7 +310,7 @@ class CardGameFramework {
       const authToken = localStorage.getItem('auth_token');
       
       // Use the config for WebSocket URL
-      const wsUrl = `${appConfig.websocketUrl}/?token=${encodeURIComponent(authToken)}`;
+      const wsUrl = `${appConfig.websocketUrl}/ws?token=${encodeURIComponent(authToken)}`;
       console.log(`Connecting to WebSocket: ${wsUrl}`);
       
       this.websocket = new WebSocket(wsUrl);

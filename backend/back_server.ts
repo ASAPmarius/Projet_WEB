@@ -37,13 +37,7 @@ function getEnv(key: string): string {
 const router = new Router();
 const app = new Application();
 
-const client = new Client({
-  user: getEnv('DB_USER'),
-  password: getEnv('DB_PASSWORD'),
-  database: getEnv('DB_NAME'),
-  hostname: getEnv('DB_HOST'),
-  port: Number(getEnv('DB_PORT')),
-});
+const client = new Client(getDatabaseConfig());
 
 try {
   await client.connect();
@@ -57,6 +51,45 @@ const cardService = new CardService(client);
 
 
 let defaultProfilePictureCache: Uint8Array | null = null;
+
+function getDatabaseConfig() {
+  const databaseUrl = Deno.env.get('DATABASE_URL');
+  
+  if (databaseUrl) {
+    try {
+      // Parse DATABASE_URL for Heroku
+      const regex = /postgres:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/;
+      const match = databaseUrl.match(regex);
+      
+      if (match) {
+        const [, user, password, host, port, database] = match;
+        console.log("Using Heroku Postgres configuration");
+        return {
+          user,
+          password,
+          database,
+          hostname: host,
+          port: Number(port),
+          ssl: { rejectUnauthorized: false }, // Required for Heroku Postgres
+        };
+      } else {
+        console.error("DATABASE_URL format not recognized");
+      }
+    } catch (error) {
+      console.error("Error parsing DATABASE_URL:", error);
+    }
+  }
+  
+  // Fallback to individual config vars
+  console.log("Using standard database configuration");
+  return {
+    user: getEnv('DB_USER'),
+    password: getEnv('DB_PASSWORD'),
+    database: getEnv('DB_NAME'),
+    hostname: getEnv('DB_HOST'),
+    port: Number(getEnv('DB_PORT')),
+  };
+}
 
 async function initDefaultProfilePicture(): Promise<void> {
   try {
@@ -2672,7 +2705,7 @@ interface TokenPayload {
   [key: string]: unknown;
 }
 
-router.get("/", async (ctx) => {
+router.get("/ws", async (ctx) => {
   if (!ctx.isUpgradable) {
     ctx.throw(501);
   }
@@ -2682,7 +2715,8 @@ router.get("/", async (ctx) => {
     const cookie = ctx.request.headers.get('cookie');
     const authToken = cookie?.split('; ').find((row) => row.startsWith('auth_token='))?.split('=')[1];
     const headerToken = ctx.request.headers.get('Authorization')?.replace('Bearer ', '');
-    const tokenToUse = authToken || headerToken;
+    const tokenParam = ctx.request.url.searchParams.get('token');
+    const tokenToUse = tokenParam || authToken || headerToken;
     
     if (!tokenToUse) {
       ctx.throw(401, "Unauthorized: Missing authentication token");
