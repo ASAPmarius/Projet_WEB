@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any require-await
-import { loadSync } from 'dotenv';
+import { loadSync } from "jsr:@std/dotenv@0.225.3";
 console.log('About to load .env file');
 const env = loadSync();
 console.log('Loaded .env file:');
@@ -9,7 +9,8 @@ for (const [key, value] of Object.entries(env)) {
 }
 
 import { Application, Context, Router } from 'https://deno.land/x/oak@v12.6.1/mod.ts';
-import { oakCors, type CorsOptions } from "https://deno.land/x/cors@v1.2.2/mod.ts";import { create, verify } from 'https://deno.land/x/djwt@v2.9.1/mod.ts'; // Adjust version as needed
+import { oakCors, type CorsOptions } from "https://deno.land/x/cors@v1.2.2/mod.ts";
+import { create, verify } from 'https://deno.land/x/djwt@v2.9.1/mod.ts'; // Adjust version as needed
 import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
 import { CardService } from "./card_service.ts";
