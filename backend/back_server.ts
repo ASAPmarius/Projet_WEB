@@ -11,7 +11,7 @@ for (const [key, value] of Object.entries(env)) {
 import { Application, Context, Router } from 'oak';
 import { cors, type CorsOptions } from 'cors';
 import { create, verify } from 'djwt';
-import { Client } from 'postgres';
+import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
 import { CardService } from "./card_service.ts";
 import { GameState, User, Connection, WebSocketMessage, ChatMessage, Card, Game , CardMetadata} from "./models.ts";
