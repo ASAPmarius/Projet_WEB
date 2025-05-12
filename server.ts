@@ -1,4 +1,4 @@
-import { Application, Router, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { Application, send } from "https://deno.land/x/oak@v12.6.1/mod.ts";
 
 const app = new Application();
 // Update the ROOT to point to the frontend directory

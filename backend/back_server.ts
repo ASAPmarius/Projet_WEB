@@ -8,9 +8,8 @@ for (const [key, value] of Object.entries(env)) {
   Deno.env.set(key, value); //this line is crucial
 }
 
-import { Application, Context, Router } from 'oak';
-import { cors, type CorsOptions } from 'cors';
-import { create, verify } from 'djwt';
+import { Application, Context, Router } from 'https://deno.land/x/oak@v12.6.1/mod.ts';
+import { oakCors, type CorsOptions } from "https://deno.land/x/cors@v1.2.2/mod.ts";import { create, verify } from 'https://deno.land/x/djwt@v2.9.1/mod.ts'; // Adjust version as needed
 import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { base64ToBytes, bytesToDataURL, convertImageToBytes } from './convertIMG.ts';
 import { CardService } from "./card_service.ts";
@@ -242,7 +241,7 @@ const authorizationMiddleware = async (ctx: Context, next: () => Promise<unknown
 
 // Middleware to check if the user is already connected
 const checkIfAlreadyConnected = async (ctx: Context, next: () => Promise<unknown>) => {
-  const body = await ctx.request.body.json();
+  const body = await ctx.request.body({ type: "json" }).value;
   const { username } = body;
 
   const isConnected = connections.some((conn) => conn.username === username);
@@ -1795,7 +1794,7 @@ router.post('/login', checkIfAlreadyConnected, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
-  const body = await ctx.request.body.json();
+  const body = await ctx.request.body({ type: "json" }).value;
   const { username, password } = body;
   
   const user = await getUserByUsername(username);
@@ -1843,7 +1842,7 @@ router.post('/create_account', async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
-  const body = await ctx.request.body.json();
+  const body = await ctx.request.body({ type: "json" }).value;
   const { username, password, profilePicture, bio, favoriteSong } = body;
 
   console.log("Creating account for user:", username);
@@ -1908,7 +1907,7 @@ router.post("/create-game", authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
   try {
-    const body = await ctx.request.body.json();
+    const body = await ctx.request.body({ type: "json" }).value;
     const gameType = body.gameType || "war"; // Default to war game if not specified
     
     const userId = ctx.state.tokenData.userId;
@@ -2018,7 +2017,7 @@ router.post('/finish-game', authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Origin", "http://localhost:8080");
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
-  const body = await ctx.request.body.json();
+  const body = await ctx.request.body({ type: "json" }).value;
   const { gameId } = body;
   
   if (!gameId) {
@@ -2216,7 +2215,7 @@ router.post('/join-game', async (ctx) => {
       return;
     }
     
-    const body = await ctx.request.body.json();
+    const body = await ctx.request.body({ type: "json" }).value;
     
     // Explicitly convert gameId to number with proper type checking
     let gameId: number;
@@ -2268,7 +2267,7 @@ router.post('/start-game', authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
   try {
-    const body = await ctx.request.body.json();
+    const body = await ctx.request.body({ type: "json" }).value;
     const { gameId } = body;
     
     if (!gameId) {
@@ -2326,7 +2325,7 @@ router.post('/restart-game', authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
   try {
-    const body = await ctx.request.body.json();
+    const body = await ctx.request.body({ type: "json" }).value;
     const { gameId } = body;
     
     if (!gameId) {
@@ -2552,7 +2551,7 @@ router.post('/user-profile', authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
   try {
-    const body = await ctx.request.body.json();
+    const body = await ctx.request.body({ type: "json" }).value;
     const { username } = body;
     
     if (!username) {
@@ -2601,7 +2600,7 @@ router.post('/update-profile', authorizationMiddleware, async (ctx) => {
   ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
   
   try {
-    const body = await ctx.request.body.json();
+    const body = await ctx.request.body({ type: "json" }).value;
     const { username, bio, favoriteSong, profilePicture } = body;
     
     // Get current user ID from token
@@ -2975,10 +2974,10 @@ app.use(async (ctx, next) => {
 
 // Configure CORS options
 const corsOptions: CorsOptions = {
-  origin: config.allowedOrigins,
-  credentials: true,
-  allowMethods: ["GET", "POST", "PUT", "DELETE"],
-  allowHeaders: ["Content-Type", "Authorization", "Accept"]
+  origin: config.allowedOrigins, // This property name is usually the same
+  credentials: true,             // This property name is usually the same
+  methods: ["GET", "POST", "PUT", "DELETE"],  // Changed from allowMethods
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"]  // Changed from allowHeaders
 };
 
 // Apply the cors middleware
