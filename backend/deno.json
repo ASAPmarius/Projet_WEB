@@ -4,7 +4,7 @@
     "cors": "jsr:@momiji/cors",
     "bcrypt": "jsr:@felix/bcrypt",
     "djwt": "jsr:@zaubrik/djwt",
-    "postgres": "jsr:@dewars/postgres@0.20.0",
+    "postgres": "https://deno.land/x/postgres@v0.17.0/mod.ts",
     "dotenv/load": "jsr:@std/dotenv/load",
     "dotenv": "jsr:@std/dotenv@0.225.3"
 
