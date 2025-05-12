@@ -2,7 +2,7 @@
 // card_service.ts - Optimized Card handling service
 
 import { Card } from "./models.ts";
-import { Client } from "postgres";
+import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { bytesToDataURL } from "./convertIMG.ts";
 
 export class CardService {

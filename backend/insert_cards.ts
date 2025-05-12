@@ -1,4 +1,4 @@
-import { Client } from "postgres";
+import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { convertImageToBytes } from "./convertIMG.ts";
 
 function getEnv(key: string): string {
