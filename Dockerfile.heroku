@@ -1,9 +1,17 @@
-FROM denoland/deno:2.2.9
+FROM denoland/deno:1.41.0
 
 WORKDIR /app
-COPY frontend/ ./frontend/
-COPY server.ts .
-RUN deno cache server.ts
-RUN deno compile --allow-net --allow-read=./frontend --output app server.ts
 
-CMD ["/app/app", "$PORT"]
+# Copy the entire project
+COPY . .
+
+# Cache dependencies
+RUN deno cache --reload ./backend/back_server.ts
+RUN deno cache --reload ./backend/insert_cards.ts
+RUN deno cache --reload ./backend/convertIMG.ts
+
+# Ensure the card images directory exists
+RUN mkdir -p /app/backend/cards_images
+
+# Command to run the server (Heroku will inject PORT)
+CMD ["run", "--allow-net", "--allow-read=.,./backend,./backend/cards_images", "--allow-env", "--unstable-ffi", "./backend/back_server.ts"]
