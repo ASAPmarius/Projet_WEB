@@ -1,0 +1,9 @@
+FROM denoland/deno:2.2.9
+
+WORKDIR /app
+COPY frontend/ ./frontend/
+COPY server.ts .
+RUN deno cache server.ts
+RUN deno compile --allow-net --allow-read=./frontend --output app server.ts
+
+CMD ["/app/app", "$PORT"]

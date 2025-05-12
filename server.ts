@@ -20,13 +20,28 @@ app.use((ctx) => {
   ctx.response.body = "404 File not found";
 });
 
-if (Deno.args.length < 1) {
+// For Heroku compatibility: check for PORT environment variable first
+let port: number;
+
+// If PORT environment variable exists (Heroku sets this), use it
+if (Deno.env.get("PORT")) {
+  port = Number(Deno.env.get("PORT"));
+  console.log(`Using PORT from environment: ${port}`);
+} 
+// Otherwise, use command line arguments
+else if (Deno.args.length >= 1) {
+  port = Number(Deno.args[0]);
+} 
+// Default fallback
+else {
   console.log(`Usage: $ deno run --allow-net --allow-read=./frontend server.ts PORT [CERT_PATH KEY_PATH]`);
-  Deno.exit();
+  Deno.exit(1);
 }
 
-const options: { port: number; secure?: boolean; cert?: string; key?: string } = { port: Number(Deno.args[0]) };
+// Configure the server options
+const options: { port: number; secure?: boolean; cert?: string; key?: string } = { port };
 
+// Add SSL configuration if provided via command line
 if (Deno.args.length >= 3) {
   options.secure = true;
   options.cert = await Deno.readTextFile(Deno.args[1]);

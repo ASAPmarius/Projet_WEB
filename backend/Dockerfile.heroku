@@ -1,0 +1,20 @@
+FROM denoland/deno:1.41.0
+
+WORKDIR /app
+
+# Copy package files and metadata
+COPY backend/ .
+
+# Copy card images folder
+COPY backend/cards_images/ /app/cards_images/
+
+# Cache dependencies
+RUN deno cache --reload back_server.ts
+RUN deno cache --reload insert_cards.ts
+RUN deno cache --reload convertIMG.ts
+
+# Create directory for card images (if it doesn't exist)
+RUN mkdir -p /app/cards_images
+
+# The command will be provided by Heroku
+CMD ["run", "--allow-net", "--allow-read=.,./cards_images", "--allow-env", "--unstable-ffi", "back_server.ts"]

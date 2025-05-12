@@ -1,4 +1,0 @@
-UML
-docker: dockercompose
-ci/cd: github action
-eroku: back eroku + front 

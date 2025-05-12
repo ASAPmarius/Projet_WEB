@@ -44,6 +44,7 @@ try {
   console.log('Connected to PostgreSQL database');
 } catch (error) {
   console.error('Failed to connect to database:', error);
+  throw error; // Rethrow to fail application startup if DB connection fails
 }
 
 // Initialize card service
